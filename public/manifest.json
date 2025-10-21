@@ -1,0 +1,24 @@
+{
+  "name": "OneKamer.co - Communauté Camerounaise",
+  "short_name": "OneKamer.co",
+  "description": "Application de la communauté camerounaise à travers le monde",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FDF9F9",
+  "theme_color": "#2BA84A",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://onekamer-media-cdn.b-cdn.net/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://onekamer-media-cdn.b-cdn.net/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

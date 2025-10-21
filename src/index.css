@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --primary: 142 65% 42%; /* #2BA84A */
+    --secondary: 210 40% 96.1%; /* bg-secondary */
+    --accent: 356 82% 51%; /* #E0222A */
+    --background: 20 50% 98%;
+    --foreground: 0 0% 17%;
+    --muted: 0 0% 42%;
+    --border: 142 30% 85%;
+    --ring: 142 65% 42%; /* #2BA84A */
+    --radius: 0.5rem;
+  }
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+.bottom-nav-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@supports (backdrop-filter: blur(10px)) {
+  .glass-effect {
+    backdrop-filter: blur(10px);
+    background-color: rgba(255, 255, 255, 0.8);
+  }
+}
+
+.editable {
+  min-height: 80px;
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  font-size: 0.95rem;
+  outline: none;
+  background-color: white;
+  -webkit-user-modify: read-write-plaintext-only;
+}
+.editable:empty::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.mention {
+  color: #2BA84A;
+  font-weight: 600;
+}
+
+.mention-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  cursor: pointer;
+  border-radius: 0.25rem;
+  transition: background-color 0.2s ease;
+}
+
+.mention-suggestion:hover {
+  background-color: rgba(43, 168, 74, 0.1);
+}
