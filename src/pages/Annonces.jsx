@@ -12,6 +12,7 @@ import React, { useState, useEffect, useCallback } from 'react';
     import MediaDisplay from '@/components/MediaDisplay';
     import FavoriteButton from '@/components/FavoriteButton';
     import { canUserAccess } from '@/lib/accessControl';
+    import { AutoAccessWrapper } from "@/lib/autoAccessWrapper";
 
     const formatPrice = (price, devise) => {
         const priceNumber = parseFloat(price);
@@ -288,33 +289,33 @@ import React, { useState, useEffect, useCallback } from 'react';
       );
 
       return (
-        <>
-          <Helmet>
-            <title>Annonces - OneKamer.co</title>
-            <meta name="description" content="Découvrez les annonces de la communauté OneKamer.co" />
-          </Helmet>
+  <AutoAccessWrapper>
+    <Helmet>
+      <title>Annonces - OneKamer.co</title>
+      <meta name="description" content="Découvrez les annonces de la communauté OneKamer.co" />
+    </Helmet>
 
-          <AnimatePresence>
-            {selectedAnnonce && (
-              <AnnonceDetail 
-                annonce={selectedAnnonce} 
-                onBack={() => setSelectedAnnonce(null)} 
-                onDelete={handleDelete}
-              />
-            )}
-          </AnimatePresence>
+    <AnimatePresence>
+      {selectedAnnonce && (
+        <AnnonceDetail 
+          annonce={selectedAnnonce} 
+          onBack={() => setSelectedAnnonce(null)} 
+          onDelete={handleDelete}
+        />
+      )}
+    </AnimatePresence>
 
-          <div className="space-y-6">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-              <div className="flex justify-between items-center mb-4">
-                <h1 className="text-3xl font-bold text-[#2BA84A]">Annonces</h1>
-                {canCreateAd && 
-                  <Button onClick={handleCreateClick} className="bg-gradient-to-r from-[#E0222A] to-[#F5C300] text-white">
-                    <Plus className="mr-2 h-4 w-4" /> Créer
-                  </Button>
-                }
-              </div>
-              
+    <div className="space-y-6">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-3xl font-bold text-[#2BA84A]">Annonces</h1>
+          {canCreateAd && 
+            <Button onClick={handleCreateClick} className="bg-gradient-to-r from-[#E0222A] to-[#F5C300] text-white">
+              <Plus className="mr-2 h-4 w-4" /> Créer
+            </Button>
+          }
+        </div>
+          
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#6B6B6B]" />
                 <Input placeholder="Rechercher une annonce..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10"/>
@@ -337,8 +338,8 @@ import React, { useState, useEffect, useCallback } from 'react';
                     <p>Soyez le premier à en publier une !</p>
                 </div>
             )}
-          </div>
-        </>
+                    </div>
+        </AutoAccessWrapper>
       );
     };
 
