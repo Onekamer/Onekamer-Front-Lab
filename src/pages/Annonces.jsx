@@ -12,7 +12,7 @@ import React, { useState, useEffect, useCallback } from 'react';
     import MediaDisplay from '@/components/MediaDisplay';
     import FavoriteButton from '@/components/FavoriteButton';
     import { canUserAccess } from '@/lib/accessControl';
-    import AutoAccessWrapper from "@/lib/autoAccessWrapper";
+    import { applyAutoAccessProtection } from "@/lib/autoAccessWrapper";
 
     const formatPrice = (price, devise) => {
         const priceNumber = parseFloat(price);
@@ -289,7 +289,7 @@ import React, { useState, useEffect, useCallback } from 'react';
       );
 
       return (
-  <AutoAccessWrapper>
+  <>
     <Helmet>
       <title>Annonces - OneKamer.co</title>
       <meta name="description" content="Découvrez les annonces de la communauté OneKamer.co" />
@@ -338,9 +338,9 @@ import React, { useState, useEffect, useCallback } from 'react';
                     <p>Soyez le premier à en publier une !</p>
                 </div>
             )}
-                    </div>
-        </AutoAccessWrapper>
-      );
-    };
+                </div>
+  </>
+);
+};
 
-    export default Annonces;
+export default Annonces;
