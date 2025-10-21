@@ -203,6 +203,7 @@ import React, { useState, useEffect, useCallback } from 'react';
   const [annonces, setAnnonces] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedAnnonce, setSelectedAnnonce] = useState(null);
+  const [searchTerm, setSearchTerm] = useState(''); // ✅ Correction ici
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
