@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Heart, X, MapPin, Eye, ArrowLeft, Briefcase, User, Ruler, Weight, Users, Film, Tv, BookOpen, Music, Cigarette, GlassWater, Baby, Paintbrush, Gem, Mail, SlidersHorizontal, Loader2, UserCircle2, Sparkles, Languages, Code, Award, GraduationCap } from 'lucide-react';
-import { toast } from '@/components/ui/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/customSupabaseClient';
@@ -159,18 +160,54 @@ const Rencontre = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [canInteract, setCanInteract] = useState(false);
+  const [canView, setCanView] = useState(false); // ✅ nouveau
 
+  const { toast } = useToast();
+
+  // ✅ 1. Vérification de l'authentification
   useEffect(() => {
-    if (user) {
-      canUserAccess(user, 'rencontre', 'interact').then(setCanInteract);
+    (async () => {
+      try {
+        await requireAuth(navigate);
+      } catch {
+        return;
+      }
+    })();
+  }, []);
+
+  // ✅ 2. Vérifications des accès selon le plan Supabase
+useEffect(() => {
+  const checkAccess = async () => {
+    setCanView(null); // ✅ ajout ici
+
+    if (!user) {
+      setCanInteract(false);
+      setCanView(false);
+      return;
     }
-  }, [user]);
+
+    // 🔁 Attendre réellement la réponse Supabase avant d'afficher quoi que ce soit
+    const [viewAccess, interactAccess] = await Promise.all([
+      canUserAccess(user, 'rencontre', 'view'),
+      canUserAccess(user, 'rencontre', 'interact')
+    ]);
+
+    console.log("🔍 Accès rencontre → view:", viewAccess, " | interact:", interactAccess);
+
+    // ✅ Mise à jour de l'état une fois les deux réponses reçues
+    setCanView(Boolean(viewAccess));
+    setCanInteract(Boolean(interactAccess));
+  };
+
+  checkAccess();
+}, [user]);
+
 
   const fetchMyProfile = useCallback(async () => {
     if (!user) {
       setLoading(false);
       return;
-    };
+    }
     setLoading(true);
     const { data, error } = await supabase.from('rencontres').select('id').eq('user_id', user.id).single();
     if (data) {
@@ -228,23 +265,47 @@ const Rencontre = () => {
   }, [myProfile, fetchProfiles]);
 
   const handleAction = async (likedProfileId, action) => {
-    if (!myProfile) return;
+  // ✅ Vérifie si l’utilisateur est connecté
+  if (!user) {
+    toast({
+      title: "Connexion requise",
+      description: "Connectez-vous pour interagir.",
+      variant: "destructive",
+    });
+    navigate('/auth');
+    return;
+  }
 
-    if (!canInteract) {
-      toast({ title: "Accès VIP requis", description: "Passez VIP pour interagir avec les profils.", variant: "destructive" });
-      navigate('/forfaits');
-      return;
-    }
+  // ✅ Vérifie si le plan autorise les interactions (VIP/Admin)
+  if (!canInteract) {
+    toast({
+      title: "Accès réservé",
+      description: "Cette action est réservée aux membres VIP.",
+      variant: "destructive",
+    });
+    return;
+  }
 
-    if (action === 'like') {
-      const { error } = await supabase.from('rencontres_likes').insert({ liker_id: myProfile.id, liked_id: likedProfileId });
-      if (error && error.code !== '23505') { // 23505 is unique_violation
-        toast({ title: 'Erreur', description: 'Le like n\'a pas pu être enregistré.', variant: 'destructive' });
-      }
+  if (!myProfile) return;
+
+  if (action === 'like') {
+    const { error } = await supabase
+      .from('rencontres_likes')
+      .insert({ liker_id: myProfile.id, liked_id: likedProfileId });
+
+    if (error && error.code !== '23505') { // 23505 = unique_violation
+      toast({
+        title: 'Erreur',
+        description: "Le like n'a pas pu être enregistré.",
+        variant: 'destructive',
+      });
     }
-    setView('card');
-    setCurrentIndex((prev) => prev + 1);
-  };
+  }
+
+  setView('card');
+  setCurrentIndex((prev) => prev + 1);
+};
+
 
   useEffect(() => {
     if (!myProfile) return;
@@ -271,18 +332,39 @@ const Rencontre = () => {
 
 
   const currentProfile = profiles[currentIndex];
-
+  
   if (loading) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-green-500" /></div>;
-  }
-  
-  if (!user) {
-     return <div className="text-center p-8">Veuillez vous connecter pour accéder aux rencontres.</div>
-  }
-  
-  if (!myProfile) {
-    return <RencontreProfil />;
-  }
+  return (
+    <div className="flex justify-center items-center h-64">
+      <Loader2 className="h-8 w-8 animate-spin text-green-500" />
+    </div>
+  );
+}
+
+if (!user) {
+  return <div className="text-center p-8">Veuillez vous connecter pour accéder aux rencontres.</div>;
+}
+
+if (canView === false) {
+  return (
+    <div className="text-center p-8">
+      Accès restreint — cette fonctionnalité est réservée aux membres disposant d’un forfait supérieur.
+    </div>
+  );
+}
+
+if (canView === null || canView === undefined) {
+  return (
+    <div className="text-center p-8">
+      Chargement des accès en cours...
+    </div>
+  );
+}
+
+
+if (!myProfile) {
+  return <RencontreProfil />;
+}
 
   return (
     <>
