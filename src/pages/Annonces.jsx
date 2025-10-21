@@ -12,7 +12,7 @@ import React, { useState, useEffect, useCallback } from 'react';
     import MediaDisplay from '@/components/MediaDisplay';
     import FavoriteButton from '@/components/FavoriteButton';
     import { canUserAccess } from '@/lib/accessControl';
-    import { AutoAccessWrapper } from "@/lib/autoAccessWrapper";
+    import AutoAccessWrapper from "@/lib/autoAccessWrapper";
 
     const formatPrice = (price, devise) => {
         const priceNumber = parseFloat(price);
