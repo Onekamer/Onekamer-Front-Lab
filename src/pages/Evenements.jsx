@@ -212,22 +212,28 @@ import React, { useState, useEffect, useCallback } from 'react';
         );
     };
 
-    const Evenements = () => {
-      const [events, setEvents] = useState([]);
-      const [loading, setLoading] = useState(true);
-      const [selectedEvent, setSelectedEvent] = useState(null);
-      const navigate = useNavigate();
-      const { user } = useAuth();
-      const { toast } = useToast();
-      const [canCreateEvent, setCanCreateEvent] = useState(false);
+   const Evenements = () => {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [canCreateEvent, setCanCreateEvent] = useState(false);
 
-      useEffect(() => {
-        if (user) {
-          canUserAccess(user, "evenements", "create").then(setCanCreateEvent);
-        } else {
-          setCanCreateEvent(false);
-        }
-      }, [user]);
+  // 🟢 Vérifie automatiquement les droits d'accès (Supabase)
+  useEffect(() => {
+    applyAutoAccessProtection(user, navigate, window.location.pathname);
+  }, [user, navigate]);
+
+  // 🟢 Vérifie si l'utilisateur peut créer un événement
+  useEffect(() => {
+    if (user) {
+      canUserAccess(user, "evenements", "create").then(setCanCreateEvent);
+    } else {
+      setCanCreateEvent(false);
+    }
+  }, [user]);
 
       const fetchEvents = useCallback(async () => {
         setLoading(true);
@@ -289,13 +295,13 @@ import React, { useState, useEffect, useCallback } from 'react';
     </Helmet>
 
     <AnimatePresence>
-      {selectedEvenement && (
-        <EvenementDetail 
-          evenement={selectedEvenement} 
-          onBack={() => setSelectedEvenement(null)} 
-        />
-      )}
-    </AnimatePresence>
+  {selectedEvent && (
+    <EvenementDetail 
+      event={selectedEvent} 
+      onBack={() => setSelectedEvent(null)} 
+    />
+  )}
+</AnimatePresence>
 
           <div className="space-y-6">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
