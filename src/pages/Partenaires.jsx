@@ -166,11 +166,11 @@ const Partenaires = () => {
   };
 
   return (
-    <>
-      <Helmet>
-        <title>Partenaires - OneKamer.co</title>
-        <meta name="description" content="Découvrez les partenaires de confiance de la communauté OneKamer." />
-      </Helmet>
+  <AutoAccessWrapper>
+    <Helmet>
+      <title>Partenaires - OneKamer.co</title>
+      <meta name="description" content="Découvrez les partenaires de confiance de la communauté OneKamer." />
+    </Helmet>
 
       <AnimatePresence>
         {selectedPartenaire && (
