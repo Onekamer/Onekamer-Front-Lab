@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Star, Share2, MessageSquare, Mail, ArrowLeft, Lock } from 'lucide-react';
 import { canUserAccess } from '@/lib/accessControl';
 import FavoriteButton from '@/components/FavoriteButton';
-import { AutoAccessWrapper } from "@/lib/autoAccessWrapper";
+import AutoAccessWrapper from "@/lib/autoAccessWrapper";
 
 const PartenaireDetail = ({ partenaire, onBack, onRecommander }) => {
   const handleShare = () => {
