@@ -16,5 +16,5 @@ export const applyAutoAccessProtection = async (user, navigate, currentPath) => 
   }
 };
 
-// ✅ Ajoute cette ligne à la fin du fichier :
+// 👇⚠️ Cette ligne DOIT être à la fin du fichier
 export default applyAutoAccessProtection;
