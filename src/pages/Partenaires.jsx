@@ -112,9 +112,17 @@ const Partenaires = () => {
   const navigate = useNavigate();
   const [canCreate, setCanCreate] = useState(false);
 
+  // 🟢 Vérifie automatiquement les droits d'accès à la page "Partenaires"
+  useEffect(() => {
+    applyAutoAccessProtection(user, navigate, window.location.pathname);
+  }, [user, navigate]);
+
+  // 🟢 Vérifie si l'utilisateur peut créer un partenaire
   useEffect(() => {
     if (user) {
       canUserAccess(user, 'partenaires', 'create').then(setCanCreate);
+    } else {
+      setCanCreate(false);
     }
   }, [user]);
 
