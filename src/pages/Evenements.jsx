@@ -282,11 +282,11 @@ import React, { useState, useEffect, useCallback } from 'react';
       };
 
       return (
-        <>
-          <Helmet>
-            <title>Événements - OneKamer.co</title>
-            <meta name="description" content="Découvrez les événements de la communauté OneKamer.co" />
-          </Helmet>
+  <AutoAccessWrapper>
+    <Helmet>
+      <title>Événements - OneKamer.co</title>
+      <meta name="description" content="Découvrez les événements de la communauté OneKamer.co" />
+    </Helmet>
 
           <AnimatePresence>
             {selectedEvent && <EvenementDetail event={selectedEvent} onBack={() => setSelectedEvent(null)} onDelete={handleDelete} />}
