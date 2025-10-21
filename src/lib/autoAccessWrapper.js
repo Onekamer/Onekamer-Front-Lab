@@ -2,10 +2,16 @@ import { redirectIfNoAccess } from "./accessRedirect";
 
 export const applyAutoAccessProtection = async (user, navigate, currentPath) => {
   const pathRules = [
+    // 🧩 Accès lecture
     { path: "/rencontre", section: "rencontre", action: "read" },
+    { path: "/annonces", section: "annonces", action: "read" },
+    { path: "/partenaires", section: "partenaires", action: "read" },
+    { path: "/evenements", section: "evenements", action: "read" },
+
+    // 🧩 Accès publication
     { path: "/publier/evenement", section: "evenements", action: "create" },
     { path: "/publier/annonce", section: "annonces", action: "create" },
-    { path: "/partenaires", section: "partenaires", action: "read" },
+    { path: "/publier/partenaire", section: "partenaires", action: "create" },
   ];
 
   for (const rule of pathRules) {
@@ -16,5 +22,5 @@ export const applyAutoAccessProtection = async (user, navigate, currentPath) => 
   }
 };
 
-// 👇⚠️ Cette ligne DOIT être à la fin du fichier
+// ⚙️ Garde cette ligne absolument :
 export default applyAutoAccessProtection;
