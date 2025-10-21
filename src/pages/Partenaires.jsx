@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Star, Share2, MessageSquare, Mail, ArrowLeft, Lock } from 'lucide-react';
 import { canUserAccess } from '@/lib/accessControl';
 import FavoriteButton from '@/components/FavoriteButton';
-import AutoAccessWrapper from "@/lib/autoAccessWrapper";
+import { applyAutoAccessProtection } from "@/lib/autoAccessWrapper";
 
 const PartenaireDetail = ({ partenaire, onBack, onRecommander }) => {
   const handleShare = () => {
@@ -166,21 +166,21 @@ const Partenaires = () => {
   };
 
   return (
-  <AutoAccessWrapper>
+  <>
     <Helmet>
       <title>Partenaires - OneKamer.co</title>
       <meta name="description" content="Découvrez les partenaires de confiance de la communauté OneKamer." />
     </Helmet>
 
-      <AnimatePresence>
-        {selectedPartenaire && (
-          <PartenaireDetail 
-            partenaire={selectedPartenaire} 
-            onBack={() => setSelectedPartenaire(null)} 
-            onRecommander={handleRecommander}
-          />
-        )}
-      </AnimatePresence>
+    <AnimatePresence>
+      {selectedPartenaire && (
+        <PartenaireDetail 
+          partenaire={selectedPartenaire} 
+          onBack={() => setSelectedPartenaire(null)} 
+          onRecommander={handleRecommander}
+        />
+      )}
+    </AnimatePresence>
       
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
@@ -276,8 +276,8 @@ const Partenaires = () => {
           </div>
         )}
             </div>
-    </AutoAccessWrapper>
-  );
+  </>
+);
 };
 
 export default Partenaires;
