@@ -200,22 +200,27 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 
     const Annonces = () => {
-      const [annonces, setAnnonces] = useState([]);
-      const [loading, setLoading] = useState(true);
-      const [searchTerm, setSearchTerm] = useState('');
-      const [selectedAnnonce, setSelectedAnnonce] = useState(null);
-      const navigate = useNavigate();
-      const { user } = useAuth();
-      const { toast } = useToast();
-      const [canCreateAd, setCanCreateAd] = useState(false);
+  const [annonces, setAnnonces] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedAnnonce, setSelectedAnnonce] = useState(null);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [canCreateAd, setCanCreateAd] = useState(false);
 
-      useEffect(() => {
-        if(user) {
-          canUserAccess(user, "annonces", "create").then(setCanCreateAd);
-        } else {
-          setCanCreateAd(false);
-        }
-      }, [user]);
+  // 🟢 Vérifie automatiquement les droits d'accès à la page "Annonces"
+  useEffect(() => {
+    applyAutoAccessProtection(user, navigate, window.location.pathname);
+  }, [user, navigate]);
+
+  // Vérifie si l'utilisateur peut créer une annonce
+  useEffect(() => {
+    if (user) {
+      canUserAccess(user, "annonces", "create").then(setCanCreateAd);
+    } else {
+      setCanCreateAd(false);
+    }
+  }, [user]);
 
       const fetchAnnonces = useCallback(async () => {
         setLoading(true);
