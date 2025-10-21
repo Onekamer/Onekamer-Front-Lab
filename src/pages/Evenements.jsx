@@ -11,7 +11,7 @@ import React, { useState, useEffect, useCallback } from 'react';
     import MediaDisplay from '@/components/MediaDisplay';
     import FavoriteButton from '@/components/FavoriteButton';
     import { canUserAccess } from '@/lib/accessControl';
-    import AutoAccessWrapper from "@/lib/autoAccessWrapper";
+    import { applyAutoAccessProtection } from "@/lib/autoAccessWrapper";
 
     const formatPrice = (price, devise) => {
         const priceNumber = parseFloat(price);
@@ -282,15 +282,20 @@ import React, { useState, useEffect, useCallback } from 'react';
       };
 
       return (
-  <AutoAccessWrapper>
+  <>
     <Helmet>
       <title>Événements - OneKamer.co</title>
       <meta name="description" content="Découvrez les événements de la communauté OneKamer.co" />
     </Helmet>
 
-          <AnimatePresence>
-            {selectedEvent && <EvenementDetail event={selectedEvent} onBack={() => setSelectedEvent(null)} onDelete={handleDelete} />}
-          </AnimatePresence>
+    <AnimatePresence>
+      {selectedEvenement && (
+        <EvenementDetail 
+          evenement={selectedEvenement} 
+          onBack={() => setSelectedEvenement(null)} 
+        />
+      )}
+    </AnimatePresence>
 
           <div className="space-y-6">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -319,8 +324,8 @@ import React, { useState, useEffect, useCallback } from 'react';
                 </div>
             )}
          </div>
-        </AutoAccessWrapper>
-      );
-    };
+  </>
+);
+};
 
-    export default Evenements;
+export default Evenements;
