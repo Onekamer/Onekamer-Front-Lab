@@ -1,6 +1,17 @@
+import React, { useEffect } from "react";
+import { useAuth } from "@/contexts/SupabaseAuthContext";
+import { useNavigate, useLocation } from "react-router-dom";
 import { redirectIfNoAccess } from "./accessRedirect";
 
-    export const applyAutoAccessProtection = async (user, navigate, currentPath) => {
+export default function AutoAccessWrapper({ children }) {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const applyAutoAccessProtection = async () => {
+      if (loading) return;
+
       const pathRules = [
         { path: "/rencontre", section: "rencontre", action: "read" },
         { path: "/publier/evenement", section: "evenements", action: "create" },
@@ -9,9 +20,27 @@ import { redirectIfNoAccess } from "./accessRedirect";
       ];
 
       for (const rule of pathRules) {
-        if (currentPath.startsWith(rule.path) && currentPath !== '/rencontre/profil' && currentPath !== '/rencontre/messages') {
+        if (
+          location.pathname.startsWith(rule.path) &&
+          location.pathname !== "/rencontre/profil" &&
+          location.pathname !== "/rencontre/messages"
+        ) {
           await redirectIfNoAccess(user, navigate, rule.section, rule.action);
-          break; 
+          break;
         }
       }
     };
+
+    applyAutoAccessProtection();
+  }, [user, loading, navigate, location]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p className="text-gray-500">Chargement...</p>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
