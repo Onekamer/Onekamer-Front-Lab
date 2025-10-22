@@ -8,6 +8,7 @@ import { Loader2, X, Mic, Square, Play, Pause } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getInitials } from '@/lib/utils';
+import { uploadAudioFile } from '@/utils/audioStorage';
 
 const AudioPlayer = ({ src, onCanPlay }) => {
     const audioRef = useRef(null);
@@ -454,8 +455,9 @@ const CreatePost = () => {
 
           const { ext } = mimeRef.current;
           const audioFile = new File([finalAudioBlob], `audio-${Date.now()}.${ext}`, { type: finalAudioBlob.type });
-          const audioUrl = await uploadToBunny(audioFile, "comments_audio");
+          const { publicUrl: audioUrl } = await uploadAudioFile(audioFile, 'comments_audio');
 
+          const normalizedDuration = Math.max(1, Math.round(audioDuration || recordingTime || 1));
           const { error: insertError } = await supabase.from("comments").insert({
             type: "audio",
             audio_url: audioUrl,
@@ -463,7 +465,7 @@ const CreatePost = () => {
             content_type: "echange",
             content: currentPostText || "",
             created_at: new Date(),
-            audio_duration: recordingTime,
+            audio_duration: normalizedDuration,
           });
           if (insertError) throw insertError;
       } else { 
