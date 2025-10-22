@@ -392,117 +392,148 @@ const CommentSection = ({ postId }) => {
     }, []);
 
     const startRecording = async () => {
-        try {
-            setAudioBlob(null);
-            setRecordingTime(0);
-            lastRecordingTimeRef.current = 0;
-            recordedDurationRef.current = 0;
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  try {
+    console.log("🎙️ Démarrage enregistrement audio...");
+    setAudioBlob(null);
+    setRecordingTime(0);
+    lastRecordingTimeRef.current = 0;
+    recordedDurationRef.current = 0;
 
-            try {
-                const ctx = new AudioContext();
-                const osc = ctx.createOscillator();
-                const dest = ctx.createMediaStreamDestination();
-                osc.connect(dest);
-                osc.start();
-                osc.stop(ctx.currentTime + 0.05);
-            } catch (e) {
-                console.warn("AudioContext init échouée", e);
-            }
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    console.log("✅ Micro autorisé :", stream.getAudioTracks().length, "piste(s)");
 
-            const chosenMime = pickSupportedMime();
-            mimeRef.current = chosenMime;
+    const chosenMime = pickSupportedMime();
+    mimeRef.current = chosenMime;
 
-            let resolveRecording;
-            const recordingDone = new Promise((resolve) => {
-                resolveRecording = resolve;
-            });
-            recorderPromiseRef.current = recordingDone;
+    let resolveRecording;
+    const recordingDone = new Promise((resolve) => {
+      resolveRecording = resolve;
+    });
+    recorderPromiseRef.current = recordingDone;
 
-            const recorder = new MediaRecorder(stream, {
-                mimeType: chosenMime.type,
-                bitsPerSecond: 128000,
-            });
+    const supportedMimeType = MediaRecorder.isTypeSupported(chosenMime.type)
+      ? chosenMime.type
+      : "audio/webm";
 
-            audioChunksRef.current = [];
+    console.log("🎚️ Type MIME utilisé :", supportedMimeType);
 
-            recorder.ondataavailable = (event) => {
-                if (event.data && event.data.size > 0) {
-                    audioChunksRef.current.push(event.data);
-                }
-            };
+    const recorder = new MediaRecorder(stream, {
+      mimeType: supportedMimeType,
+      bitsPerSecond: 128000,
+    });
 
-            recorder.onerror = (event) => {
-                console.error("MediaRecorder error:", event.error || event);
-                toast({ title: "Erreur", description: "Une erreur est survenue pendant l'enregistrement.", variant: "destructive" });
-                resolveRecording?.(null);
-                recorderPromiseRef.current = null;
-            };
+    audioChunksRef.current = [];
 
-            recorder.onstop = async () => {
-                clearInterval(recordingIntervalRef.current);
-                recordingIntervalRef.current = null;
-                stream.getTracks().forEach(track => track.stop());
-
-                await new Promise((resolve) => setTimeout(resolve, 500));
-
-                const { type } = mimeRef.current || { type: "audio/webm" };
-                const audioBlob = new Blob(audioChunksRef.current, { type: type.split(";")[0] });
-
-                const fallbackDuration = Math.max(1, lastRecordingTimeRef.current || recordingTime);
-                const measuredDuration = await getBlobDuration(audioBlob, fallbackDuration);
-                const normalizedDuration = Math.max(1, Math.round(measuredDuration || fallbackDuration));
-                setRecordingTime(normalizedDuration);
-                lastRecordingTimeRef.current = normalizedDuration;
-                recordedDurationRef.current = normalizedDuration;
-
-                setAudioBlob(audioBlob);
-                setMediaFile(null);
-                setMediaPreviewUrl(null);
-                setIsRecording(false);
-                mediaRecorderRef.current = null;
-                resolveRecording?.(audioBlob);
-                recorderPromiseRef.current = Promise.resolve(audioBlob);
-            };
-
-            recorder.ignoreMutedMedia = true;
-            recorder.start(1000);
-
-            mediaRecorderRef.current = recorder;
-            setIsRecording(true);
-            recordingIntervalRef.current = setInterval(() => {
-                setRecordingTime(prev => {
-                    const next = prev + 1;
-                    lastRecordingTimeRef.current = next;
-                    return next;
-                });
-            }, 1000);
-
-            setTimeout(() => {
-                if (recorder.state !== "inactive") {
-                    recorder.stop();
-                }
-            }, 120000);
-        } catch (error) {
-            console.error("Erreur d'enregistrement:", error);
-            toast({ title: "Erreur", description: "Impossible d'accéder au microphone.", variant: "destructive" });
-            recorderPromiseRef.current = null;
-            recordedDurationRef.current = 0;
-        }
+    recorder.ondataavailable = (event) => {
+      console.log("📦 Chunk reçu :", event.data.size, "octets");
+      if (event.data && event.data.size > 0) {
+        audioChunksRef.current.push(event.data);
+      } else {
+        console.warn("⚠️ Chunk vide détecté !");
+      }
     };
 
-    const stopRecording = () => {
+    recorder.onerror = (event) => {
+      console.error("❌ Erreur MediaRecorder :", event.error || event);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue pendant l'enregistrement.",
+        variant: "destructive",
+      });
+      resolveRecording?.(null);
+      recorderPromiseRef.current = null;
+    };
+
+    recorder.onstop = async () => {
+      console.log("🛑 Enregistrement terminé, création du blob...");
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+      stream.getTracks().forEach((t) => t.stop());
+
+      await new Promise((resolve) => setTimeout(resolve, 400));
+
+      const { type } = mimeRef.current || { type: "audio/webm" };
+      const audioBlob = new Blob(audioChunksRef.current, {
+        type: type.split(";")[0],
+      });
+      console.log("💾 Taille finale du blob :", audioBlob.size, "octets");
+
+      const fallbackDuration = Math.max(1, lastRecordingTimeRef.current || recordingTime);
+      const measuredDuration = await getBlobDuration(audioBlob, fallbackDuration);
+      const normalizedDuration = Math.max(1, Math.round(measuredDuration || fallbackDuration));
+      console.log("⏱️ Durée mesurée :", normalizedDuration, "sec");
+
+      setRecordingTime(normalizedDuration);
+      lastRecordingTimeRef.current = normalizedDuration;
+      recordedDurationRef.current = normalizedDuration;
+
+      setAudioBlob(audioBlob);
+      setMediaFile(null);
+      setMediaPreviewUrl(null);
+      setIsRecording(false);
+      mediaRecorderRef.current = null;
+      resolveRecording?.(audioBlob);
+      recorderPromiseRef.current = Promise.resolve(audioBlob);
+    };
+
+    recorder.ignoreMutedMedia = true;
+    recorder.start(1000);
+    console.log("⏺️ Enregistrement démarré.");
+
+    mediaRecorderRef.current = recorder;
+    setIsRecording(true);
+    recordingIntervalRef.current = setInterval(() => {
+      setRecordingTime((prev) => {
+        const next = prev + 1;
+        lastRecordingTimeRef.current = next;
+        return next;
+      });
+    }, 1000);
+
+    setTimeout(() => {
+      if (recorder.state !== "inactive") {
+        console.log("⏹️ Arrêt automatique après 120 sec.");
+        recorder.stop();
+      }
+    }, 120000);
+  } catch (error) {
+    console.error("❌ Erreur d'enregistrement :", error);
+    toast({
+      title: "Erreur",
+      description: "Impossible d'accéder au microphone.",
+      variant: "destructive",
+    });
+    recorderPromiseRef.current = null;
+    recordedDurationRef.current = 0;
+  }
+};
+
+  const stopRecording = () => {
+  console.log("🧭 Arrêt manuel de l'enregistrement...");
+  
+  if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+    try {
+      // Demande le dernier chunk avant de stopper
+      mediaRecorderRef.current.requestData?.();
+
+      setTimeout(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-            mediaRecorderRef.current.requestData?.();
-            setTimeout(() => {
-                if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-                    mediaRecorderRef.current.stop();
-                }
-            }, 300);
-            clearInterval(recordingIntervalRef.current);
-            recordingIntervalRef.current = null;
+          console.log("⏹️ Enregistrement stoppé par l'utilisateur.");
+          mediaRecorderRef.current.stop();
         }
-    };
+      }, 500); // petit délai pour laisser le dernier fragment audio arriver
+    } catch (error) {
+      console.error("❌ Erreur à l'arrêt de l'enregistrement :", error);
+    } finally {
+      // Nettoyage du timer de durée
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+  } else {
+    console.warn("⚠️ Aucun enregistrement actif à arrêter.");
+  }
+};
+
     
     const formatRecordingTime = (time) => {
       const minutes = Math.floor(time / 60);
