@@ -410,14 +410,24 @@ const CommentSection = ({ postId }) => {
 
     const startRecording = async () => {
   try {
-    console.log("🎙️ Initialisation mobile/desktop...");
+    console.log("🎙️ Initialisation de l'enregistrement mobile...");
+
     setAudioBlob(null);
     setRecordingTime(0);
     lastRecordingTimeRef.current = 0;
     recordedDurationRef.current = 0;
 
+    // 🔊 Étape cruciale : réveiller le contexte audio mobile
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    oscillator.connect(audioContext.destination);
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.05);
+    console.log("🔔 AudioContext initialisé");
+
+    // 🎧 Demande micro après le "wake" audio
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    console.log("✅ Micro activé :", stream.getAudioTracks().length, "piste(s)");
+    console.log("✅ Micro autorisé :", stream.getAudioTracks().length, "piste(s)");
 
     const chosenMime = pickSupportedMime();
     mimeRef.current = chosenMime;
@@ -430,29 +440,28 @@ const CommentSection = ({ postId }) => {
       ? chosenMime.type
       : "audio/mp4";
 
-    console.log("🎚️ Type MIME utilisé :", supportedMimeType);
+    const recorder = new MediaRecorder(stream, {
+      mimeType: supportedMimeType,
+      audioBitsPerSecond: 128000,
+    });
 
-    const recorder = new MediaRecorder(stream, { mimeType: supportedMimeType });
     audioChunksRef.current = [];
 
     recorder.ondataavailable = (event) => {
       if (event.data && event.data.size > 0) {
         console.log("📦 Chunk reçu :", event.data.size, "octets");
         audioChunksRef.current.push(event.data);
-      } else {
-        console.warn("⚠️ Chunk vide ou ignoré");
       }
     };
 
     recorder.onerror = (event) => {
       console.error("❌ Erreur MediaRecorder :", event.error || event);
       toast({
-        title: "Erreur d'enregistrement",
-        description: "Le micro a rencontré un problème.",
+        title: "Erreur",
+        description: "Une erreur est survenue pendant l'enregistrement.",
         variant: "destructive",
       });
-      resolveRecording?.(null);
-      recorderPromiseRef.current = null;
+      resolveRecording(null);
     };
 
     recorder.onstop = async () => {
@@ -460,8 +469,8 @@ const CommentSection = ({ postId }) => {
       recordingIntervalRef.current = null;
       stream.getTracks().forEach((t) => t.stop());
 
-      // petit délai pour laisser le navigateur flush le dernier chunk
-      await new Promise((r) => setTimeout(r, 300));
+      // 🕒 Laisse le temps aux chunks d'arriver
+      await new Promise((r) => setTimeout(r, 500));
 
       const audioBlob = new Blob(audioChunksRef.current, {
         type: supportedMimeType.split(";")[0],
@@ -473,11 +482,12 @@ const CommentSection = ({ postId }) => {
       const measuredDuration = await getBlobDuration(audioBlob, fallbackDuration);
       const normalizedDuration = Math.max(1, Math.round(measuredDuration || fallbackDuration));
 
-      console.log("⏱️ Durée mesurée :", normalizedDuration, "s");
+      console.log("⏱️ Durée mesurée :", normalizedDuration, "sec");
 
       setRecordingTime(normalizedDuration);
       recordedDurationRef.current = normalizedDuration;
       lastRecordingTimeRef.current = normalizedDuration;
+
       setAudioBlob(audioBlob);
       setMediaFile(null);
       setMediaPreviewUrl(null);
@@ -487,9 +497,9 @@ const CommentSection = ({ postId }) => {
       recorderPromiseRef.current = Promise.resolve(audioBlob);
     };
 
-    // Important : démarrage avec timeslice = 1000 ms
+    // ⚡ Démarrage avec timeSlice = 1000 ms pour forcer le flush
     recorder.start(1000);
-    console.log("⏺️ Enregistrement démarré (flush toutes les 1s)");
+    console.log("⏺️ Enregistrement démarré (flush toutes les secondes)");
 
     mediaRecorderRef.current = recorder;
     setIsRecording(true);
@@ -501,22 +511,23 @@ const CommentSection = ({ postId }) => {
       });
     }, 1000);
 
-    // auto-stop après 2 minutes
+    // ⏹️ Auto stop après 2 min max
     setTimeout(() => {
       if (recorder.state !== "inactive") {
+        console.log("⏹️ Auto-stop après 120s");
         recorder.stop();
       }
     }, 120000);
   } catch (error) {
     console.error("❌ Erreur microphone :", error);
     toast({
-      title: "Micro non accessible",
-      description: "Autorisez le micro dans votre navigateur mobile.",
+      title: "Erreur micro",
+      description: "Impossible d'accéder au micro. Vérifiez les autorisations.",
       variant: "destructive",
     });
-    recorderPromiseRef.current = null;
   }
 };
+
 
   const stopRecording = () => {
   console.log("🧭 Arrêt manuel de l'enregistrement...");
