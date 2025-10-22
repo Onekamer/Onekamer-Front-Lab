@@ -410,38 +410,40 @@ const CommentSection = ({ postId }) => {
 
    const startRecording = async () => {
   try {
-    console.log("🎙️ Initialisation étendue mobile...");
+    console.log("🎙️ Initialisation mobile avec maintien de flux...");
 
     setAudioBlob(null);
     setRecordingTime(0);
     lastRecordingTimeRef.current = 0;
     recordedDurationRef.current = 0;
 
-    // 🔊 Maintenir un contexte audio actif (empêche le gel du flux sur mobile)
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const silentOscillator = audioContext.createOscillator();
-    const silentGain = audioContext.createGain();
-    silentGain.gain.value = 0.00001; // quasi inaudible
-    silentOscillator.connect(silentGain);
-    silentGain.connect(audioContext.destination);
-    silentOscillator.start();
+    // ⚡ RÉVEIL AUDIO POUR MOBILE
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioCtx();
 
+    // Crée un silence permanent pour empêcher le mode "pause audio" mobile
+    const source = ctx.createBufferSource();
+    const buffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    source.buffer = buffer;
+    const gainNode = ctx.createGain();
+    gainNode.gain.value = 0.00001; // quasi inaudible
+    source.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    source.start(0);
+
+    // 📱 Accès au micro
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    console.log("✅ Micro actif :", stream.getAudioTracks().length, "piste(s)");
+    console.log("✅ Micro mobile autorisé :", stream.getAudioTracks().length);
 
     const chosenMime = pickSupportedMime();
     mimeRef.current = chosenMime;
 
-    let resolveRecording;
-    const recordingDone = new Promise(resolve => (resolveRecording = resolve));
-    recorderPromiseRef.current = recordingDone;
-
-    const supportedMimeType = MediaRecorder.isTypeSupported(chosenMime.type)
+    const supportedMime = MediaRecorder.isTypeSupported(chosenMime.type)
       ? chosenMime.type
-      : "audio/mp4";
+      : "audio/webm";
 
     const recorder = new MediaRecorder(stream, {
-      mimeType: supportedMimeType,
+      mimeType: supportedMime,
       audioBitsPerSecond: 128000,
     });
 
@@ -449,65 +451,49 @@ const CommentSection = ({ postId }) => {
 
     recorder.ondataavailable = (event) => {
       if (event.data && event.data.size > 0) {
-        console.log("📦 Chunk reçu :", event.data.size, "octets");
         audioChunksRef.current.push(event.data);
+        console.log("📦 Chunk mobile reçu :", event.data.size);
       }
     };
 
     recorder.onerror = (event) => {
-      console.error("❌ Erreur MediaRecorder :", event.error || event);
+      console.error("❌ Erreur MediaRecorder :", event.error);
       toast({
-        title: "Erreur d'enregistrement",
-        description: "Le micro a rencontré un problème.",
+        title: "Erreur micro",
+        description: "Problème d'enregistrement sur mobile.",
         variant: "destructive",
       });
-      resolveRecording(null);
     };
 
     recorder.onstop = async () => {
-      console.log("🛑 Fin de l'enregistrement, traitement du blob...");
       clearInterval(recordingIntervalRef.current);
-      recordingIntervalRef.current = null;
       stream.getTracks().forEach((t) => t.stop());
 
-      // ⏹️ On arrête l'oscillateur de maintien
-      try {
-        silentOscillator.stop();
-        audioContext.close();
-      } catch (e) {}
+      try { ctx.close(); } catch {}
 
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 300));
 
-      const audioBlob = new Blob(audioChunksRef.current, {
-        type: supportedMimeType.split(";")[0],
-      });
+      const blob = new Blob(audioChunksRef.current, { type: supportedMime.split(";")[0] });
+      console.log("💾 Taille finale :", blob.size);
 
-      console.log("💾 Taille finale :", audioBlob.size, "octets");
+      const fallback = Math.max(1, lastRecordingTimeRef.current || recordingTime);
+      const measured = await getBlobDuration(blob, fallback);
+      const normalized = Math.max(1, Math.round(measured || fallback));
 
-      const fallbackDuration = Math.max(1, lastRecordingTimeRef.current || recordingTime);
-      const measuredDuration = await getBlobDuration(audioBlob, fallbackDuration);
-      const normalizedDuration = Math.max(1, Math.round(measuredDuration || fallbackDuration));
-
-      console.log("⏱️ Durée mesurée :", normalizedDuration, "sec");
-
-      setRecordingTime(normalizedDuration);
-      recordedDurationRef.current = normalizedDuration;
-      lastRecordingTimeRef.current = normalizedDuration;
-      setAudioBlob(audioBlob);
+      setRecordingTime(normalized);
+      setAudioBlob(blob);
       setMediaFile(null);
       setMediaPreviewUrl(null);
       setIsRecording(false);
       mediaRecorderRef.current = null;
-      resolveRecording(audioBlob);
-      recorderPromiseRef.current = Promise.resolve(audioBlob);
     };
 
-    // ⚡ Démarrage avec timeslice = 1000 ms pour maintenir le flux actif
-    recorder.start(1000);
-    console.log("⏺️ Enregistrement démarré (chunks toutes les 1s)");
+    recorder.start(500); // 🔥 CHUNK toutes les 0.5s (empêche timeout Android)
+    console.log("⏺️ Enregistrement actif (0.5 s flush)");
 
     mediaRecorderRef.current = recorder;
     setIsRecording(true);
+
     recordingIntervalRef.current = setInterval(() => {
       setRecordingTime((prev) => {
         const next = prev + 1;
@@ -516,18 +502,11 @@ const CommentSection = ({ postId }) => {
       });
     }, 1000);
 
-    // ⏹️ Auto stop après 2 min max
-    setTimeout(() => {
-      if (recorder.state !== "inactive") {
-        console.log("⏹️ Auto-stop après 120s");
-        recorder.stop();
-      }
-    }, 120000);
   } catch (error) {
-    console.error("❌ Erreur microphone :", error);
+    console.error("❌ Erreur microphone mobile :", error);
     toast({
-      title: "Erreur micro",
-      description: "Impossible d'accéder au micro. Vérifiez les autorisations.",
+      title: "Micro non accessible",
+      description: "Autorisez le micro sur votre appareil mobile.",
       variant: "destructive",
     });
   }
