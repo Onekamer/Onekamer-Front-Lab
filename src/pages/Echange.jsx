@@ -382,18 +382,35 @@ const CommentSection = ({ postId }) => {
   }
   
     const pickSupportedMime = useCallback(() => {
-      if (window.MediaRecorder?.isTypeSupported("audio/webm;codecs=opus"))
-        return { type: "audio/webm;codecs=opus", ext: "webm" };
-      if (window.MediaRecorder?.isTypeSupported("audio/ogg;codecs=opus"))
-        return { type: "audio/ogg;codecs=opus", ext: "ogg" };
-      if (window.MediaRecorder?.isTypeSupported("audio/mp4;codecs=mp4a.40.2"))
-        return { type: "audio/mp4;codecs=mp4a.40.2", ext: "m4a" };
-      return { type: "audio/webm", ext: "webm" };
-    }, []);
+  const ua = navigator.userAgent.toLowerCase();
+
+  // ✅ iOS / Safari ou PWA iPhone
+  if (ua.includes("iphone") || ua.includes("ipad") || ua.includes("safari")) {
+    return { type: "audio/mp4;codecs=mp4a.40.2", ext: "m4a" };
+  }
+
+  // ✅ Android (Chrome / Edge / PWA)
+  if (ua.includes("android")) {
+    return { type: "audio/mp4;codecs=mp4a.40.2", ext: "m4a" };
+  }
+
+  // ✅ Desktop (Chrome / Edge)
+  if (window.MediaRecorder?.isTypeSupported("audio/webm;codecs=opus")) {
+    return { type: "audio/webm;codecs=opus", ext: "webm" };
+  }
+
+  // ✅ Desktop (Firefox)
+  if (window.MediaRecorder?.isTypeSupported("audio/ogg;codecs=opus")) {
+    return { type: "audio/ogg;codecs=opus", ext: "ogg" };
+  }
+
+  // 🔙 Fallback universel
+  return { type: "audio/mp4;codecs=mp4a.40.2", ext: "m4a" };
+}, []);
 
     const startRecording = async () => {
   try {
-    console.log("🎙️ Démarrage enregistrement audio...");
+    console.log("🎙️ Initialisation de l'enregistrement...");
     setAudioBlob(null);
     setRecordingTime(0);
     lastRecordingTimeRef.current = 0;
@@ -406,26 +423,19 @@ const CommentSection = ({ postId }) => {
     mimeRef.current = chosenMime;
 
     let resolveRecording;
-    const recordingDone = new Promise((resolve) => {
-      resolveRecording = resolve;
-    });
+    const recordingDone = new Promise(resolve => (resolveRecording = resolve));
     recorderPromiseRef.current = recordingDone;
 
     const supportedMimeType = MediaRecorder.isTypeSupported(chosenMime.type)
       ? chosenMime.type
-      : "audio/webm";
+      : "audio/mp4";
 
     console.log("🎚️ Type MIME utilisé :", supportedMimeType);
 
-    const recorder = new MediaRecorder(stream, {
-      mimeType: supportedMimeType,
-      bitsPerSecond: 128000,
-    });
-
+    const recorder = new MediaRecorder(stream, { mimeType: supportedMimeType });
     audioChunksRef.current = [];
 
     recorder.ondataavailable = (event) => {
-      console.log("📦 Chunk reçu :", event.data.size, "octets");
       if (event.data && event.data.size > 0) {
         audioChunksRef.current.push(event.data);
       } else {
@@ -436,8 +446,8 @@ const CommentSection = ({ postId }) => {
     recorder.onerror = (event) => {
       console.error("❌ Erreur MediaRecorder :", event.error || event);
       toast({
-        title: "Erreur",
-        description: "Une erreur est survenue pendant l'enregistrement.",
+        title: "Erreur d'enregistrement",
+        description: "Une erreur est survenue pendant la capture audio.",
         variant: "destructive",
       });
       resolveRecording?.(null);
@@ -450,11 +460,10 @@ const CommentSection = ({ postId }) => {
       recordingIntervalRef.current = null;
       stream.getTracks().forEach((t) => t.stop());
 
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
-      const { type } = mimeRef.current || { type: "audio/webm" };
       const audioBlob = new Blob(audioChunksRef.current, {
-        type: type.split(";")[0],
+        type: supportedMimeType.split(";")[0],
       });
       console.log("💾 Taille finale du blob :", audioBlob.size, "octets");
 
@@ -464,21 +473,23 @@ const CommentSection = ({ postId }) => {
       console.log("⏱️ Durée mesurée :", normalizedDuration, "sec");
 
       setRecordingTime(normalizedDuration);
-      lastRecordingTimeRef.current = normalizedDuration;
       recordedDurationRef.current = normalizedDuration;
-
+      lastRecordingTimeRef.current = normalizedDuration;
       setAudioBlob(audioBlob);
       setMediaFile(null);
       setMediaPreviewUrl(null);
       setIsRecording(false);
       mediaRecorderRef.current = null;
-      resolveRecording?.(audioBlob);
+      resolveRecording(audioBlob);
       recorderPromiseRef.current = Promise.resolve(audioBlob);
     };
 
-    recorder.ignoreMutedMedia = true;
-    recorder.start(1000);
-    console.log("⏺️ Enregistrement démarré.");
+    // ⚡ Fix mobile : attendre un court délai avant démarrage
+    await new Promise((r) => setTimeout(r, 300));
+
+    // ✅ Important : pas de timeslice ici (start sans paramètre)
+    recorder.start();
+    console.log("⏺️ Enregistrement démarré avec format :", supportedMimeType);
 
     mediaRecorderRef.current = recorder;
     setIsRecording(true);
@@ -490,17 +501,18 @@ const CommentSection = ({ postId }) => {
       });
     }, 1000);
 
+    // ⏹️ Auto-stop après 120 secondes
     setTimeout(() => {
       if (recorder.state !== "inactive") {
-        console.log("⏹️ Arrêt automatique après 120 sec.");
+        console.log("⏹️ Arrêt automatique après 120s.");
         recorder.stop();
       }
     }, 120000);
   } catch (error) {
-    console.error("❌ Erreur d'enregistrement :", error);
+    console.error("❌ Erreur d'accès micro :", error);
     toast({
-      title: "Erreur",
-      description: "Impossible d'accéder au microphone.",
+      title: "Erreur microphone",
+      description: "Veuillez autoriser le micro dans votre navigateur.",
       variant: "destructive",
     });
     recorderPromiseRef.current = null;
