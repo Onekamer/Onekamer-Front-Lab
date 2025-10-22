@@ -730,7 +730,7 @@ const CommentSection = ({ postId }) => {
                 )}
                 <input type="file" ref={mediaInputRef} accept="image/*,video/*" className="hidden" onChange={handleFileChange} disabled={isRecording || !!audioBlob}/>
                 
-                 {!mediaFile && (
+                  {!mediaFile && (
                   <>
                     {isRecording ? (
                       <Button
@@ -751,14 +751,26 @@ const CommentSection = ({ postId }) => {
                           variant="ghost"
                           onMouseDown={(e) => {
                             e.preventDefault();
-                            startRecording();
+                            // 🕐 Déclenche après 300ms (anti-clic court)
+                            window._holdTimeout = setTimeout(() => {
+                              startRecording();
+                            }, 300);
+                          }}
+                          onMouseUp={() => {
+                            clearTimeout(window._holdTimeout);
+                            stopRecording();
                           }}
                           onTouchStart={(e) => {
                             e.preventDefault();
-                            startRecording();
+                            // 🕐 Idem mobile : attend 300ms avant d’enregistrer
+                            window._holdTimeout = setTimeout(() => {
+                              startRecording();
+                            }, 300);
                           }}
-                          onMouseUp={stopRecording}
-                          onTouchEnd={stopRecording}
+                          onTouchEnd={() => {
+                            clearTimeout(window._holdTimeout);
+                            stopRecording();
+                          }}
                           className="bg-gray-100 active:bg-green-100"
                           disabled={isPostingComment}
                         >
