@@ -410,14 +410,14 @@ const CommentSection = ({ postId }) => {
 
     const startRecording = async () => {
   try {
-    console.log("🎙️ Initialisation de l'enregistrement...");
+    console.log("🎙️ Initialisation mobile/desktop...");
     setAudioBlob(null);
     setRecordingTime(0);
     lastRecordingTimeRef.current = 0;
     recordedDurationRef.current = 0;
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    console.log("✅ Micro autorisé :", stream.getAudioTracks().length, "piste(s)");
+    console.log("✅ Micro activé :", stream.getAudioTracks().length, "piste(s)");
 
     const chosenMime = pickSupportedMime();
     mimeRef.current = chosenMime;
@@ -437,9 +437,10 @@ const CommentSection = ({ postId }) => {
 
     recorder.ondataavailable = (event) => {
       if (event.data && event.data.size > 0) {
+        console.log("📦 Chunk reçu :", event.data.size, "octets");
         audioChunksRef.current.push(event.data);
       } else {
-        console.warn("⚠️ Chunk vide détecté !");
+        console.warn("⚠️ Chunk vide ou ignoré");
       }
     };
 
@@ -447,7 +448,7 @@ const CommentSection = ({ postId }) => {
       console.error("❌ Erreur MediaRecorder :", event.error || event);
       toast({
         title: "Erreur d'enregistrement",
-        description: "Une erreur est survenue pendant la capture audio.",
+        description: "Le micro a rencontré un problème.",
         variant: "destructive",
       });
       resolveRecording?.(null);
@@ -455,22 +456,24 @@ const CommentSection = ({ postId }) => {
     };
 
     recorder.onstop = async () => {
-      console.log("🛑 Enregistrement terminé, création du blob...");
       clearInterval(recordingIntervalRef.current);
       recordingIntervalRef.current = null;
       stream.getTracks().forEach((t) => t.stop());
 
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      // petit délai pour laisser le navigateur flush le dernier chunk
+      await new Promise((r) => setTimeout(r, 300));
 
       const audioBlob = new Blob(audioChunksRef.current, {
         type: supportedMimeType.split(";")[0],
       });
+
       console.log("💾 Taille finale du blob :", audioBlob.size, "octets");
 
       const fallbackDuration = Math.max(1, lastRecordingTimeRef.current || recordingTime);
       const measuredDuration = await getBlobDuration(audioBlob, fallbackDuration);
       const normalizedDuration = Math.max(1, Math.round(measuredDuration || fallbackDuration));
-      console.log("⏱️ Durée mesurée :", normalizedDuration, "sec");
+
+      console.log("⏱️ Durée mesurée :", normalizedDuration, "s");
 
       setRecordingTime(normalizedDuration);
       recordedDurationRef.current = normalizedDuration;
@@ -484,12 +487,9 @@ const CommentSection = ({ postId }) => {
       recorderPromiseRef.current = Promise.resolve(audioBlob);
     };
 
-    // ⚡ Fix mobile : attendre un court délai avant démarrage
-    await new Promise((r) => setTimeout(r, 300));
-
-    // ✅ Important : pas de timeslice ici (start sans paramètre)
-    recorder.start();
-    console.log("⏺️ Enregistrement démarré avec format :", supportedMimeType);
+    // Important : démarrage avec timeslice = 1000 ms
+    recorder.start(1000);
+    console.log("⏺️ Enregistrement démarré (flush toutes les 1s)");
 
     mediaRecorderRef.current = recorder;
     setIsRecording(true);
@@ -501,22 +501,20 @@ const CommentSection = ({ postId }) => {
       });
     }, 1000);
 
-    // ⏹️ Auto-stop après 120 secondes
+    // auto-stop après 2 minutes
     setTimeout(() => {
       if (recorder.state !== "inactive") {
-        console.log("⏹️ Arrêt automatique après 120s.");
         recorder.stop();
       }
     }, 120000);
   } catch (error) {
-    console.error("❌ Erreur d'accès micro :", error);
+    console.error("❌ Erreur microphone :", error);
     toast({
-      title: "Erreur microphone",
-      description: "Veuillez autoriser le micro dans votre navigateur.",
+      title: "Micro non accessible",
+      description: "Autorisez le micro dans votre navigateur mobile.",
       variant: "destructive",
     });
     recorderPromiseRef.current = null;
-    recordedDurationRef.current = 0;
   }
 };
 
