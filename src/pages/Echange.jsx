@@ -27,6 +27,11 @@ import { Label } from '@/components/ui/label';
 import { getInitials } from '@/lib/utils';
 import { uploadAudioFile, ensurePublicAudioUrl } from '@/utils/audioStorage';
 
+const normalizeAudioEntry = (entry) => {
+  if (!entry || !entry.audio_url) return entry;
+  return { ...entry, audio_url: ensurePublicAudioUrl(entry.audio_url) };
+};
+
 const parseMentions = (text) => {
   if (!text) return '';
   const mentionRegex = /@(\w+)/g;
@@ -265,15 +270,6 @@ const CommentSection = ({ postId }) => {
   const lastRecordingTimeRef = useRef(0);
   const recordedDurationRef = useRef(0);
 
-  const resolveAudioEntry = useCallback(
-    (entry) => {
-      if (!entry) return entry;
-      if (!entry.audio_url) return entry;
-      return { ...entry, audio_url: ensurePublicAudioUrl(entry.audio_url) };
-    },
-    []
-  );
-
   const getBlobDuration = useCallback((blob, fallback = 0) => {
     if (!blob) return Promise.resolve(fallback);
 
@@ -328,11 +324,11 @@ const CommentSection = ({ postId }) => {
     if (error) {
       console.error('Erreur chargement commentaires :', error.message);
     } else {
-      const normalized = (data || []).map((comment) => resolveAudioEntry(comment));
+      const normalized = (data || []).map((comment) => normalizeAudioEntry(comment));
       setComments(normalized);
     }
     setLoadingComments(false);
-  }, [postId, resolveAudioEntry]);
+  }, [postId]);
 
   useEffect(() => {
     fetchComments();
@@ -355,10 +351,10 @@ const CommentSection = ({ postId }) => {
             .single();
 
           if (!profileError) {
-              const resolved = resolveAudioEntry({ ...payload.new, author: profileData });
+              const resolved = normalizeAudioEntry({ ...payload.new, author: profileData });
               setComments((prev) => [...prev, resolved]);
           } else {
-              const resolved = resolveAudioEntry({ ...payload.new, author: { username: 'Anonyme', avatar_url: null } });
+              const resolved = normalizeAudioEntry({ ...payload.new, author: { username: 'Anonyme', avatar_url: null } });
               setComments((prev) => [...prev, resolved]);
           }
         }
@@ -368,7 +364,7 @@ const CommentSection = ({ postId }) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [postId, fetchComments, resolveAudioEntry]);
+  }, [postId, fetchComments]);
   
   const handleRemoveMedia = () => {
     setMediaFile(null);
@@ -924,15 +920,15 @@ const Echange = () => {
     }
 
     const combinedFeed = [
-      ...(postsData || []).map(p => ({ ...resolveAudioEntry(p), feed_type: 'post' })),
-      ...(audioData || []).map(a => ({ ...resolveAudioEntry(a), feed_type: 'audio_post' }))
+      ...(postsData || []).map(p => ({ ...normalizeAudioEntry(p), feed_type: 'post' })),
+      ...(audioData || []).map(a => ({ ...normalizeAudioEntry(a), feed_type: 'audio_post' }))
     ];
 
     combinedFeed.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     setFeedItems(combinedFeed);
     setLoadingPosts(false);
-  }, [resolveAudioEntry]);
+  }, []);
   
   useEffect(() => {
     fetchFeed();
