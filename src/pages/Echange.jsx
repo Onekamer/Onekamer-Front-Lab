@@ -408,26 +408,26 @@ const CommentSection = ({ postId }) => {
   return { type: "audio/mp4;codecs=mp4a.40.2", ext: "m4a" };
 }, []);
 
-    const startRecording = async () => {
+   const startRecording = async () => {
   try {
-    console.log("🎙️ Initialisation de l'enregistrement mobile...");
+    console.log("🎙️ Initialisation étendue mobile...");
 
     setAudioBlob(null);
     setRecordingTime(0);
     lastRecordingTimeRef.current = 0;
     recordedDurationRef.current = 0;
 
-    // 🔊 Étape cruciale : réveiller le contexte audio mobile
+    // 🔊 Maintenir un contexte audio actif (empêche le gel du flux sur mobile)
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    oscillator.connect(audioContext.destination);
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + 0.05);
-    console.log("🔔 AudioContext initialisé");
+    const silentOscillator = audioContext.createOscillator();
+    const silentGain = audioContext.createGain();
+    silentGain.gain.value = 0.00001; // quasi inaudible
+    silentOscillator.connect(silentGain);
+    silentGain.connect(audioContext.destination);
+    silentOscillator.start();
 
-    // 🎧 Demande micro après le "wake" audio
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    console.log("✅ Micro autorisé :", stream.getAudioTracks().length, "piste(s)");
+    console.log("✅ Micro actif :", stream.getAudioTracks().length, "piste(s)");
 
     const chosenMime = pickSupportedMime();
     mimeRef.current = chosenMime;
@@ -457,26 +457,32 @@ const CommentSection = ({ postId }) => {
     recorder.onerror = (event) => {
       console.error("❌ Erreur MediaRecorder :", event.error || event);
       toast({
-        title: "Erreur",
-        description: "Une erreur est survenue pendant l'enregistrement.",
+        title: "Erreur d'enregistrement",
+        description: "Le micro a rencontré un problème.",
         variant: "destructive",
       });
       resolveRecording(null);
     };
 
     recorder.onstop = async () => {
+      console.log("🛑 Fin de l'enregistrement, traitement du blob...");
       clearInterval(recordingIntervalRef.current);
       recordingIntervalRef.current = null;
       stream.getTracks().forEach((t) => t.stop());
 
-      // 🕒 Laisse le temps aux chunks d'arriver
+      // ⏹️ On arrête l'oscillateur de maintien
+      try {
+        silentOscillator.stop();
+        audioContext.close();
+      } catch (e) {}
+
       await new Promise((r) => setTimeout(r, 500));
 
       const audioBlob = new Blob(audioChunksRef.current, {
         type: supportedMimeType.split(";")[0],
       });
 
-      console.log("💾 Taille finale du blob :", audioBlob.size, "octets");
+      console.log("💾 Taille finale :", audioBlob.size, "octets");
 
       const fallbackDuration = Math.max(1, lastRecordingTimeRef.current || recordingTime);
       const measuredDuration = await getBlobDuration(audioBlob, fallbackDuration);
@@ -487,7 +493,6 @@ const CommentSection = ({ postId }) => {
       setRecordingTime(normalizedDuration);
       recordedDurationRef.current = normalizedDuration;
       lastRecordingTimeRef.current = normalizedDuration;
-
       setAudioBlob(audioBlob);
       setMediaFile(null);
       setMediaPreviewUrl(null);
@@ -497,9 +502,9 @@ const CommentSection = ({ postId }) => {
       recorderPromiseRef.current = Promise.resolve(audioBlob);
     };
 
-    // ⚡ Démarrage avec timeSlice = 1000 ms pour forcer le flush
+    // ⚡ Démarrage avec timeslice = 1000 ms pour maintenir le flux actif
     recorder.start(1000);
-    console.log("⏺️ Enregistrement démarré (flush toutes les secondes)");
+    console.log("⏺️ Enregistrement démarré (chunks toutes les 1s)");
 
     mediaRecorderRef.current = recorder;
     setIsRecording(true);
@@ -527,7 +532,6 @@ const CommentSection = ({ postId }) => {
     });
   }
 };
-
 
   const stopRecording = () => {
   console.log("🧭 Arrêt manuel de l'enregistrement...");
