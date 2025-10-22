@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
 import { getInitials } from '@/lib/utils';
+import { uploadAudioFile, ensurePublicAudioUrl } from '@/utils/audioStorage';
 
 const parseMentions = (text) => {
   if (!text) return '';
@@ -257,11 +258,55 @@ const CommentSection = ({ postId }) => {
   const [audioBlob, setAudioBlob] = useState(null);
   const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recorderPromiseRef = useRef(null);
+  const mimeRef = useRef(null);
   const recordingIntervalRef = useRef(null);
+  const lastRecordingTimeRef = useRef(0);
+  const recordedDurationRef = useRef(0);
+
+  const resolveAudioEntry = useCallback(
+    (entry) => {
+      if (!entry) return entry;
+      if (!entry.audio_url) return entry;
+      return { ...entry, audio_url: ensurePublicAudioUrl(entry.audio_url) };
+    },
+    []
+  );
+
+  const getBlobDuration = useCallback((blob, fallback = 0) => {
+    if (!blob) return Promise.resolve(fallback);
+
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio();
+      audio.preload = 'metadata';
+      audio.src = url;
+
+      let resolved = false;
+      const cleanup = () => {
+        URL.revokeObjectURL(url);
+        audio.src = '';
+      };
+
+      const finish = (value) => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        const numeric = Number(value);
+        resolve(Number.isFinite(numeric) && numeric > 0 ? numeric : fallback);
+      };
+
+      audio.onloadedmetadata = () => finish(audio.duration);
+      audio.onerror = () => finish(fallback);
+
+      setTimeout(() => finish(fallback), 4000);
+    });
+  }, []);
 
   const fetchComments = useCallback(async () => {
     setLoadingComments(true);
-  
+
     const { data, error } = await supabase
       .from('comments')
       .select(`
@@ -279,14 +324,15 @@ const CommentSection = ({ postId }) => {
       .eq('content_id', postId)
       .eq('content_type', 'post')
       .order('created_at', { ascending: true });
-  
+
     if (error) {
       console.error('Erreur chargement commentaires :', error.message);
     } else {
-      setComments(data || []);
+      const normalized = (data || []).map((comment) => resolveAudioEntry(comment));
+      setComments(normalized);
     }
     setLoadingComments(false);
-  }, [postId]);
+  }, [postId, resolveAudioEntry]);
 
   useEffect(() => {
     fetchComments();
@@ -309,18 +355,20 @@ const CommentSection = ({ postId }) => {
             .single();
 
           if (!profileError) {
-              setComments((prev) => [...prev, { ...payload.new, author: profileData }]);
+              const resolved = resolveAudioEntry({ ...payload.new, author: profileData });
+              setComments((prev) => [...prev, resolved]);
           } else {
-              setComments((prev) => [...prev, { ...payload.new, author: { username: 'Anonyme', avatar_url: null } }]);
+              const resolved = resolveAudioEntry({ ...payload.new, author: { username: 'Anonyme', avatar_url: null } });
+              setComments((prev) => [...prev, resolved]);
           }
         }
       )
       .subscribe();
-  
+
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [postId, fetchComments]);
+  }, [postId, fetchComments, resolveAudioEntry]);
   
   const handleRemoveMedia = () => {
     setMediaFile(null);
@@ -337,38 +385,126 @@ const CommentSection = ({ postId }) => {
     }
   }
   
+    const pickSupportedMime = useCallback(() => {
+      if (window.MediaRecorder?.isTypeSupported("audio/webm;codecs=opus"))
+        return { type: "audio/webm;codecs=opus", ext: "webm" };
+      if (window.MediaRecorder?.isTypeSupported("audio/ogg;codecs=opus"))
+        return { type: "audio/ogg;codecs=opus", ext: "ogg" };
+      if (window.MediaRecorder?.isTypeSupported("audio/mp4;codecs=mp4a.40.2"))
+        return { type: "audio/mp4;codecs=mp4a.40.2", ext: "m4a" };
+      return { type: "audio/webm", ext: "webm" };
+    }, []);
+
     const startRecording = async () => {
         try {
+            setAudioBlob(null);
+            setRecordingTime(0);
+            lastRecordingTimeRef.current = 0;
+            recordedDurationRef.current = 0;
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-            const audioChunks = [];
-            mediaRecorderRef.current.ondataavailable = event => {
-                audioChunks.push(event.data);
+
+            try {
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const dest = ctx.createMediaStreamDestination();
+                osc.connect(dest);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.05);
+            } catch (e) {
+                console.warn("AudioContext init échouée", e);
+            }
+
+            const chosenMime = pickSupportedMime();
+            mimeRef.current = chosenMime;
+
+            let resolveRecording;
+            const recordingDone = new Promise((resolve) => {
+                resolveRecording = resolve;
+            });
+            recorderPromiseRef.current = recordingDone;
+
+            const recorder = new MediaRecorder(stream, {
+                mimeType: chosenMime.type,
+                bitsPerSecond: 128000,
+            });
+
+            audioChunksRef.current = [];
+
+            recorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                }
             };
-            mediaRecorderRef.current.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+
+            recorder.onerror = (event) => {
+                console.error("MediaRecorder error:", event.error || event);
+                toast({ title: "Erreur", description: "Une erreur est survenue pendant l'enregistrement.", variant: "destructive" });
+                resolveRecording?.(null);
+                recorderPromiseRef.current = null;
+            };
+
+            recorder.onstop = async () => {
+                clearInterval(recordingIntervalRef.current);
+                recordingIntervalRef.current = null;
+                stream.getTracks().forEach(track => track.stop());
+
+                await new Promise((resolve) => setTimeout(resolve, 500));
+
+                const { type } = mimeRef.current || { type: "audio/webm" };
+                const audioBlob = new Blob(audioChunksRef.current, { type: type.split(";")[0] });
+
+                const fallbackDuration = Math.max(1, lastRecordingTimeRef.current || recordingTime);
+                const measuredDuration = await getBlobDuration(audioBlob, fallbackDuration);
+                const normalizedDuration = Math.max(1, Math.round(measuredDuration || fallbackDuration));
+                setRecordingTime(normalizedDuration);
+                lastRecordingTimeRef.current = normalizedDuration;
+                recordedDurationRef.current = normalizedDuration;
+
                 setAudioBlob(audioBlob);
                 setMediaFile(null);
                 setMediaPreviewUrl(null);
-                stream.getTracks().forEach(track => track.stop());
+                setIsRecording(false);
+                mediaRecorderRef.current = null;
+                resolveRecording?.(audioBlob);
+                recorderPromiseRef.current = Promise.resolve(audioBlob);
             };
-            mediaRecorderRef.current.start();
+
+            recorder.ignoreMutedMedia = true;
+            recorder.start(1000);
+
+            mediaRecorderRef.current = recorder;
             setIsRecording(true);
-            setRecordingTime(0);
             recordingIntervalRef.current = setInterval(() => {
-                setRecordingTime(prev => prev + 1);
+                setRecordingTime(prev => {
+                    const next = prev + 1;
+                    lastRecordingTimeRef.current = next;
+                    return next;
+                });
             }, 1000);
+
+            setTimeout(() => {
+                if (recorder.state !== "inactive") {
+                    recorder.stop();
+                }
+            }, 120000);
         } catch (error) {
             console.error("Erreur d'enregistrement:", error);
             toast({ title: "Erreur", description: "Impossible d'accéder au microphone.", variant: "destructive" });
+            recorderPromiseRef.current = null;
+            recordedDurationRef.current = 0;
         }
     };
 
     const stopRecording = () => {
-        if (mediaRecorderRef.current) {
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+            mediaRecorderRef.current.requestData?.();
+            setTimeout(() => {
+                if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+                    mediaRecorderRef.current.stop();
+                }
+            }, 300);
             clearInterval(recordingIntervalRef.current);
+            recordingIntervalRef.current = null;
         }
     };
     
@@ -381,6 +517,10 @@ const CommentSection = ({ postId }) => {
     const handleRemoveAudio = () => {
         setAudioBlob(null);
         setRecordingTime(0);
+        lastRecordingTimeRef.current = 0;
+        recordedDurationRef.current = 0;
+        recorderPromiseRef.current = null;
+        mimeRef.current = null;
     };
   
   const uploadToBunny = async (file, folder) => {
@@ -393,10 +533,22 @@ const CommentSection = ({ postId }) => {
       body: formData,
     });
 
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error("Erreur d’upload BunnyCDN");
+    const text = await response.text();
+    let data = null;
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch (error) {
+        console.error("Réponse upload invalide:", text);
+        throw new Error("Réponse inattendue du serveur d'upload");
+      }
     }
+
+    if (!response.ok || !data?.success) {
+      const message = data?.message || `Erreur d’upload BunnyCDN (code ${response.status})`;
+      throw new Error(message);
+    }
+
     return data.url;
   };
 
@@ -417,21 +569,40 @@ const CommentSection = ({ postId }) => {
         let audio_duration = null;
         let type = 'text';
 
+        let finalAudioBlob = audioBlob;
+        if (!finalAudioBlob && recorderPromiseRef.current) {
+            finalAudioBlob = await recorderPromiseRef.current;
+        }
+
         if (mediaFile) {
             media_url = await uploadToBunny(mediaFile, "comments");
             media_type = mediaFile.type;
             type = mediaFile.type.startsWith('image') ? 'image' : 'video';
-        } else if (audioBlob) {
-            const audioFile = new File([audioBlob], `audio-comment-${user.id}-${Date.now()}.webm`, { type: 'audio/webm' });
-            audio_url = await uploadToBunny(audioFile, "comments_audio");
-            audio_duration = recordingTime;
+        } else if (finalAudioBlob) {
+            const { type: mimeType, ext } = mimeRef.current || { type: finalAudioBlob.type || 'audio/webm', ext: 'webm' };
+            const normalizedType = mimeType.split(";")[0];
+            if (!finalAudioBlob || finalAudioBlob.size < 2000) {
+                toast({ title: 'Erreur audio', description: "L’audio semble vide ou trop court. Réessayez.", variant: 'destructive' });
+                return;
+            }
+            const audioFile = new File([finalAudioBlob], `audio-comment-${user.id}-${Date.now()}.${ext}`, { type: normalizedType || 'audio/webm' });
+            const { publicUrl } = await uploadAudioFile(audioFile, 'comments_audio');
+            audio_url = publicUrl;
+            const fallbackDuration = Math.max(1, recordedDurationRef.current || lastRecordingTimeRef.current || recordingTime || 1);
+            const measuredDuration = await getBlobDuration(finalAudioBlob, fallbackDuration);
+            const normalizedDuration = Math.max(1, Math.round(measuredDuration || fallbackDuration));
+            recordedDurationRef.current = normalizedDuration;
+            lastRecordingTimeRef.current = normalizedDuration;
+            setRecordingTime(normalizedDuration);
+            audio_duration = normalizedDuration;
+            recorderPromiseRef.current = null;
             type = 'audio';
         }
 
-        const { error: insertError } = await supabase.from('comments').insert([{ 
+        const { error: insertError } = await supabase.from('comments').insert([{
             content_id: postId,
             content_type: 'post',
-            user_id: user.id, 
+            user_id: user.id,
             content: newComment,
             media_url,
             media_type,
@@ -753,15 +924,15 @@ const Echange = () => {
     }
 
     const combinedFeed = [
-      ...(postsData || []).map(p => ({ ...p, feed_type: 'post' })),
-      ...(audioData || []).map(a => ({ ...a, feed_type: 'audio_post' }))
+      ...(postsData || []).map(p => ({ ...resolveAudioEntry(p), feed_type: 'post' })),
+      ...(audioData || []).map(a => ({ ...resolveAudioEntry(a), feed_type: 'audio_post' }))
     ];
 
     combinedFeed.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     setFeedItems(combinedFeed);
     setLoadingPosts(false);
-  }, []);
+  }, [resolveAudioEntry]);
   
   useEffect(() => {
     fetchFeed();
