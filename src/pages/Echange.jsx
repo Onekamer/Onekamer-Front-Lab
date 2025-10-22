@@ -730,36 +730,50 @@ const CommentSection = ({ postId }) => {
                 )}
                 <input type="file" ref={mediaInputRef} accept="image/*,video/*" className="hidden" onChange={handleFileChange} disabled={isRecording || !!audioBlob}/>
                 
-                                {!mediaFile && (
-                  isRecording ? (
-                    // ✅ Bouton Stop classique (utile sur desktop)
-                    <Button size="sm" type="button" variant="destructive" onClick={stopRecording}>
-                      <Square className="h-4 w-4 mr-2" /> Stop
-                    </Button>
-                  ) : (
-                    !audioBlob && (
-                      // ✅ Bouton "Maintenir pour parler" compatible mobile
+                 {!mediaFile && (
+                  <>
+                    {isRecording ? (
                       <Button
                         size="sm"
                         type="button"
-                        variant="ghost"
-                        onMouseDown={startRecording}   // desktop
-                        onMouseUp={stopRecording}       // desktop
-                        onTouchStart={startRecording}   // mobile
-                        onTouchEnd={stopRecording}      // mobile
-                        disabled={isPostingComment}
+                        variant="destructive"
+                        onMouseUp={stopRecording}
+                        onTouchEnd={stopRecording}
+                        className="bg-red-500 hover:bg-red-600"
                       >
-                        <Mic className="h-4 w-4 mr-2" /> Maintenir pour parler
+                        <Square className="h-4 w-4 mr-2" /> Relâcher pour envoyer
                       </Button>
-                    )
-                  )
+                    ) : (
+                      !audioBlob && (
+                        <Button
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            startRecording();
+                          }}
+                          onTouchStart={(e) => {
+                            e.preventDefault();
+                            startRecording();
+                          }}
+                          onMouseUp={stopRecording}
+                          onTouchEnd={stopRecording}
+                          className="bg-gray-100 active:bg-green-100"
+                          disabled={isPostingComment}
+                        >
+                          <Mic className="h-4 w-4 mr-2" /> Maintenir pour parler
+                        </Button>
+                      )
+                    )}
+                  </>
                 )}
             </div>
         </form>
       </div>
     </motion.div>
   );
-}; // ✅ Fermeture du composant CommentSection
+}; // ✅ Fermeture correcte du composant CommentSection
 
 const PostCard = ({ post, user, profile, onLike, onDelete, showComments, onToggleComments, refreshBalance }) => {
   const navigate = useNavigate();
