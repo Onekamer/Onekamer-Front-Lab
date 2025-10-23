@@ -779,7 +779,7 @@ const CommentSection = ({ postId }) => {
             clearTimeout(holdTimerRef.current);
             hasStartedRef.current = false;
 
-            // 🔒 Démarre seulement si appui ≥ 300ms
+            // 🕐 Démarre seulement si maintien ≥ 300ms
             holdTimerRef.current = setTimeout(async () => {
               await startRecording();
               hasStartedRef.current = true;
@@ -810,7 +810,7 @@ const CommentSection = ({ postId }) => {
             }
           }}
           disabled={isPostingComment}
-          className="touch-none select-none active:bg-green-100"
+          className="active:bg-green-100 touch-none select-none"
         >
           <Mic className="h-4 w-4 mr-2" /> Maintenir pour parler
         </Button>
@@ -818,6 +818,12 @@ const CommentSection = ({ postId }) => {
     )}
   </>
 )}
+          </div>
+        </form>
+      </div>
+    </motion.div>
+  );
+}; // ✅ fermeture propre de CommentSection
 
 const PostCard = ({ post, user, profile, onLike, onDelete, showComments, onToggleComments, refreshBalance }) => {
   const navigate = useNavigate();
