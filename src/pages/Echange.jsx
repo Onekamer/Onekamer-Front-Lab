@@ -269,6 +269,8 @@ const CommentSection = ({ postId }) => {
   const recordingIntervalRef = useRef(null);
   const lastRecordingTimeRef = useRef(0);
   const recordedDurationRef = useRef(0);
+  const holdTimerRef = useRef(null);
+  const hasStartedRef = useRef(false);
 
   const getBlobDuration = useCallback((blob, fallback = 0) => {
     if (!blob) return Promise.resolve(fallback);
@@ -731,61 +733,91 @@ const CommentSection = ({ postId }) => {
                 <input type="file" ref={mediaInputRef} accept="image/*,video/*" className="hidden" onChange={handleFileChange} disabled={isRecording || !!audioBlob}/>
                 
                   {!mediaFile && (
-                  <>
-                    {isRecording ? (
-                      <Button
-                        size="sm"
-                        type="button"
-                        variant="destructive"
-                        onMouseUp={stopRecording}
-                        onTouchEnd={stopRecording}
-                        className="bg-red-500 hover:bg-red-600"
-                      >
-                        <Square className="h-4 w-4 mr-2" /> Relâcher pour envoyer
-                      </Button>
-                    ) : (
-                      !audioBlob && (
-                        <Button
-                          size="sm"
-                          type="button"
-                          variant="ghost"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            // 🕐 Déclenche après 300ms (anti-clic court)
-                            window._holdTimeout = setTimeout(() => {
-                              startRecording();
-                            }, 300);
-                          }}
-                          onMouseUp={() => {
-                            clearTimeout(window._holdTimeout);
-                            stopRecording();
-                          }}
-                          onTouchStart={(e) => {
-                            e.preventDefault();
-                            // 🕐 Idem mobile : attend 300ms avant d’enregistrer
-                            window._holdTimeout = setTimeout(() => {
-                              startRecording();
-                            }, 300);
-                          }}
-                          onTouchEnd={() => {
-                            clearTimeout(window._holdTimeout);
-                            stopRecording();
-                          }}
-                          className="bg-gray-100 active:bg-green-100"
-                          disabled={isPostingComment}
-                        >
-                          <Mic className="h-4 w-4 mr-2" /> Maintenir pour parler
-                        </Button>
-                      )
-                    )}
-                  </>
-                )}
-            </div>
-        </form>
-      </div>
-    </motion.div>
-  );
-}; // ✅ Fermeture correcte du composant CommentSection
+  <>
+    {isRecording ? (
+      <Button
+        size="sm"
+        type="button"
+        variant="destructive"
+        onPointerUp={() => {
+          clearTimeout(holdTimerRef.current);
+          holdTimerRef.current = null;
+          if (hasStartedRef.current) {
+            stopRecording();
+            hasStartedRef.current = false;
+          }
+        }}
+        onPointerCancel={() => {
+          clearTimeout(holdTimerRef.current);
+          holdTimerRef.current = null;
+          if (hasStartedRef.current) {
+            stopRecording();
+            hasStartedRef.current = false;
+          }
+        }}
+        onPointerLeave={() => {
+          clearTimeout(holdTimerRef.current);
+          holdTimerRef.current = null;
+          if (hasStartedRef.current) {
+            stopRecording();
+            hasStartedRef.current = false;
+          }
+        }}
+        className="bg-red-500 hover:bg-red-600 touch-none select-none"
+      >
+        <Square className="h-4 w-4 mr-2" /> Relâcher pour envoyer
+      </Button>
+    ) : (
+      !audioBlob && (
+        <Button
+          size="sm"
+          type="button"
+          variant="ghost"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            clearTimeout(holdTimerRef.current);
+            hasStartedRef.current = false;
+
+            // 🔒 Démarre seulement si appui ≥ 300ms
+            holdTimerRef.current = setTimeout(async () => {
+              await startRecording();
+              hasStartedRef.current = true;
+            }, 300);
+          }}
+          onPointerUp={() => {
+            clearTimeout(holdTimerRef.current);
+            holdTimerRef.current = null;
+            if (hasStartedRef.current) {
+              stopRecording();
+              hasStartedRef.current = false;
+            }
+          }}
+          onPointerCancel={() => {
+            clearTimeout(holdTimerRef.current);
+            holdTimerRef.current = null;
+            if (hasStartedRef.current) {
+              stopRecording();
+              hasStartedRef.current = false;
+            }
+          }}
+          onPointerLeave={() => {
+            clearTimeout(holdTimerRef.current);
+            holdTimerRef.current = null;
+            if (hasStartedRef.current) {
+              stopRecording();
+              hasStartedRef.current = false;
+            }
+          }}
+          disabled={isPostingComment}
+          className="touch-none select-none active:bg-green-100"
+        >
+          <Mic className="h-4 w-4 mr-2" /> Maintenir pour parler
+        </Button>
+      )
+    )}
+  </>
+)}
 
 const PostCard = ({ post, user, profile, onLike, onDelete, showComments, onToggleComments, refreshBalance }) => {
   const navigate = useNavigate();
