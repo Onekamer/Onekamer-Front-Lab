@@ -269,8 +269,6 @@ const CommentSection = ({ postId }) => {
   const recordingIntervalRef = useRef(null);
   const lastRecordingTimeRef = useRef(0);
   const recordedDurationRef = useRef(0);
-  const holdTimerRef = useRef(null);
-  const hasStartedRef = useRef(false);
 
   const getBlobDuration = useCallback((blob, fallback = 0) => {
     if (!blob) return Promise.resolve(fallback);
@@ -410,92 +408,91 @@ const CommentSection = ({ postId }) => {
   return { type: "audio/mp4;codecs=mp4a.40.2", ext: "m4a" };
 }, []);
 
-   const startRecording = async () => {
+    const startRecording = async () => {
   try {
-    console.log("🎙️ Initialisation mobile avec maintien de flux...");
-
+    console.log("🎙️ Initialisation de l'enregistrement...");
     setAudioBlob(null);
     setRecordingTime(0);
     lastRecordingTimeRef.current = 0;
     recordedDurationRef.current = 0;
 
-    // ⚡ RÉVEIL AUDIO POUR MOBILE
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AudioCtx();
-
-    // Crée un silence permanent pour empêcher le mode "pause audio" mobile
-    const source = ctx.createBufferSource();
-    const buffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
-    source.buffer = buffer;
-    const gainNode = ctx.createGain();
-    gainNode.gain.value = 0.00001; // quasi inaudible
-    source.connect(gainNode);
-    gainNode.connect(ctx.destination);
-    source.start(0);
-
-    // 📱 Accès au micro
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    console.log("✅ Micro mobile autorisé :", stream.getAudioTracks().length);
+    console.log("✅ Micro autorisé :", stream.getAudioTracks().length, "piste(s)");
 
     const chosenMime = pickSupportedMime();
     mimeRef.current = chosenMime;
 
-    const supportedMime = MediaRecorder.isTypeSupported(chosenMime.type)
+    let resolveRecording;
+    const recordingDone = new Promise(resolve => (resolveRecording = resolve));
+    recorderPromiseRef.current = recordingDone;
+
+    const supportedMimeType = MediaRecorder.isTypeSupported(chosenMime.type)
       ? chosenMime.type
-      : "audio/webm";
+      : "audio/mp4";
 
-    const recorder = new MediaRecorder(stream, {
-      mimeType: supportedMime,
-      audioBitsPerSecond: 128000,
-    });
+    console.log("🎚️ Type MIME utilisé :", supportedMimeType);
 
+    const recorder = new MediaRecorder(stream, { mimeType: supportedMimeType });
     audioChunksRef.current = [];
 
     recorder.ondataavailable = (event) => {
       if (event.data && event.data.size > 0) {
         audioChunksRef.current.push(event.data);
-        console.log("📦 Chunk mobile reçu :", event.data.size);
+      } else {
+        console.warn("⚠️ Chunk vide détecté !");
       }
     };
 
     recorder.onerror = (event) => {
-      console.error("❌ Erreur MediaRecorder :", event.error);
+      console.error("❌ Erreur MediaRecorder :", event.error || event);
       toast({
-        title: "Erreur micro",
-        description: "Problème d'enregistrement sur mobile.",
+        title: "Erreur d'enregistrement",
+        description: "Une erreur est survenue pendant la capture audio.",
         variant: "destructive",
       });
+      resolveRecording?.(null);
+      recorderPromiseRef.current = null;
     };
 
     recorder.onstop = async () => {
+      console.log("🛑 Enregistrement terminé, création du blob...");
       clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
       stream.getTracks().forEach((t) => t.stop());
 
-      try { ctx.close(); } catch {}
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
-      await new Promise((r) => setTimeout(r, 300));
+      const audioBlob = new Blob(audioChunksRef.current, {
+        type: supportedMimeType.split(";")[0],
+      });
+      console.log("💾 Taille finale du blob :", audioBlob.size, "octets");
 
-      const blob = new Blob(audioChunksRef.current, { type: supportedMime.split(";")[0] });
-      console.log("💾 Taille finale :", blob.size);
+      const fallbackDuration = Math.max(1, lastRecordingTimeRef.current || recordingTime);
+      const measuredDuration = await getBlobDuration(audioBlob, fallbackDuration);
+      const normalizedDuration = Math.max(1, Math.round(measuredDuration || fallbackDuration));
+      console.log("⏱️ Durée mesurée :", normalizedDuration, "sec");
 
-      const fallback = Math.max(1, lastRecordingTimeRef.current || recordingTime);
-      const measured = await getBlobDuration(blob, fallback);
-      const normalized = Math.max(1, Math.round(measured || fallback));
-
-      setRecordingTime(normalized);
-      setAudioBlob(blob);
+      setRecordingTime(normalizedDuration);
+      recordedDurationRef.current = normalizedDuration;
+      lastRecordingTimeRef.current = normalizedDuration;
+      setAudioBlob(audioBlob);
       setMediaFile(null);
       setMediaPreviewUrl(null);
       setIsRecording(false);
       mediaRecorderRef.current = null;
+      resolveRecording(audioBlob);
+      recorderPromiseRef.current = Promise.resolve(audioBlob);
     };
 
-    recorder.start(500); // 🔥 CHUNK toutes les 0.5s (empêche timeout Android)
-    console.log("⏺️ Enregistrement actif (0.5 s flush)");
+    // ⚡ Fix mobile : attendre un court délai avant démarrage
+    await new Promise((r) => setTimeout(r, 300));
+
+    // ✅ Important : pas de timeslice ici (start sans paramètre)
+    recorder.start();
+    console.log("⏺️ Enregistrement démarré avec format :", supportedMimeType);
 
     mediaRecorderRef.current = recorder;
     setIsRecording(true);
-
     recordingIntervalRef.current = setInterval(() => {
       setRecordingTime((prev) => {
         const next = prev + 1;
@@ -504,13 +501,22 @@ const CommentSection = ({ postId }) => {
       });
     }, 1000);
 
+    // ⏹️ Auto-stop après 120 secondes
+    setTimeout(() => {
+      if (recorder.state !== "inactive") {
+        console.log("⏹️ Arrêt automatique après 120s.");
+        recorder.stop();
+      }
+    }, 120000);
   } catch (error) {
-    console.error("❌ Erreur microphone mobile :", error);
+    console.error("❌ Erreur d'accès micro :", error);
     toast({
-      title: "Micro non accessible",
-      description: "Autorisez le micro sur votre appareil mobile.",
+      title: "Erreur microphone",
+      description: "Veuillez autoriser le micro dans votre navigateur.",
       variant: "destructive",
     });
+    recorderPromiseRef.current = null;
+    recordedDurationRef.current = 0;
   }
 };
 
@@ -732,98 +738,25 @@ const CommentSection = ({ postId }) => {
                 )}
                 <input type="file" ref={mediaInputRef} accept="image/*,video/*" className="hidden" onChange={handleFileChange} disabled={isRecording || !!audioBlob}/>
                 
-                  {!mediaFile && (
-  <>
-    {isRecording ? (
-      <Button
-        size="sm"
-        type="button"
-        variant="destructive"
-        onPointerUp={() => {
-          clearTimeout(holdTimerRef.current);
-          holdTimerRef.current = null;
-          if (hasStartedRef.current) {
-            stopRecording();
-            hasStartedRef.current = false;
-          }
-        }}
-        onPointerCancel={() => {
-          clearTimeout(holdTimerRef.current);
-          holdTimerRef.current = null;
-          if (hasStartedRef.current) {
-            stopRecording();
-            hasStartedRef.current = false;
-          }
-        }}
-        onPointerLeave={() => {
-          clearTimeout(holdTimerRef.current);
-          holdTimerRef.current = null;
-          if (hasStartedRef.current) {
-            stopRecording();
-            hasStartedRef.current = false;
-          }
-        }}
-        className="bg-red-500 hover:bg-red-600 touch-none select-none"
-      >
-        <Square className="h-4 w-4 mr-2" /> Relâcher pour envoyer
-      </Button>
-    ) : (
-      !audioBlob && (
-        <Button
-          size="sm"
-          type="button"
-          variant="ghost"
-          onPointerDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            clearTimeout(holdTimerRef.current);
-            hasStartedRef.current = false;
-
-            // 🕐 Démarre seulement si maintien ≥ 300ms
-            holdTimerRef.current = setTimeout(async () => {
-              await startRecording();
-              hasStartedRef.current = true;
-            }, 300);
-          }}
-          onPointerUp={() => {
-            clearTimeout(holdTimerRef.current);
-            holdTimerRef.current = null;
-            if (hasStartedRef.current) {
-              stopRecording();
-              hasStartedRef.current = false;
-            }
-          }}
-          onPointerCancel={() => {
-            clearTimeout(holdTimerRef.current);
-            holdTimerRef.current = null;
-            if (hasStartedRef.current) {
-              stopRecording();
-              hasStartedRef.current = false;
-            }
-          }}
-          onPointerLeave={() => {
-            clearTimeout(holdTimerRef.current);
-            holdTimerRef.current = null;
-            if (hasStartedRef.current) {
-              stopRecording();
-              hasStartedRef.current = false;
-            }
-          }}
-          disabled={isPostingComment}
-          className="active:bg-green-100 touch-none select-none"
-        >
-          <Mic className="h-4 w-4 mr-2" /> Maintenir pour parler
-        </Button>
-      )
-    )}
-  </>
-)}
-          </div>
+                {!mediaFile && (
+                    isRecording ? (
+                        <Button size="sm" type="button" variant="destructive" onClick={stopRecording}>
+                            <Square className="h-4 w-4 mr-2" /> Stop
+                        </Button>
+                    ) : (
+                       !audioBlob &&
+                        <Button size="sm" type="button" variant="ghost" onClick={startRecording} disabled={isPostingComment}>
+                            <Mic className="h-4 w-4 mr-2" /> Audio
+                        </Button>
+                    )
+                )}
+            </div>
         </form>
       </div>
     </motion.div>
   );
-}; // ✅ fermeture propre de CommentSection
+};
+
 
 const PostCard = ({ post, user, profile, onLike, onDelete, showComments, onToggleComments, refreshBalance }) => {
   const navigate = useNavigate();
