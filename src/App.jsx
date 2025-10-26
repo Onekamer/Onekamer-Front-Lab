@@ -33,7 +33,6 @@ import React, { useState, useEffect } from 'react';
     import RencontreMessages from '@/pages/rencontre/RencontreMessages';
     import ConversationDetail from '@/pages/rencontre/ConversationDetail';
     import RencontreProfil from '@/pages/rencontre/RencontreProfil';
-    import RencontreProfilDetail from '@/pages/rencontre/RencontreProfilDetail';
     import AuthPage from '@/pages/Auth';
     import PaiementSuccess from '@/pages/PaiementSuccess';
     import PaiementAnnule from '@/pages/PaiementAnnule';
