@@ -1,0 +1,309 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Helmet } from 'react-helmet';
+import { useAuth } from '@/contexts/SupabaseAuthContext';
+import { supabase } from '@/lib/customSupabaseClient';
+import { useToast } from '@/components/ui/use-toast';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Loader2, UserX, MessageSquare as MessageSquareHeart, Lightbulb, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+// Custom hook for debouncing
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+  return debouncedValue;
+};
+
+const SupportCenter = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [requestType, setRequestType] = useState(null);
+  
+  // State for user search
+  const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+
+  const [category, setCategory] = useState('');
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const debouncedSearchQuery = useDebounce(searchQuery, 400);
+
+  const handleSelectUser = useCallback((user) => {
+    if (!user) return;
+    setSelectedUser(user);
+    setSearchQuery('');
+    setSearchResults([]);
+    setOpen(false);
+    toast({
+      title: `👤 ${user.username || user.full_name} sélectionné`,
+      duration: 1500,
+    });
+  }, [toast]);
+
+  useEffect(() => {
+    const searchUsers = async () => {
+      if (debouncedSearchQuery.length < 2) {
+        setSearchResults([]);
+        return;
+      }
+      setSearchLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, full_name, avatar_url')
+        .or(`username.ilike.%${debouncedSearchQuery}%,full_name.ilike.%${debouncedSearchQuery}%`)
+        .limit(10);
+
+      if (error) {
+        console.error('Error searching users:', error);
+        toast({ variant: 'destructive', title: 'Erreur de recherche' });
+      } else {
+        setSearchResults(data);
+      }
+      setSearchLoading(false);
+    };
+
+    searchUsers();
+  }, [debouncedSearchQuery, toast]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!user || !requestType || !message) {
+      toast({
+        variant: 'destructive',
+        title: 'Champs manquants',
+        description: 'Veuillez remplir tous les champs requis.',
+      });
+      return;
+    }
+
+    if (requestType === 'report' && !selectedUser) {
+      toast({
+        variant: 'destructive',
+        title: 'Utilisateur manquant',
+        description: 'Merci de sélectionner l’utilisateur à signaler.',
+      });
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await supabase.from('support_requests').insert({
+      user_id: user.id,
+      type: requestType,
+      target_user_id:
+        requestType === 'report' && selectedUser?.id
+          ? selectedUser.id
+          : null,
+      category:
+        requestType === 'report' && category
+          ? category.trim()
+          : null,
+      message: message?.trim() || '',
+      status: 'new',
+    });
+    setLoading(false);
+
+    if (error) {
+      console.error("Error submitting support request:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Erreur',
+        description: 'Impossible d’envoyer la demande. Réessaie plus tard.',
+      });
+    } else {
+      toast({
+        title: '✅ Message envoyé !',
+        description: 'Ta demande a bien été transmise à notre équipe. Merci !',
+      });
+      // Reset form
+      setRequestType(null);
+      setSelectedUser(null);
+      setCategory('');
+      setMessage('');
+    }
+  };
+
+  const renderForm = () => {
+    if (!requestType) return null;
+
+    return (
+      <form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in-50 duration-500">
+        {requestType === 'report' && (
+          <>
+            <div className="space-y-2">
+              <label htmlFor="target-user-id" className="text-sm font-medium text-gray-700">
+                Utilisateur à signaler <span className="text-red-500">*</span>
+              </label>
+              <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    className="w-full justify-between"
+                  >
+                    {selectedUser
+                      ? (
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={selectedUser.avatar_url} alt={selectedUser.username} />
+                            <AvatarFallback>{selectedUser.username?.[0]?.toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          {selectedUser.username || selectedUser.full_name}
+                        </div>
+                      )
+                      : "Rechercher un utilisateur..."}
+                    <Loader2 className={cn("ml-2 h-4 w-4 shrink-0 opacity-50", !searchLoading && "hidden")} />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                  <Command>
+                    <CommandInput 
+                      placeholder="Taper un nom ou pseudo..."
+                      value={searchQuery}
+                      onValueChange={setSearchQuery}
+                    />
+                    <CommandList>
+                      <CommandEmpty>Aucun utilisateur trouvé.</CommandEmpty>
+                      <CommandGroup>
+                        {searchResults.map((profile) => (
+                          <CommandItem
+                            key={profile.id}
+                            value={profile.username}
+                            onSelect={(value) => {
+                              const user = searchResults.find((u) => u.username === value);
+                              if (user) handleSelectUser(user);
+                            }}
+                            onClick={() => handleSelectUser(profile)} // ✅ fallback pour Safari / iOS
+                          >
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={profile.avatar_url} alt={profile.username} />
+                                <AvatarFallback>{profile.username?.[0]?.toUpperCase()}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-medium">{profile.username}</p>
+                                {profile.full_name && (
+                                  <p className="text-xs text-gray-500">{profile.full_name}</p>
+                                )}
+                              </div>
+                            </div>
+                            <Check
+                              className={cn(
+                                "ml-auto h-4 w-4",
+                                selectedUser?.id === profile.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="category" className="text-sm font-medium text-gray-700">
+                Catégorie du signalement (ex: harcèlement, spam...)
+              </label>
+              <Input
+                id="category"
+                placeholder="Harcèlement, Faux profil, Contenu inapproprié..."
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              />
+            </div>
+          </>
+        )}
+        <div className="space-y-2">
+          <label htmlFor="message" className="text-sm font-medium text-gray-700">
+            Ton message <span className="text-red-500">*</span>
+          </label>
+          <Textarea
+            id="message"
+            placeholder="Explique-nous en détail ce qu'il se passe..."
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            required
+            rows={5}
+          />
+        </div>
+        <Button type="submit" disabled={loading} className="w-full">
+          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Envoyer la demande'}
+        </Button>
+      </form>
+    );
+  };
+
+  return (
+    <>
+      <Helmet>
+        <title>Centre d'aide - OneKamer</title>
+        <meta name="description" content="Signaler un problème, donner un feedback ou proposer une suggestion à l'équipe OneKamer." />
+      </Helmet>
+      <div className="max-w-2xl mx-auto py-8">
+        <Card className="shadow-lg border-t-4 border-t-[#2BA84A]">
+          <CardHeader className="text-center">
+            <CardTitle className="text-3xl font-bold text-gray-800">Centre d'aide OneKamer</CardTitle>
+            <CardDescription className="text-gray-600">
+              Un problème ? Une idée ? Nous sommes là pour t'écouter.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {!requestType ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in-50 duration-500">
+                <Button
+                  variant="outline"
+                  className="h-24 flex-col gap-2"
+                  onClick={() => setRequestType('report')}
+                >
+                  <UserX className="h-6 w-6 text-red-500" />
+                  <span className="font-semibold">Signaler un utilisateur</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-24 flex-col gap-2"
+                  onClick={() => setRequestType('feedback')}
+                >
+                  <MessageSquareHeart className="h-6 w-6 text-blue-500" />
+                  <span className="font-semibold">Donner un feedback</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-24 flex-col gap-2"
+                  onClick={() => setRequestType('suggestion')}
+                >
+                  <Lightbulb className="h-6 w-6 text-yellow-500" />
+                  <span className="font-semibold">Suggérer une idée</span>
+                </Button>
+              </div>
+            ) : (
+                <Button variant="link" onClick={() => { setRequestType(null); setSelectedUser(null); }} className="text-sm text-[#2BA84A]">
+                &larr; Choisir un autre type de demande
+              </Button>
+            )}
+            {renderForm()}
+          </CardContent>
+        </Card>
+      </div>
+    </>
+  );
+};
+
+export default SupportCenter;
