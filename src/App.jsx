@@ -88,7 +88,7 @@ import React, { useState, useEffect } from 'react';
               <Route path="/rencontre/messages" element={<RencontreMessages />} />
               <Route path="/rencontre/messages/:conversationId" element={<ConversationDetail />} />
               <Route path="/rencontre/profil" element={<RencontreProfil />} />
-              <Route path="/rencontre/profil/:id" element={<RencontreProfilDetail />} />
+              {/* <Route path="/rencontre/profil/:id" element={<RencontreProfilDetail />} /> */}
               <Route path="/faits-divers" element={<FaitsDivers />} />
               <Route path="/groupes" element={<Groupes />} />
               <Route path="/groupes/creer" element={<CreateGroupe />} />
