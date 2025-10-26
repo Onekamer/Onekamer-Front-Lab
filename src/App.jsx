@@ -33,6 +33,7 @@ import React, { useState, useEffect } from 'react';
     import RencontreMessages from '@/pages/rencontre/RencontreMessages';
     import ConversationDetail from '@/pages/rencontre/ConversationDetail';
     import RencontreProfil from '@/pages/rencontre/RencontreProfil';
+    import RencontreProfilDetail from '@/pages/rencontre/RencontreProfilDetail';
     import AuthPage from '@/pages/Auth';
     import PaiementSuccess from '@/pages/PaiementSuccess';
     import PaiementAnnule from '@/pages/PaiementAnnule';
@@ -42,6 +43,8 @@ import React, { useState, useEffect } from 'react';
     import { useCharteValidation } from '@/hooks/useCharteValidation';
     import { applyAutoAccessProtection } from "@/lib/autoAccessWrapper";
     import ResetPassword from '@/pages/ResetPassword';
+    import OneSignalInitializer from '@/OneSignalInitializer';
+    import SupportCenter from '@/pages/SupportCenter';
 
     const AppLayout = () => {
       const { profile } = useAuth();
@@ -85,6 +88,7 @@ import React, { useState, useEffect } from 'react';
               <Route path="/rencontre/messages" element={<RencontreMessages />} />
               <Route path="/rencontre/messages/:conversationId" element={<ConversationDetail />} />
               <Route path="/rencontre/profil" element={<RencontreProfil />} />
+              <Route path="/rencontre/profil/:id" element={<RencontreProfilDetail />} />
               <Route path="/faits-divers" element={<FaitsDivers />} />
               <Route path="/groupes" element={<Groupes />} />
               <Route path="/groupes/creer" element={<CreateGroupe />} />
@@ -110,6 +114,7 @@ import React, { useState, useEffect } from 'react';
               <Route path="/verification-sms" element={<VerificationSMS />} />
               <Route path="/paiement-success" element={<PaiementSuccess />} />
               <Route path="/paiement-annule" element={<PaiementAnnule />} />
+              <Route path="/aide" element={<SupportCenter />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>
@@ -131,6 +136,8 @@ import React, { useState, useEffect } from 'react';
               <meta name="theme-color" content="#2BA84A" />
             </Helmet>
             
+            <OneSignalInitializer />
+
             <div className="min-h-screen bg-gradient-to-br from-[#FDF9F9] to-[#CDE1D5] pb-20">
               <AppContent />
             </div>
