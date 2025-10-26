@@ -139,73 +139,82 @@ const SupportCenter = () => {
   };
 
   const renderForm = () => {
-    if (!requestType) return null;
+  if (!requestType) return null;
 
-    return (
-      <form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in-50 duration-500">
-        {requestType === 'report' && (
-          <>
-            <div className="space-y-2">
-              <label htmlFor="target-user-id" className="text-sm font-medium text-gray-700">
-                Utilisateur à signaler <span className="text-red-500">*</span>
-              </label>
-              <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="w-full justify-between"
-                  >
-                    {selectedUser
-                      ? (
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-6 w-6">
-                            <AvatarImage src={selectedUser.avatar_url} alt={selectedUser.username} />
-                            <AvatarFallback>{selectedUser.username?.[0]?.toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          {selectedUser.username || selectedUser.full_name}
-                        </div>
-                      )
-                      : "Rechercher un utilisateur..."}
-                    <Loader2 className={cn("ml-2 h-4 w-4 shrink-0 opacity-50", !searchLoading && "hidden")} />
-                  <div className="mt-2 text-sm text-gray-500">
-  (Recherche temporairement désactivée)
-</div>
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in-50 duration-500">
+      {requestType === 'report' && (
+        <>
+          <div className="space-y-2">
+            <label htmlFor="target-user-id" className="text-sm font-medium text-gray-700">
+              Utilisateur à signaler <span className="text-red-500">*</span>
+            </label>
 
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="category" className="text-sm font-medium text-gray-700">
-                Catégorie du signalement (ex: harcèlement, spam...)
-              </label>
-              <Input
-                id="category"
-                placeholder="Harcèlement, Faux profil, Contenu inapproprié..."
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className="w-full justify-between"
+              onClick={handleSearch}
+            >
+              {selectedUser ? (
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage src={selectedUser.avatar_url} alt={selectedUser.username} />
+                    <AvatarFallback>{selectedUser.username?.[0]?.toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  {selectedUser.username || selectedUser.full_name}
+                </div>
+              ) : (
+                "Rechercher un utilisateur..."
+              )}
+              <Loader2
+                className={cn(
+                  "ml-2 h-4 w-4 shrink-0 opacity-50",
+                  !searchLoading && "hidden"
+                )}
               />
+            </Button>
+
+            <div className="mt-2 text-sm text-gray-500">
+              (Recherche temporairement désactivée)
             </div>
-          </>
-        )}
-        <div className="space-y-2">
-          <label htmlFor="message" className="text-sm font-medium text-gray-700">
-            Ton message <span className="text-red-500">*</span>
-          </label>
-          <Textarea
-            id="message"
-            placeholder="Explique-nous en détail ce qu'il se passe..."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            required
-            rows={5}
-          />
-        </div>
-        <Button type="submit" disabled={loading} className="w-full">
-          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Envoyer la demande'}
-        </Button>
-      </form>
-    );
-  };
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="category" className="text-sm font-medium text-gray-700">
+              Catégorie du signalement (ex: harcèlement, spam...)
+            </label>
+            <Input
+              id="category"
+              placeholder="Harcèlement, Faux profil, Contenu inapproprié..."
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            />
+          </div>
+        </>
+      )}
+
+      <div className="space-y-2">
+        <label htmlFor="message" className="text-sm font-medium text-gray-700">
+          Ton message <span className="text-red-500">*</span>
+        </label>
+        <Textarea
+          id="message"
+          placeholder="Explique-nous en détail ce qu'il se passe..."
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          required
+          rows={5}
+        />
+      </div>
+
+      <Button type="submit" disabled={loading} className="w-full">
+        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Envoyer la demande'}
+      </Button>
+    </form>
+  );
+};
 
   return (
     <>
