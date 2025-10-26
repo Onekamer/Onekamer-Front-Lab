@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
     import { Helmet } from 'react-helmet';
     import { useParams, useNavigate } from 'react-router-dom';
     import { Card, CardContent } from '@/components/ui/card';
@@ -18,7 +18,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
     import GroupMembers from '@/pages/groupes/GroupMembers';
     import GroupAdmin from '@/pages/groupes/GroupAdmin';
 
-    const MessageItem = ({ msg, currentUserId }) => {
+    const MessageItem = ({ msg, currentUserId, groupId, onActionComplete }) => {
       const { user } = useAuth();
       const [isLiked, setIsLiked] = useState(false);
       const [likesCount, setLikesCount] = useState(msg.likes_count || 0);
@@ -36,10 +36,12 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
           setIsLiked(true);
         }
       }, [user, msg.message_id]);
-
+      
       useEffect(() => {
-        checkLiked();
-      }, [checkLiked]);
+        if (!msg.is_system_message) {
+          checkLiked();
+        }
+      }, [checkLiked, msg.is_system_message]);
 
       const handleLike = async () => {
         if (!user || !msg.message_id) {
@@ -57,6 +59,14 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
           await supabase.from('group_message_likes').insert({ message_id: msg.message_id, user_id: user.id });
         }
       };
+      
+      if (msg.is_system_message) {
+        return (
+            <div className="text-center my-4">
+                <p className="text-sm text-green-600 bg-green-100 rounded-full px-3 py-1 inline-block">{msg.message_contenu}</p>
+            </div>
+        );
+      }
 
       const renderContent = () => {
         try {
@@ -101,7 +111,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
                         <span>{likesCount}</span>
                       </button>
                       {!isMyMessage && msg.sender_id && (
-                        <DonationDialog receiverId={msg.sender_id} receiverName={msg.sender_username} />
+                        <DonationDialog receiverId={msg.sender_id} receiverName={msg.sender_username} groupId={groupId} onDonationComplete={onActionComplete} />
                       )}
                   </div>
               </CardContent>
@@ -114,10 +124,11 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
       const navigate = useNavigate();
       const { user, session, loading: authLoading } = useAuth();
       const [groupData, setGroupData] = useState([]);
+      const [messages, setMessages] = useState([]);
       const [loading, setLoading] = useState(true);
       const [newMessage, setNewMessage] = useState('');
       const [joinRequestStatus, setJoinRequestStatus] = useState('idle');
-      const messagesEndRef = React.useRef(null);
+      const messagesEndRef = useRef(null);
     
       const fetchGroupData = useCallback(async () => {
         if (!user || !session) {
@@ -129,7 +140,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
             .from('vue_groupes_complete')
             .select('*')
             .eq('groupe_id', groupId)
-            .order('message_date', { ascending: false });
+            .order('message_date', { ascending: true });
 
         if (error) {
             console.error('Erreur chargement vue:', error);
@@ -155,8 +166,16 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
              groupe_fondateur_id: groupOnlyData.fondateur_id,
              groupe_image_url: groupOnlyData.image_url,
            }]);
+           setMessages([]);
         } else {
             setGroupData(data);
+            const uniqueMessages = new Map();
+            data.forEach(row => {
+                if (row.message_id && !uniqueMessages.has(row.message_id)) {
+                    uniqueMessages.set(row.message_id, row);
+                }
+            });
+            setMessages(Array.from(uniqueMessages.values()));
         }
 
         setLoading(false);
@@ -173,21 +192,48 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
       }, [user, session, authLoading, fetchGroupData, navigate]);
     
       useEffect(() => {
-        if (!user) return;
+        if (!user || !groupId) return;
+      
         const channel = supabase
-          .channel(`group-chat-${groupId}`)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'messages_groupes', filter: `groupe_id=eq.${groupId}` }, 
-            payload => {
-                fetchGroupData();
-            })
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'group_message_likes' },
-            payload => {
-                fetchGroupData();
-            })
+          .channel(`group-realtime-${groupId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'messages_groupes',
+              filter: `groupe_id=eq.${groupId}`,
+            },
+            async (payload) => {
+              const { data: senderProfile } = await supabase
+                .from('profiles')
+                .select('username, avatar_url')
+                .eq('id', payload.new.sender_id)
+                .single();
+      
+              const newMessage = {
+                message_id: payload.new.id,
+                message_contenu: payload.new.contenu,
+                message_date: payload.new.created_at,
+                sender_id: payload.new.sender_id,
+                likes_count: 0,
+                sender_username: senderProfile?.username,
+                sender_avatar: senderProfile?.avatar_url,
+                is_system_message: payload.new.is_system_message
+              };
+      
+              setMessages((prev) => [...prev, newMessage]);
+              setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+            }
+          )
           .subscribe();
-    
+      
         return () => supabase.removeChannel(channel);
-      }, [groupId, fetchGroupData, user]);
+      }, [groupId, user]);
+
+      useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, [messages]);
 
       const handleSendMessage = async () => {
         if (!newMessage.trim() || !user) return;
@@ -240,17 +286,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
         return Array.from(uniqueMembers.values());
       }, [groupData]);
 
-      const messages = useMemo(() => {
-        if (!groupData) return [];
-        const uniqueMessages = new Map();
-        groupData.forEach(row => {
-            if (row.message_id && !uniqueMessages.has(row.message_id)) {
-                uniqueMessages.set(row.message_id, row);
-            }
-        });
-        return Array.from(uniqueMessages.values());
-      }, [groupData]);
-
       const currentUserRole = useMemo(() => {
         if (!groupInfo || !user) return 'guest';
         if (groupInfo.groupe_fondateur_id === user.id) return 'fondateur';
@@ -296,25 +331,29 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
         <>
           <Helmet><title>{groupInfo.groupe_nom} - Groupe OneKamer.co</title></Helmet>
           <div className="flex flex-col h-[calc(100vh-8rem)]">
-            <div className="flex items-center p-3 border-b">
-              <Button variant="ghost" size="icon" onClick={() => navigate('/groupes')}><ArrowLeft className="h-5 w-5" /></Button>
-              <div className="flex-1 text-center">
-                <h1 className="font-bold text-lg">{groupInfo.groupe_nom}</h1>
-                <p className="text-sm text-gray-500">{members.length} membres</p>
+            <div className="flex-shrink-0">
+              <div className="flex items-center p-3 border-b">
+                <Button variant="ghost" size="icon" onClick={() => navigate('/groupes')}><ArrowLeft className="h-5 w-5" /></Button>
+                <div className="flex-1 text-center">
+                  <h1 className="font-bold text-lg">{groupInfo.groupe_nom}</h1>
+                  <p className="text-sm text-gray-500">{members.length} membres</p>
+                </div>
+                <div className="w-10"></div>
               </div>
-              <div className="w-10"></div>
             </div>
             
-            <Tabs defaultValue="messages" className="flex-grow flex flex-col">
-              <TabsList className="grid w-full grid-cols-3 mx-auto max-w-md">
-                <TabsTrigger value="messages">Messages</TabsTrigger>
-                <TabsTrigger value="members">Membres</TabsTrigger>
-                {(currentUserRole === 'admin' || currentUserRole === 'fondateur') && <TabsTrigger value="admin">Admin</TabsTrigger>}
-              </TabsList>
+            <Tabs defaultValue="messages" className="flex-grow flex flex-col overflow-hidden">
+              <div className="flex-shrink-0">
+                <TabsList className="grid w-full grid-cols-3 mx-auto max-w-md">
+                  <TabsTrigger value="messages">Messages</TabsTrigger>
+                  <TabsTrigger value="members">Membres</TabsTrigger>
+                  {(currentUserRole === 'admin' || currentUserRole === 'fondateur') && <TabsTrigger value="admin">Admin</TabsTrigger>}
+                </TabsList>
+              </div>
               
-              <TabsContent value="messages" className="flex-grow flex flex-col">
+              <TabsContent value="messages" className="flex-grow flex flex-col overflow-hidden">
                 {isMember && (
-                  <div className="p-3 border-b bg-gray-50">
+                  <div className="flex-shrink-0 p-3 border-b bg-gray-50">
                       <div className="flex items-center gap-2">
                           <Textarea 
                               value={newMessage} 
@@ -334,7 +373,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
                   </div>
                 )}
                 <div className="flex-grow overflow-y-auto p-4 space-y-2">
-                  {messages.map(msg => <MessageItem key={msg.message_id} msg={msg} currentUserId={user.id} />)}
+                  {messages.map(msg => <MessageItem key={msg.message_id} msg={msg} currentUserId={user.id} groupId={groupId} onActionComplete={fetchGroupData} />)}
                   <div ref={messagesEndRef}></div>
                 </div>
               </TabsContent>
@@ -345,7 +384,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
               {(currentUserRole === 'admin' || currentUserRole === 'fondateur') && (
                 <TabsContent value="admin" className="flex-grow overflow-y-auto p-4">
-                  <GroupAdmin group={{...groupInfo, id: groupInfo.groupe_id, fondateur_id: groupInfo.groupe_fondateur_id}} onGroupUpdate={fetchGroupData}/>
+                  <GroupAdmin group={{...groupInfo, id: groupInfo.groupe_id, fondateur_id: groupInfo.groupe_fondateur_id, groupes_membres: members}} onGroupUpdate={fetchGroupData}/>
                 </TabsContent>
               )}
             </Tabs>
