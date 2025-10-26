@@ -544,8 +544,8 @@ const CreatePost = () => {
             className="editable"
             data-placeholder={`${
                 profile?.username
-                ? `Quoi de neuf, ${profile.username} ? Mentionnez un membre avec @ — commencez à écrire, appuyez sur la photo ou tapez son nom.`
-                : 'Quoi de neuf ? Mentionnez un membre avec @ — commencez à écrire, appuyez sur la photo ou tapez son nom.'
+                ? `Quoi de neuf, ${profile.username} ? Mentionnez un membre avec @`
+                : 'Quoi de neuf ? Mentionnez un membre avec @'
             }`}
           />
           <MentionSuggestions />
