@@ -7,7 +7,6 @@ import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, UserX, MessageSquare as MessageSquareHeart, Lightbulb, Check } from 'lucide-react';
@@ -170,53 +169,10 @@ const SupportCenter = () => {
                       )
                       : "Rechercher un utilisateur..."}
                     <Loader2 className={cn("ml-2 h-4 w-4 shrink-0 opacity-50", !searchLoading && "hidden")} />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                  <Command>
-                    <CommandInput 
-                      placeholder="Taper un nom ou pseudo..."
-                      value={searchQuery}
-                      onValueChange={setSearchQuery}
-                    />
-                    <CommandList>
-                      <CommandEmpty>Aucun utilisateur trouvé.</CommandEmpty>
-                      <CommandGroup>
-                        {searchResults.map((profile) => (
-                          <CommandItem
-                            key={profile.id}
-                            value={profile.username}
-                            onSelect={(value) => {
-                              const user = searchResults.find((u) => u.username === value);
-                              if (user) handleSelectUser(user);
-                            }}
-                            onClick={() => handleSelectUser(profile)} // ✅ fallback pour Safari / iOS
-                          >
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={profile.avatar_url} alt={profile.username} />
-                                <AvatarFallback>{profile.username?.[0]?.toUpperCase()}</AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <p className="font-medium">{profile.username}</p>
-                                {profile.full_name && (
-                                  <p className="text-xs text-gray-500">{profile.full_name}</p>
-                                )}
-                              </div>
-                            </div>
-                            <Check
-                              className={cn(
-                                "ml-auto h-4 w-4",
-                                selectedUser?.id === profile.id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                  <div className="mt-2 text-sm text-gray-500">
+  (Recherche temporairement désactivée)
+</div>
+
             </div>
             <div className="space-y-2">
               <label htmlFor="category" className="text-sm font-medium text-gray-700">
