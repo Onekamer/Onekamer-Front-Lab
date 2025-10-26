@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
@@ -26,7 +27,7 @@ const Home = () => {
   const navigate = useNavigate();
   const [posts, setPosts] = useState([]);
   const [events, setEvents] = useState([]);
-  const [partners, setPartners] = useState([]);
+  const [faitsDivers, setFaitsDivers] = useState([]); // Changed from partners
   const [annonces, setAnnonces] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -46,8 +47,8 @@ const Home = () => {
         .order('date', { ascending: true })
         .limit(2);
 
-      const fetchPartners = supabase
-        .from('partenaires')
+      const fetchFaitsDivers = supabase // Changed from fetchPartners
+        .from('faits_divers') // Changed table
         .select('*')
         .order('created_at', { ascending: false })
         .limit(2);
@@ -61,13 +62,13 @@ const Home = () => {
       const [
         postsResult,
         eventsResult,
-        partnersResult,
+        faitsDiversResult, // Changed from partnersResult
         annoncesResult
-      ] = await Promise.all([fetchPosts, fetchEvents, fetchPartners, fetchAnnonces]);
+      ] = await Promise.all([fetchPosts, fetchEvents, fetchFaitsDivers, fetchAnnonces]); // Changed from partnersResult
 
       setPosts(postsResult.data || []);
       setEvents(eventsResult.data || []);
-      setPartners(partnersResult.data || []);
+      setFaitsDivers(faitsDiversResult.data || []); // Changed from setPartners
       setAnnonces(annoncesResult.data || []);
       
       setLoading(false);
@@ -156,17 +157,16 @@ const Home = () => {
               </div>
             </motion.section>
 
+            {/* Section for Faits Divers - Replaced Partners */}
             <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
-              <SectionHeader title="Partenaires" icon={Users} path="/partenaires" navigate={navigate} />
-              <div className="grid grid-cols-2 gap-4">
-                {partners.map(partner => (
-                  <Card key={partner.id} className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/partenaires')}>
-                    <CardContent className="p-4 text-center">
-                      <div className="w-16 h-16 rounded-full mx-auto mb-3 overflow-hidden">
-                        <MediaDisplay bucket="partenaires" path={partner.media_url} alt={partner.name} className="w-full h-full object-cover" />
-                      </div>
-                      <h3 className="font-bold text-sm truncate">{partner.name}</h3>
-                      <p className="text-xs text-gray-500 truncate">{partner.address}</p>
+              <SectionHeader title="Faits Divers" icon={FileText} path="/faits-divers" navigate={navigate} /> {/* Updated title, icon, and path */}
+              <div className="grid grid-cols-1 gap-4"> {/* Changed grid layout to 1 column for article format */}
+                {faitsDivers.map(fait => ( // Changed from partners to faitsDivers
+                  <Card key={fait.id} className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/faits-divers')}>
+                    <MediaDisplay bucket="faits_divers" path={fait.image_url} alt={fait.title} className="w-full h-40 object-cover" /> {/* Updated image display */}
+                    <CardContent className="p-4">
+                      <h3 className="font-bold text-md mb-2 truncate">{fait.title}</h3> {/* Display title */}
+                      <p className="text-xs text-gray-500 line-clamp-2">{fait.excerpt}</p> {/* Display excerpt */}
                     </CardContent>
                   </Card>
                 ))}
