@@ -38,7 +38,8 @@
     "react-router-dom": "^6.16.0",
     "tailwind-merge": "^1.14.0",
     "tailwindcss-animate": "^1.0.7",
-    "react-onesignal": "^3.0.0"
+    "react-onesignal": "^3.0.0",
+    "cmdk": "^1.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.8.3",
