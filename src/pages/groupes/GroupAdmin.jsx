@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, UserPlus, X, Crown, Shield } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   AlertDialog,
@@ -39,6 +40,7 @@ const GroupAdmin = ({ group, onGroupUpdate }) => {
     const wrapperRef = useRef(null);
     
     const isFounder = group.fondateur_id === user.id;
+    const isAdmin = group.groupes_membres.find(m => m.user_id === user.id)?.is_admin || false;
 
     useEffect(() => {
         setMembers(group.groupes_membres || []);
@@ -173,6 +175,88 @@ const GroupAdmin = ({ group, onGroupUpdate }) => {
 
     return (
         <div className="space-y-6">
+            {(isAdmin || isFounder) && (
+                <Card>
+                    <CardHeader><CardTitle>Paramètres du groupe</CardTitle></CardHeader>
+                    <CardContent className="space-y-6">
+                        <div>
+                            <label className="text-sm font-medium">Nom du groupe</label>
+                            <Input
+                                type="text"
+                                defaultValue={group.nom}
+                                className="w-full border rounded-md p-2 text-sm mt-1"
+                                onBlur={async (e) => {
+                                    const { error } = await supabase.from('groupes').update({ nom: e.target.value }).eq('id', group.id);
+                                    if (error) toast({ title: 'Erreur', description: 'Impossible de modifier le nom du groupe.', variant: 'destructive' });
+                                    else {
+                                        toast({ title: 'Succès', description: 'Nom du groupe mis à jour.' });
+                                        onGroupUpdate();
+                                    }
+                                }}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium">Description du groupe</label>
+                            <Textarea
+                                defaultValue={group.description}
+                                className="w-full border rounded-md p-2 text-sm mt-1"
+                                onBlur={async (e) => {
+                                    const { error } = await supabase.from('groupes').update({ description: e.target.value }).eq('id', group.id);
+                                    if (error) toast({ title: 'Erreur', description: 'Impossible de modifier la description.', variant: 'destructive' });
+                                    else {
+                                        toast({ title: 'Succès', description: 'Description mise à jour.' });
+                                        onGroupUpdate();
+                                    }
+                                }}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium">Visibilité du groupe</label>
+                            <select
+                                className="w-full border rounded-md p-2 text-sm mt-1 bg-white"
+                                defaultValue={!group.est_prive ? 'true' : 'false'}
+                                onChange={async (e) => {
+                                    const newStatus = e.target.value === 'true';
+                                    const { error } = await supabase.from('groupes').update({ est_prive: !newStatus }).eq('id', group.id);
+                                    if (error) toast({ title: 'Erreur', description: 'Impossible de modifier la visibilité.', variant: 'destructive' });
+                                    else {
+                                        toast({ title: 'Succès', description: `Le groupe est maintenant ${newStatus ? 'public' : 'privé'}.` });
+                                        onGroupUpdate();
+                                    }
+                                }}
+                            >
+                                <option value="false">Groupe privé (invitation uniquement)</option>
+                                <option value="true">Groupe public (visible par tous)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium">Photo de profil du groupe</label>
+                            <Input
+                                type="file"
+                                accept="image/*"
+                                className="w-full text-sm mt-1"
+                                onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    const fileExt = file.name.split('.').pop();
+                                    const filePath = `${group.id}.${fileExt}`;
+                                    const { error: uploadError } = await supabase.storage.from('groupes').upload(filePath, file, { upsert: true });
+                                    if (uploadError) return toast({ title: 'Erreur', description: 'Impossible de téléverser la photo.', variant: 'destructive' });
+                                    const { data } = supabase.storage.from('groupes').getPublicUrl(filePath);
+                                    const publicUrl = `${data.publicUrl}?t=${new Date().getTime()}`;
+                                    const { error: updateError } = await supabase.from('groupes').update({ image_url: publicUrl }).eq('id', group.id);
+                                    if (updateError) toast({ title: 'Erreur', description: 'Impossible de mettre à jour la photo.', variant: 'destructive' });
+                                    else {
+                                        toast({ title: 'Succès', description: 'Photo du groupe mise à jour.' });
+                                        onGroupUpdate();
+                                    }
+                                }}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             <Card>
                 <CardHeader><CardTitle>Gérer les membres</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
@@ -224,7 +308,7 @@ const GroupAdmin = ({ group, onGroupUpdate }) => {
                                      <Avatar><AvatarImage src={m.profile?.avatar_url} /><AvatarFallback>{m.profile?.username?.[0]}</AvatarFallback></Avatar>
                                      <p>{m.profile?.username}</p>
                                 </div>
-                                {m.role !== 'fondateur' && (isFounder || (group.groupes_membres.find(gm => gm.user_id === user.id)?.is_admin && !m.is_admin)) && (
+                                {m.role !== 'fondateur' && (isFounder || (isAdmin && !m.is_admin)) && (
                                     <div className="flex gap-2">
                                         {isFounder && (
                                             <Button variant={m.is_admin ? 'secondary' : 'outline'} size="sm" onClick={() => handleToggleAdmin(m.user_id, m.is_admin)} disabled={actionLoading}>
