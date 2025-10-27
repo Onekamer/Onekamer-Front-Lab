@@ -640,7 +640,8 @@ const RencontreProfil = () => {
                     <Input id="nombre_enfant" name="nombre_enfant" type="number" value={profile.nombre_enfant || ''} onChange={handleChange} min="1" />
                   </div>
                 )}
-              </div>
+</div> {/* ✅ ferme le grid principal */}
+</div> {/* ✅ ferme le bloc supérieur space-y-3 */}
               <div className="flex justify-end pt-4"><Button type="submit" disabled={saving} className="bg-gradient-to-r from-green-500 to-emerald-500 text-white">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Enregistrer</Button></div>
             </form>
           </CardContent>
