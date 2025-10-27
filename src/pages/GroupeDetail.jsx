@@ -6,7 +6,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
     import { Button } from '@/components/ui/button';
     import { ArrowLeft, Send, Loader2, Heart } from 'lucide-react';
     import { Textarea } from '@/components/ui/textarea';
-    import { toast } from '@/components/ui/use-toast';
+    import { useToast } from '@/components/ui/use-toast';
     import { supabase } from '@/lib/customSupabaseClient';
     import { useAuth } from '@/contexts/SupabaseAuthContext';
     import MediaDisplay from '@/components/MediaDisplay';
@@ -20,6 +20,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 
     const MessageItem = ({ msg, currentUserId, groupId, onActionComplete }) => {
       const { user } = useAuth();
+      const { toast } = useToast();
       const [isLiked, setIsLiked] = useState(false);
       const [likesCount, setLikesCount] = useState(msg.likes_count || 0);
 
@@ -123,6 +124,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
       const { groupId } = useParams();
       const navigate = useNavigate();
       const { user, session, loading: authLoading } = useAuth();
+      const { toast } = useToast();
       const [groupData, setGroupData] = useState([]);
       const [messages, setMessages] = useState([]);
       const [loading, setLoading] = useState(true);
@@ -179,7 +181,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
         }
 
         setLoading(false);
-    }, [groupId, user, session, navigate]);
+    }, [groupId, user, session, navigate, toast]);
 
       useEffect(() => {
         if (!authLoading) {
