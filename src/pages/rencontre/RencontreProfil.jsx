@@ -182,39 +182,55 @@ const RencontreProfil = () => {
   };
 
   const handleGalleryChange = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
 
-    const remainingSlots = 6 - (profile.photos.length + galleryFiles.length);
-    if (remainingSlots <= 0) {
-      toast({ title: 'Limite atteinte', description: 'Vous pouvez ajouter jusqu\'à 6 photos.', variant: 'destructive' });
-      e.target.value = '';
-      return;
-    }
-
-    const filesToProcess = files.slice(0, remainingSlots);
-    const options = { maxSizeMB: 1, maxWidthOrHeight: 800, useWebWorker: true };
-
-    const newGalleryItems = [];
-    for (const file of filesToProcess) {
-      try {
-        const compressedFile = await imageCompression(file, options);
-        newGalleryItems.push({
-          id: `${Date.now()}-${Math.random()}`,
-          file: compressedFile,
-          preview: URL.createObjectURL(compressedFile),
-        });
-      } catch (error) {
-        toast({ title: "Erreur d'image", description: error.message, variant: 'destructive' });
-      }
-    }
-
-    if (newGalleryItems.length > 0) {
-      setGalleryFiles(prev => [...prev, ...newGalleryItems]);
-    }
-
+  // 🔒 Limite à 6 photos max
+  const remainingSlots = 6 - (profile.photos.length + galleryFiles.length);
+  if (remainingSlots <= 0) {
+    toast({
+      title: 'Limite atteinte',
+      description: 'Vous pouvez ajouter jusqu’à 6 photos.',
+      variant: 'destructive',
+    });
     e.target.value = '';
-  };
+    return;
+  }
+
+  // 🔧 Compression
+  const filesToProcess = files.slice(0, remainingSlots);
+  const options = { maxSizeMB: 1, maxWidthOrHeight: 800, useWebWorker: true };
+
+  const newGalleryItems = [];
+  for (const file of filesToProcess) {
+    try {
+      const compressedFile = await imageCompression(file, options);
+      newGalleryItems.push({
+        id: `${Date.now()}-${Math.random()}`,
+        file: compressedFile,
+        preview: URL.createObjectURL(compressedFile),
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur d'image",
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  }
+
+  if (newGalleryItems.length > 0) {
+    setGalleryFiles((prev) => [...prev, ...newGalleryItems]);
+
+    // 🖼️ Correction principale : afficher immédiatement la première image
+    // si aucune photo principale n'est encore visible
+    if (!imagePreview) {
+      setImagePreview(newGalleryItems[0].preview);
+    }
+  }
+
+  e.target.value = '';
+};
 
   const handleRemovePhoto = (url) => {
     setProfile(prev => ({ ...prev, photos: prev.photos.filter(photo => photo !== url) }));
@@ -475,18 +491,50 @@ const RencontreProfil = () => {
                     </div>
                   ))}
                   {(profile.photos.length + galleryFiles.length) < 6 && (
-                    <button
-                      type="button"
-                      onClick={() => galleryInputRef.current?.click()}
-                      className="flex flex-col items-center justify-center aspect-square rounded-lg border-2 border-dashed border-gray-300 text-gray-500 hover:border-green-400 hover:text-green-500 transition"
-                    >
-                      <Plus className="h-8 w-8" />
-                      <span className="mt-2 text-sm font-medium">Ajouter</span>
-                    </button>
-                  )}
-                </div>
-                <input type="file" accept="image/*" multiple ref={galleryInputRef} onChange={handleGalleryChange} className="hidden" />
-              </div>
+  <button
+    type="button"
+    onClick={() => galleryInputRef.current?.click()}
+    className="flex flex-col items-center justify-center aspect-square rounded-lg border-2 border-dashed border-gray-300 text-gray-500 hover:border-green-400 hover:text-green-500 transition"
+  >
+    <Plus className="h-8 w-8" />
+    <span className="mt-2 text-sm font-medium">Ajouter</span>
+  </button>
+)}
+
+{/* 🖼️ Aperçu instantané des nouvelles photos avant enregistrement */}
+{galleryFiles.length > 0 && (
+  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
+    {galleryFiles.map(item => (
+      <div
+        key={item.id}
+        className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 group"
+      >
+        <img
+          src={item.preview}
+          alt="Aperçu"
+          className="w-full h-full object-cover"
+        />
+        <button
+          type="button"
+          onClick={() => handleRemoveNewPhoto(item.id)}
+          className="absolute top-2 right-2 p-1 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition"
+          aria-label="Supprimer la nouvelle photo"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    ))}
+  </div>
+)}
+
+<input
+  type="file"
+  accept="image/*"
+  multiple
+  ref={galleryInputRef}
+  onChange={handleGalleryChange}
+  className="hidden"
+/>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div><Label htmlFor="name">Nom/Pseudo</Label><Input id="name" name="name" value={profile.name || ''} onChange={handleChange} /></div>
