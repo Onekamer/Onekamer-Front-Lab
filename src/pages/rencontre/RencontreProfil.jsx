@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, ArrowLeft, Camera, Pencil, MapPin, Briefcase, User, Ruler, Weight, Users, Cigarette, GlassWater, Baby, Paintbrush, Gem, Tv, Music, Film, Book, Sparkles, Languages, Code, Award, GraduationCap } from 'lucide-react';
+import { Loader2, ArrowLeft, Camera, Pencil, MapPin, Briefcase, User, Ruler, Weight, Users, Cigarette, GlassWater, Baby, Paintbrush, Gem, Tv, Music, Film, Book, Sparkles, Languages, Code, Award, GraduationCap, Plus, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -71,6 +71,7 @@ const RencontreProfil = () => {
     langues_parlees: [],
     competences_techniques: [],
     competences_humaines: [],
+    photos: [],
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -80,6 +81,8 @@ const RencontreProfil = () => {
   const [imagePreview, setImagePreview] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const fileInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
+  const [galleryFiles, setGalleryFiles] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
 
@@ -96,7 +99,7 @@ const RencontreProfil = () => {
       }
       setProfile(p => ({ ...p, image_url: userProfile?.avatar_url, name: userProfile?.username, user_id: user.id }))
     } else if (data) {
-      setProfile(prev => ({...prev, ...data}));
+      setProfile(prev => ({...prev, ...data, photos: Array.isArray(data.photos) ? data.photos : []}));
       setImagePreview(data.image_url);
       setHasProfile(true);
     } else if (error) {
@@ -178,6 +181,55 @@ const RencontreProfil = () => {
     }
   };
 
+  const handleGalleryChange = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const remainingSlots = 6 - (profile.photos.length + galleryFiles.length);
+    if (remainingSlots <= 0) {
+      toast({ title: 'Limite atteinte', description: 'Vous pouvez ajouter jusqu\'à 6 photos.', variant: 'destructive' });
+      e.target.value = '';
+      return;
+    }
+
+    const filesToProcess = files.slice(0, remainingSlots);
+    const options = { maxSizeMB: 1, maxWidthOrHeight: 800, useWebWorker: true };
+
+    const newGalleryItems = [];
+    for (const file of filesToProcess) {
+      try {
+        const compressedFile = await imageCompression(file, options);
+        newGalleryItems.push({
+          id: `${Date.now()}-${Math.random()}`,
+          file: compressedFile,
+          preview: URL.createObjectURL(compressedFile),
+        });
+      } catch (error) {
+        toast({ title: "Erreur d'image", description: error.message, variant: 'destructive' });
+      }
+    }
+
+    if (newGalleryItems.length > 0) {
+      setGalleryFiles(prev => [...prev, ...newGalleryItems]);
+    }
+
+    e.target.value = '';
+  };
+
+  const handleRemovePhoto = (url) => {
+    setProfile(prev => ({ ...prev, photos: prev.photos.filter(photo => photo !== url) }));
+  };
+
+  const handleRemoveNewPhoto = (id) => {
+    setGalleryFiles(prev => {
+      const toRemove = prev.find(item => item.id === id);
+      if (toRemove?.preview) {
+        URL.revokeObjectURL(toRemove.preview);
+      }
+      return prev.filter(item => item.id !== id);
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) return;
@@ -209,12 +261,40 @@ const RencontreProfil = () => {
         const data = await res.json();
         imageUrl = data.url;
     }
-    
+
+    const uploadedGalleryUrls = [];
+    for (const item of galleryFiles) {
+      const formData = new FormData();
+      const fileName = item.file.name || `gallery_${Date.now()}.jpg`;
+      const safeFile = new File([item.file], fileName, { type: item.file.type || 'image/jpeg' });
+      formData.append('file', safeFile);
+      formData.append('type', 'rencontres');
+      formData.append('recordId', user.id);
+
+      const res = await fetch('https://onekamer-server.onrender.com/api/upload-media', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        toast({ title: "Erreur d'upload", description: "L'envoi d'une photo a échoué.", variant: 'destructive' });
+        setSaving(false);
+        return;
+      }
+
+      const data = await res.json();
+      uploadedGalleryUrls.push(data.url);
+    }
+
+    const finalGallery = [...(profile.photos || []), ...uploadedGalleryUrls];
+    const coverImage = imageUrl || finalGallery[0] || null;
+
     const { created_at, id, pays, ville, ...rest } = profile;
 
     const updateData = {
       ...rest,
-      image_url: imageUrl,
+      photos: finalGallery,
+      image_url: coverImage,
       user_id: user.id,
       updated_at: new Date(),
     };
@@ -235,6 +315,11 @@ const RencontreProfil = () => {
       await refreshProfile();
       await fetchProfile();
       setIsEditing(false);
+      galleryFiles.forEach(item => item.preview && URL.revokeObjectURL(item.preview));
+      setGalleryFiles([]);
+      if (!imageFile) {
+        setImagePreview(coverImage);
+      }
     }
     setSaving(false);
   };
@@ -245,6 +330,13 @@ const RencontreProfil = () => {
   
   if (!isEditing) {
     const enfantValue = `${profile.enfant}${profile.enfant === 'Oui' && profile.show_nombre_enfant ? ` (${profile.nombre_enfant || 'N/A'})` : ''}`;
+    const galleryPhotos = (() => {
+      const existing = Array.isArray(profile.photos) ? profile.photos.filter(Boolean) : [];
+      if (profile.image_url && !existing.includes(profile.image_url)) {
+        return [profile.image_url, ...existing];
+      }
+      return existing;
+    })();
 
     return (
       <>
@@ -267,6 +359,18 @@ const RencontreProfil = () => {
                       <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {profile.ville?.nom || profile.city}</span>
                       <span className="flex items-center gap-1.5"><Briefcase className="h-4 w-4" /> {profile.profession}</span>
                     </div>
+                    {galleryPhotos.length > 0 && (
+                      <div className="mt-6 space-y-3">
+                        <h3 className="font-semibold text-gray-800">Mes photos</h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {galleryPhotos.slice(0, 6).map((photo, index) => (
+                            <div key={`${photo}-${index}`} className="aspect-square rounded-lg overflow-hidden border border-gray-200">
+                              <MediaDisplay bucket="rencontres" path={photo} alt={`${profile.name} - Photo ${index + 1}`} className="w-full h-full object-cover" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                 </div>
 
                 <div className="space-y-2">
@@ -335,6 +439,53 @@ const RencontreProfil = () => {
                   </Button>
                   <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" />
                 </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <Label className="font-semibold">Galerie de photos</Label>
+                  <span className="text-sm text-gray-500">{profile.photos.length + galleryFiles.length}/6</span>
+                </div>
+                <p className="text-sm text-gray-500">Ajoutez jusqu'à 6 photos pour présenter votre univers.</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {profile.photos.map((photo, index) => (
+                    <div key={`${photo}-${index}`} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 group">
+                      <MediaDisplay bucket="rencontres" path={photo} alt={`${profile.name} - Photo ${index + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePhoto(photo)}
+                        className="absolute top-2 right-2 p-1 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition"
+                        aria-label="Supprimer la photo"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {galleryFiles.map(item => (
+                    <div key={item.id} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 group">
+                      <img src={item.preview} alt="Aperçu de la nouvelle photo" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveNewPhoto(item.id)}
+                        className="absolute top-2 right-2 p-1 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition"
+                        aria-label="Supprimer la nouvelle photo"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {(profile.photos.length + galleryFiles.length) < 6 && (
+                    <button
+                      type="button"
+                      onClick={() => galleryInputRef.current?.click()}
+                      className="flex flex-col items-center justify-center aspect-square rounded-lg border-2 border-dashed border-gray-300 text-gray-500 hover:border-green-400 hover:text-green-500 transition"
+                    >
+                      <Plus className="h-8 w-8" />
+                      <span className="mt-2 text-sm font-medium">Ajouter</span>
+                    </button>
+                  )}
+                </div>
+                <input type="file" accept="image/*" multiple ref={galleryInputRef} onChange={handleGalleryChange} className="hidden" />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
