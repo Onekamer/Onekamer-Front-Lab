@@ -535,6 +535,8 @@ const RencontreProfil = () => {
   onChange={handleGalleryChange}
   className="hidden"
 />
+</div>
+<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div><Label htmlFor="name">Nom/Pseudo</Label><Input id="name" name="name" value={profile.name || ''} onChange={handleChange} /></div>
