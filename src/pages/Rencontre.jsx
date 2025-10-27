@@ -248,7 +248,11 @@ useEffect(() => {
     if (error) {
       toast({ title: "Erreur", description: "Impossible de charger les profils.", variant: "destructive" });
     } else {
-      setProfiles(data || []);
+      const normalizedProfiles = (data || []).map(profile => ({
+        ...profile,
+        photos: Array.isArray(profile.photos) ? profile.photos.filter(Boolean) : [],
+      }));
+      setProfiles(normalizedProfiles);
       setCurrentIndex(0);
     }
     setLoading(false);
@@ -332,6 +336,14 @@ useEffect(() => {
 
 
   const currentProfile = profiles[currentIndex];
+  const mainPhoto = currentProfile ? (currentProfile.image_url || (Array.isArray(currentProfile.photos) ? currentProfile.photos[0] : null)) : null;
+  const galleryPhotos = currentProfile ? (() => {
+    const existing = Array.isArray(currentProfile.photos) ? currentProfile.photos.filter(Boolean) : [];
+    if (currentProfile.image_url && !existing.includes(currentProfile.image_url)) {
+      return [currentProfile.image_url, ...existing];
+    }
+    return existing;
+  })() : [];
   
   if (loading) {
   return (
@@ -406,7 +418,7 @@ if (!myProfile) {
               ) : (
                 <Card className="overflow-hidden shadow-lg rounded-2xl">
                   <div className="relative h-[55vh] max-h-[450px]">
-                    <MediaDisplay bucket="rencontres" path={currentProfile.image_url} alt={currentProfile.name} className="w-full h-full object-cover" />
+                    <MediaDisplay bucket="rencontres" path={mainPhoto} alt={currentProfile.name} className="w-full h-full object-cover" />
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 text-white">
                       <h2 className="text-3xl font-bold">{currentProfile.name?.split(' ')[0]}, {currentProfile.age}</h2>
                       <div className="flex items-center gap-2 text-sm"><MapPin className="h-4 w-4" /><span>{currentProfile.ville?.nom || currentProfile.city}</span></div>
@@ -434,13 +446,26 @@ if (!myProfile) {
             >
               <button onClick={() => setView('card')} className="flex items-center gap-2 text-green-600 font-semibold"><ArrowLeft className="h-5 w-5" />Retour</button>
               <div className="text-center">
-                <div className="w-32 h-32 rounded-full mx-auto mb-4 overflow-hidden border-4 border-green-200"><MediaDisplay bucket="rencontres" path={currentProfile.image_url} alt={currentProfile.name} className="w-full h-full object-cover" /></div>
+                <div className="w-32 h-32 rounded-full mx-auto mb-4 overflow-hidden border-4 border-green-200"><MediaDisplay bucket="rencontres" path={mainPhoto} alt={currentProfile.name} className="w-full h-full object-cover" /></div>
                 <h2 className="text-3xl font-bold text-gray-800">{currentProfile.name?.split(' ')[0]}, {currentProfile.age}</h2>
                 <div className="flex items-center justify-center gap-4 text-gray-500 text-sm mt-2">
                   <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {currentProfile.ville?.nom || currentProfile.city}</span>
                   <span className="flex items-center gap-1.5"><Briefcase className="h-4 w-4" /> {currentProfile.profession}</span>
                 </div>
               </div>
+
+              {galleryPhotos.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="font-bold text-lg text-gray-800">Photos</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {galleryPhotos.slice(0, 6).map((photo, index) => (
+                      <div key={`${photo}-${index}`} className="aspect-square rounded-lg overflow-hidden border border-gray-200">
+                        <MediaDisplay bucket="rencontres" path={photo} alt={`${currentProfile.name} - Photo ${index + 1}`} className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                  {currentProfile.bio && (
