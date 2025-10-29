@@ -160,7 +160,7 @@ const Rencontre = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [canInteract, setCanInteract] = useState(false);
-  const [canView, setCanView] = useState(false); // ✅ nouveau
+  const [canView, setCanView] = useState(null); // ✅ nouveau
 
   const { toast } = useToast();
 
@@ -344,13 +344,21 @@ useEffect(() => {
     return existing;
   })() : [];
   
+  if (authLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-green-500" />
+      </div>
+    );
+  }
+
   if (loading) {
-  return (
-    <div className="flex justify-center items-center h-64">
-      <Loader2 className="h-8 w-8 animate-spin text-green-500" />
-    </div>
-  );
-}
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-green-500" />
+      </div>
+    );
+  }
 
 if (!user) {
   return <div className="text-center p-8">Veuillez vous connecter pour accéder aux rencontres.</div>;
