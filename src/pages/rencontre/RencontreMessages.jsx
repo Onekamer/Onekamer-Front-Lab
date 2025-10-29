@@ -12,12 +12,14 @@ import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Input } from "@/components/ui/input";
 import { Send } from 'lucide-react';
+import { notifyRencontreMessage } from '@/services/oneSignalNotifications';
 
 const MessagesPrives = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [matches, setMatches] = useState([]);
   const [myRencontreId, setMyRencontreId] = useState(null);
+  const [myRencontreProfile, setMyRencontreProfile] = useState(null);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
@@ -26,9 +28,10 @@ const MessagesPrives = () => {
 
   const fetchMyRencontreId = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase.from('rencontres').select('id').eq('user_id', user.id).single();
+    const { data } = await supabase.from('rencontres').select('id, name, user_id').eq('user_id', user.id).single();
     if (data) {
       setMyRencontreId(data.id);
+      setMyRencontreProfile(data);
     }
   }, [user]);
 
@@ -37,7 +40,7 @@ const MessagesPrives = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("rencontres_matches")
-      .select("*, user1:rencontres!user1_id(id, name, image_url), user2:rencontres!user2_id(id, name, image_url)")
+      .select("*, user1:rencontres!user1_id(id, user_id, name, image_url), user2:rencontres!user2_id(id, user_id, name, image_url)")
       .or(`user1_id.in.(${myRencontreId}),user2_id.in.(${myRencontreId})`)
       .order("created_at", { ascending: false });
 
@@ -83,13 +86,30 @@ const MessagesPrives = () => {
     
     const receiver_id = currentMatch.user1_id === myRencontreId ? currentMatch.user2_id : currentMatch.user1_id;
 
-    const { error } = await supabase.from("messages_rencontres").insert({
-      match_id: selectedMatch,
-      sender_id: myRencontreId,
-      receiver_id: receiver_id,
-      content: newMessage.trim(),
-    });
-    if (!error) setNewMessage("");
+    const content = newMessage.trim();
+    const { error } = await supabase
+      .from("messages_rencontres")
+      .insert({
+        match_id: selectedMatch,
+        sender_id: myRencontreId,
+        receiver_id: receiver_id,
+        content,
+      });
+    if (!error) {
+      setNewMessage("");
+      const receiverProfile = otherUsers[receiver_id];
+      if (receiverProfile?.user_id) {
+        try {
+          await notifyRencontreMessage({
+            recipientId: receiverProfile.user_id,
+            senderName: myRencontreProfile?.name || user?.user_metadata?.full_name || user?.email || 'Un membre OneKamer',
+            message: content,
+          });
+        } catch (notificationError) {
+          console.error('Erreur notification OneSignal (message match):', notificationError);
+        }
+      }
+    }
   };
 
   useEffect(() => {
