@@ -144,7 +144,7 @@ const ArrayDetailItem = ({ icon: Icon, label, values }) => (
 
 
 const Rencontre = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -166,17 +166,16 @@ const Rencontre = () => {
 
   // ✅ 1. Vérification de l'authentification
   useEffect(() => {
-    (async () => {
-      try {
-        await requireAuth(navigate);
-      } catch {
-        return;
-      }
-    })();
-  }, []);
+    if (authLoading) return;
+    if (!user) {
+      navigate('/auth');
+    }
+  }, [authLoading, user, navigate]);
 
   // ✅ 2. Vérifications des accès selon le plan Supabase
 useEffect(() => {
+  if (authLoading) return;
+
   const checkAccess = async () => {
     setCanView(null); // ✅ ajout ici
 
@@ -200,7 +199,7 @@ useEffect(() => {
   };
 
   checkAccess();
-}, [user]);
+}, [user, authLoading]);
 
 
   const fetchMyProfile = useCallback(async () => {
