@@ -254,19 +254,20 @@ const RencontreProfil = () => {
   let imageUrl = profile.image_url;
 
   // 📸 Upload de la photo principale via serveur LAB (BunnyCDN)
-  if (imageFile) {
-    const formData = new FormData();
-    const safeFile = new File(
-      [imageFile],
-      imageFile.name || `upload_${Date.now()}.jpg`,
-      { type: imageFile.type || "image/jpeg" }
-    );
-    formData.append("file", safeFile);
+if (imageFile) {
+  const formData = new FormData();
+  const safeFile = new File(
+    [imageFile],
+    imageFile.name || `upload_${Date.now()}.jpg`,
+    { type: imageFile.type || "image/jpeg" }
+  );
+  formData.append("file", safeFile);
+  formData.append("type", "rencontres"); // ✅ ajout ici
 
-    const res = await fetch("https://onekamer-server-lab.onrender.com/api/upload", {
-      method: "POST",
-      body: formData,
-    });
+  const res = await fetch("https://onekamer-server-lab.onrender.com/api/upload", {
+    method: "POST",
+    body: formData,
+  });
 
     if (!res.ok) {
       console.error("Erreur d'upload principale :", await res.text());
@@ -287,18 +288,19 @@ const RencontreProfil = () => {
   const uploadedGalleryUrls = [];
 
   for (const item of galleryFiles) {
-    const formData = new FormData();
-    const safeFile = new File(
-      [item.file],
-      item.file.name || `gallery_${Date.now()}.jpg`,
-      { type: item.file.type || "image/jpeg" }
-    );
-    formData.append("file", safeFile);
+  const formData = new FormData();
+  const safeFile = new File(
+    [item.file],
+    item.file.name || `gallery_${Date.now()}.jpg`,
+    { type: item.file.type || "image/jpeg" }
+  );
+  formData.append("file", safeFile);
+  formData.append("type", "rencontres"); // ✅ ajout ici
 
-    const res = await fetch("https://onekamer-server-lab.onrender.com/api/upload", {
-      method: "POST",
-      body: formData,
-    });
+  const res = await fetch("https://onekamer-server-lab.onrender.com/api/upload", {
+    method: "POST",
+    body: formData,
+  });
 
     if (!res.ok) {
       console.error("Erreur d’upload galerie :", await res.text());
