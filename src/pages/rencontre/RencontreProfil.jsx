@@ -247,106 +247,128 @@ const RencontreProfil = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!user) return;
-    setSaving(true);
+  e.preventDefault();
+  if (!user) return;
+  setSaving(true);
 
-    let imageUrl = profile.image_url;
-    if (imageFile) {
-        const formData = new FormData();
-        const safeFile = new File(
-          [imageFile],
-          imageFile.name || `upload_${Date.now()}.jpg`,
-          { type: imageFile.type || "image/jpeg" }
-        );
-        formData.append("file", safeFile);
-        formData.append("type", "rencontres");
-        formData.append("recordId", user.id);
+  let imageUrl = profile.image_url;
 
-        const res = await fetch("https://onekamer-server.onrender.com/api/upload-media", {
-            method: "POST",
-            body: formData,
-        });
+  // 📸 Upload de la photo principale via serveur LAB (BunnyCDN)
+  if (imageFile) {
+    const formData = new FormData();
+    const safeFile = new File(
+      [imageFile],
+      imageFile.name || `upload_${Date.now()}.jpg`,
+      { type: imageFile.type || "image/jpeg" }
+    );
+    formData.append("file", safeFile);
 
-        if (!res.ok) {
-            toast({ title: 'Erreur d\'upload', description: 'La mise à jour de l\'image a échoué', variant: 'destructive' });
-            setSaving(false);
-            return;
-        }
+    const res = await fetch("https://onekamer-server-lab.onrender.com/api/upload", {
+      method: "POST",
+      body: formData,
+    });
 
-        const data = await res.json();
-        imageUrl = data.url;
+    if (!res.ok) {
+      console.error("Erreur d'upload principale :", await res.text());
+      toast({
+        title: "Erreur d'upload",
+        description: "La mise à jour de l'image a échoué.",
+        variant: "destructive",
+      });
+      setSaving(false);
+      return;
     }
 
-    const uploadedGalleryUrls = [];
+    const data = await res.json();
+    if (data.url) imageUrl = data.url;
+  }
 
-for (const item of galleryFiles) {
-  const formData = new FormData();
-  const safeFile = new File(
-    [item.file],
-    item.file.name || `gallery_${Date.now()}.jpg`,
-    { type: item.file.type || 'image/jpeg' }
-  );
-  formData.append('file', safeFile);
+  // 🖼️ Upload des images de la galerie
+  const uploadedGalleryUrls = [];
 
-  // ✅ Upload direct vers BunnyCDN via serveur LAB
-  const res = await fetch('https://onekamer-server-lab.onrender.com/upload', {
-    method: 'POST',
-    body: formData,
-  });
+  for (const item of galleryFiles) {
+    const formData = new FormData();
+    const safeFile = new File(
+      [item.file],
+      item.file.name || `gallery_${Date.now()}.jpg`,
+      { type: item.file.type || "image/jpeg" }
+    );
+    formData.append("file", safeFile);
 
-  if (!res.ok) {
-    console.error('Erreur d’upload :', await res.text());
+    const res = await fetch("https://onekamer-server-lab.onrender.com/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!res.ok) {
+      console.error("Erreur d’upload galerie :", await res.text());
+      toast({
+        title: "Erreur d'upload",
+        description: "L'envoi d'une photo a échoué.",
+        variant: "destructive",
+      });
+      setSaving(false);
+      return;
+    }
+
+    const data = await res.json();
+    if (data.url) uploadedGalleryUrls.push(data.url);
+  }
+
+  // 🔗 Fusion des anciennes et nouvelles images
+  const finalGallery = [...(profile.photos || []), ...uploadedGalleryUrls];
+  const coverImage = imageUrl || finalGallery[0] || null;
+
+  const { created_at, id, pays, ville, ...rest } = profile;
+
+  const updateData = {
+    ...rest,
+    photos: finalGallery,
+    image_url: coverImage,
+    user_id: user.id,
+    updated_at: new Date(),
+  };
+
+  if (
+    updateData.enfant === "Oui" &&
+    (!updateData.nombre_enfant || updateData.nombre_enfant <= 0)
+  ) {
     toast({
-      title: "Erreur d'upload",
-      description: "L'envoi d'une photo a échoué.",
-      variant: 'destructive',
+      title: "Information manquante",
+      description: "Veuillez indiquer le nombre d'enfants.",
+      variant: "destructive",
     });
     setSaving(false);
     return;
   }
 
-  const data = await res.json();
-  if (data.url) uploadedGalleryUrls.push(data.url);
-}
+  const { error } = await supabase
+    .from("rencontres")
+    .upsert(updateData, { onConflict: "user_id", defaultToNull: false });
 
-    const finalGallery = [...(profile.photos || []), ...uploadedGalleryUrls];
-    const coverImage = imageUrl || finalGallery[0] || null;
-
-    const { created_at, id, pays, ville, ...rest } = profile;
-
-    const updateData = {
-      ...rest,
-      photos: finalGallery,
-      image_url: coverImage,
-      user_id: user.id,
-      updated_at: new Date(),
-    };
-
-    if (updateData.enfant === 'Oui' && (!updateData.nombre_enfant || updateData.nombre_enfant <= 0)) {
-        toast({ title: 'Information manquante', description: 'Veuillez indiquer le nombre d\'enfants.', variant: 'destructive' });
-        setSaving(false);
-        return;
+  if (error) {
+    console.error("Supabase upsert error:", error);
+    toast({
+      title: "Erreur",
+      description: `La mise à jour a échoué: ${error.message}`,
+      variant: "destructive",
+    });
+  } else {
+    toast({ title: "Succès", description: "Votre profil a été mis à jour !" });
+    await refreshProfile();
+    await fetchProfile();
+    setIsEditing(false);
+    galleryFiles.forEach(
+      (item) => item.preview && URL.revokeObjectURL(item.preview)
+    );
+    setGalleryFiles([]);
+    if (!imageFile) {
+      setImagePreview(coverImage);
     }
+  }
 
-    const { error } = await supabase.from('rencontres').upsert(updateData, { onConflict: 'user_id', defaultToNull: false });
-
-    if (error) {
-      console.error("Supabase upsert error:", error);
-      toast({ title: 'Erreur', description: `La mise à jour a échoué: ${error.message}`, variant: 'destructive' });
-    } else {
-      toast({ title: 'Succès', description: 'Votre profil a été mis à jour !' });
-      await refreshProfile();
-      await fetchProfile();
-      setIsEditing(false);
-      galleryFiles.forEach(item => item.preview && URL.revokeObjectURL(item.preview));
-      setGalleryFiles([]);
-      if (!imageFile) {
-        setImagePreview(coverImage);
-      }
-    }
-    setSaving(false);
-  };
+  setSaving(false);
+};
 
   if (loading) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-green-500" /></div>;
