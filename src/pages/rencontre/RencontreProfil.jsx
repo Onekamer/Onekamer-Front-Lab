@@ -279,28 +279,36 @@ const RencontreProfil = () => {
     }
 
     const uploadedGalleryUrls = [];
-    for (const item of galleryFiles) {
-      const formData = new FormData();
-      const fileName = item.file.name || `gallery_${Date.now()}.jpg`;
-      const safeFile = new File([item.file], fileName, { type: item.file.type || 'image/jpeg' });
-      formData.append('file', safeFile);
-      formData.append('type', 'rencontres');
-      formData.append('recordId', user.id);
 
-      const res = await fetch('https://onekamer-server.onrender.com/api/upload-media', {
-        method: 'POST',
-        body: formData,
-      });
+for (const item of galleryFiles) {
+  const formData = new FormData();
+  const safeFile = new File(
+    [item.file],
+    item.file.name || `gallery_${Date.now()}.jpg`,
+    { type: item.file.type || 'image/jpeg' }
+  );
+  formData.append('file', safeFile);
 
-      if (!res.ok) {
-        toast({ title: "Erreur d'upload", description: "L'envoi d'une photo a échoué.", variant: 'destructive' });
-        setSaving(false);
-        return;
-      }
+  // ✅ Upload direct vers BunnyCDN via serveur LAB
+  const res = await fetch('https://onekamer-server-lab.onrender.com/upload', {
+    method: 'POST',
+    body: formData,
+  });
 
-      const data = await res.json();
-      uploadedGalleryUrls.push(data.url);
-    }
+  if (!res.ok) {
+    console.error('Erreur d’upload :', await res.text());
+    toast({
+      title: "Erreur d'upload",
+      description: "L'envoi d'une photo a échoué.",
+      variant: 'destructive',
+    });
+    setSaving(false);
+    return;
+  }
+
+  const data = await res.json();
+  if (data.url) uploadedGalleryUrls.push(data.url);
+}
 
     const finalGallery = [...(profile.photos || []), ...uploadedGalleryUrls];
     const coverImage = imageUrl || finalGallery[0] || null;
