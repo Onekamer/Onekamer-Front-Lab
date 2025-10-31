@@ -262,7 +262,7 @@ if (imageFile) {
     { type: imageFile.type || "image/jpeg" }
   );
   formData.append("file", safeFile);
-  formData.append("type", "rencontres"); // ✅ ajout ici
+  formData.append("type", "rencontres"); // ✅ ajoute cette ligne !
 
   const res = await fetch("https://onekamer-server-lab.onrender.com/api/upload", {
     method: "POST",
@@ -295,7 +295,7 @@ if (imageFile) {
     { type: item.file.type || "image/jpeg" }
   );
   formData.append("file", safeFile);
-  formData.append("type", "rencontres"); // ✅ ajout ici
+  formData.append("type", "rencontres"); // ✅ ajoute cette ligne aussi
 
   const res = await fetch("https://onekamer-server-lab.onrender.com/api/upload", {
     method: "POST",
