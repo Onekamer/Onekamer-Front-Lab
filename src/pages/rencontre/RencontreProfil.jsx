@@ -28,6 +28,13 @@ const ChoiceButton = ({ value, selectedValue, onSelect, children }) => (
     </Button>
 );
 
+// 🧩 Fonction utilitaire pour résoudre correctement l’URL CDN/Supabase
+const resolveMediaUrl = (path) => {
+  if (!path) return "";
+  if (path.startsWith("http")) return path;
+  return `https://neswuuicqesslduqwzck.supabase.co/storage/v1/object/public/rencontres/${path}`;
+};
+
 const DetailItem = ({ icon: Icon, label, value }) => (
   <div className="flex flex-col items-start">
     <div className="flex items-center text-sm text-gray-500 gap-2">
@@ -400,7 +407,7 @@ if (imageFile) {
             <Card className="p-4 md:p-6 space-y-6">
                 <div className="text-center">
                     <div className="w-32 h-32 rounded-full mx-auto mb-4 overflow-hidden border-4 border-green-200">
-                      <MediaDisplay bucket="rencontres" path={profile.image_url} alt={profile.name} className="w-full h-full object-cover" />
+                      <MediaDisplay bucket="rencontres" path={resolveMediaUrl(profile.image_url)} alt={profile.name} className="w-full h-full object-cover" />
                     </div>
                     <h2 className="text-3xl font-bold text-gray-800">{profile.name?.split(' ')[0]}, {profile.age}</h2>
                     <div className="flex items-center justify-center flex-wrap gap-x-4 gap-y-1 text-gray-500 text-sm mt-2">
@@ -413,7 +420,7 @@ if (imageFile) {
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                           {galleryPhotos.slice(0, 6).map((photo, index) => (
                             <div key={`${photo}-${index}`} className="aspect-square rounded-lg overflow-hidden border border-gray-200">
-                              <MediaDisplay bucket="rencontres" path={photo} alt={`${profile.name} - Photo ${index + 1}`} className="w-full h-full object-cover" />
+                              <MediaDisplay bucket="rencontres" path={resolveMediaUrl(photo)} alt={`${profile.name} - Photo ${index + 1}`} className="w-full h-full object-cover" />
                             </div>
                           ))}
                         </div>
@@ -498,7 +505,7 @@ if (imageFile) {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   {profile.photos.map((photo, index) => (
                     <div key={`${photo}-${index}`} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 group">
-                      <MediaDisplay bucket="rencontres" path={photo} alt={`${profile.name} - Photo ${index + 1}`} className="w-full h-full object-cover" />
+                      <MediaDisplay bucket="rencontres" path={resolveMediaUrl(photo)} alt={`${profile.name} - Photo ${index + 1}`} className="w-full h-full object-cover" />
                       <button
                         type="button"
                         onClick={() => handleRemovePhoto(photo)}
