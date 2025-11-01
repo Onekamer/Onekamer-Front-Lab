@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/customSupabaseClient';
 import { Loader2, ImageOff } from 'lucide-react';
@@ -17,66 +18,66 @@ const MediaDisplay = ({ bucket, path, alt, className }) => {
   const [errorState, setErrorState] = useState(false);
 
   useEffect(() => {
-  const fetchMedia = async () => {
-    setLoading(true);
-    setErrorState(false);
-    setMediaUrl(null);
+    const fetchMedia = async () => {
+      setLoading(true);
+      setErrorState(false);
+      setMediaUrl(null);
 
-    // 🧩 Cas 1 : pas de path -> image par défaut
-    if (!path) {
-      const fallback = defaultImages[bucket] || null;
-      setMediaUrl(fallback);
-      setMediaType('image');
-      setErrorState(!fallback);
-      setLoading(false);
-      return;
-    }
-
-    // 🧩 Cas 2 : URL complète Supabase signée (avec token)
-    if (path.startsWith('https://neswuuicqesslduqwzck.supabase.co')) {
-      setMediaUrl(path);
-      setMediaType('image');
-      setLoading(false);
-      return;
-    }
-
-    // 🧩 Cas 3 : autre URL complète (BunnyCDN ou blob local)
-    if (path.startsWith('http') || path.startsWith('blob:')) {
-      setMediaUrl(path);
-      const fileExt = path.split('.').pop().toLowerCase();
-      const isVideo = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(fileExt);
-      setMediaType(isVideo ? 'video' : 'image');
-      setLoading(false);
-      return;
-    }
-
-    // 🧩 Cas 4 : chemin relatif Supabase → création d’URL signée temporaire
-    try {
-      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
-      if (error || !data?.signedUrl) {
-        console.warn(`⚠️ Média introuvable ou non signé dans ${bucket}/${path}`);
+      // 🧩 Cas 1 : pas de path -> image par défaut
+      if (!path) {
         const fallback = defaultImages[bucket] || null;
         setMediaUrl(fallback);
         setMediaType('image');
         setErrorState(!fallback);
-      } else {
-        setMediaUrl(data.signedUrl);
-        const fileExt = path.split('.').pop().toLowerCase();
-        setMediaType(['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(fileExt) ? 'video' : 'image');
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      console.error(`❌ Erreur MediaDisplay (${bucket}/${path}):`, err.message);
-      const fallback = defaultImages[bucket] || null;
-      setMediaUrl(fallback);
-      setMediaType('image');
-      setErrorState(!fallback);
-    } finally {
-      setLoading(false);
-    }
-  }; // ✅ ← ici on ferme bien la fonction fetchMedia
 
-  fetchMedia();
-}, [path, bucket]);
+      // 🧩 Cas 2 : URL déjà signée Supabase (avec token)
+      if (path.includes('supabase.co/storage/v1/object')) {
+        setMediaUrl(path);
+        setMediaType('image');
+        setLoading(false);
+        return;
+      }
+
+      // 🧩 Cas 3 : autre URL complète (BunnyCDN, blob local, etc.)
+      if (path.startsWith('http') || path.startsWith('blob:')) {
+        setMediaUrl(path);
+        const fileExt = path.split('.').pop().toLowerCase();
+        const isVideo = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(fileExt);
+        setMediaType(isVideo ? 'video' : 'image');
+        setLoading(false);
+        return;
+      }
+
+      // 🧩 Cas 4 : chemin relatif Supabase → création d’URL signée temporaire
+      try {
+        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
+        if (error || !data?.signedUrl) {
+          console.warn(`⚠️ Média introuvable ou non signé dans ${bucket}/${path}`);
+          const fallback = defaultImages[bucket] || null;
+          setMediaUrl(fallback);
+          setMediaType('image');
+          setErrorState(!fallback);
+        } else {
+          setMediaUrl(data.signedUrl);
+          const fileExt = path.split('.').pop().toLowerCase();
+          setMediaType(['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(fileExt) ? 'video' : 'image');
+        }
+      } catch (err) {
+        console.error(`❌ Erreur MediaDisplay (${bucket}/${path}):`, err.message);
+        const fallback = defaultImages[bucket] || null;
+        setMediaUrl(fallback);
+        setMediaType('image');
+        setErrorState(!fallback);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMedia();
+  }, [path, bucket]);
 
   if (loading) {
     return (
@@ -96,31 +97,29 @@ const MediaDisplay = ({ bucket, path, alt, className }) => {
   }
 
   if (mediaType === 'video') {
+    return (
+      <video
+        key={mediaUrl}
+        src={mediaUrl}
+        controls
+        className={className}
+        playsInline
+      />
+    );
+  }
+
   return (
-    <video
-      key={mediaUrl} // 🔑 force React à recharger si l’URL change
+    <img
+      key={mediaUrl}
       src={mediaUrl}
-      controls
-      className={className}
-      playsInline
+      alt={alt || 'image'}
+      className={`${className} w-full h-auto object-cover`}
+      onError={(e) => {
+        console.warn('⚠️ Erreur de rendu image :', mediaUrl);
+        e.currentTarget.src = defaultImages[bucket] || '';
+      }}
     />
   );
-}
-
-// ✅ version corrigée de l'image
-return (
-  <img
-    key={mediaUrl} // 🔑 force React à recharger si le token Supabase change
-    src={mediaUrl}
-    alt={alt || 'image'}
-    className={`${className} w-full h-auto object-cover`}
-    onError={(e) => {
-      console.warn('⚠️ Erreur de rendu image :', mediaUrl);
-      e.currentTarget.src = defaultImages[bucket] || '';
-    }}
-    />
-);
-}; // ✅ ← ferme la fonction ici avant l’export
+};
 
 export default MediaDisplay;
-
