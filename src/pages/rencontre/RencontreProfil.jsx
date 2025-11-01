@@ -262,7 +262,8 @@ if (imageFile) {
     { type: imageFile.type || "image/jpeg" }
   );
   formData.append("file", safeFile);
-  formData.append("type", "rencontres"); // ✅ ajoute cette ligne !
+  formData.append("type", "rencontres"); 
+  formData.append("user_id", user.id); // ✅ nouveau : identifiant pour le sous-dossier utilisateur
 
   const res = await fetch("https://onekamer-server-lab.onrender.com/api/upload", {
     method: "POST",
@@ -295,7 +296,8 @@ if (imageFile) {
     { type: item.file.type || "image/jpeg" }
   );
   formData.append("file", safeFile);
-  formData.append("type", "rencontres"); // ✅ ajoute cette ligne aussi
+  formData.append("type", "rencontres");
+  formData.append("user_id", user.id); // ✅ nouveau aussi ici
 
   const res = await fetch("https://onekamer-server-lab.onrender.com/api/upload", {
     method: "POST",
