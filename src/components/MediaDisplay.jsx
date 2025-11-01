@@ -88,10 +88,29 @@ const MediaDisplay = ({ bucket, path, alt, className }) => {
   }
 
   if (mediaType === 'video') {
-    return <video src={mediaUrl} controls className={className} playsInline />;
-  }
+  return (
+    <video
+      key={mediaUrl} // 🔑 force React à recharger si l’URL change
+      src={mediaUrl}
+      controls
+      className={className}
+      playsInline
+    />
+  );
+}
 
-  return <img src={mediaUrl} alt={alt || 'image'} className={className} />;
-};
+// ✅ version corrigée de l'image
+return (
+  <img
+    key={mediaUrl} // 🔑 force React à recharger si le token Supabase change
+    src={mediaUrl}
+    alt={alt || 'image'}
+    className={`${className} w-full h-auto object-cover`}
+    onError={(e) => {
+      console.warn('⚠️ Erreur de rendu image :', mediaUrl);
+      e.currentTarget.src = defaultImages[bucket] || '';
+    }}
+  />
+);
 
 export default MediaDisplay;
