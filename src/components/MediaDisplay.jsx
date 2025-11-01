@@ -110,7 +110,9 @@ return (
       console.warn('⚠️ Erreur de rendu image :', mediaUrl);
       e.currentTarget.src = defaultImages[bucket] || '';
     }}
-  />
+    />
 );
+}; // ✅ ← ferme la fonction ici avant l’export
 
 export default MediaDisplay;
+
