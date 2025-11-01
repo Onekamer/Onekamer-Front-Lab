@@ -17,64 +17,66 @@ const MediaDisplay = ({ bucket, path, alt, className }) => {
   const [errorState, setErrorState] = useState(false);
 
   useEffect(() => {
-    const fetchMedia = async () => {
-      setLoading(true);
-      setErrorState(false);
-      setMediaUrl(null);
+  const fetchMedia = async () => {
+    setLoading(true);
+    setErrorState(false);
+    setMediaUrl(null);
 
-      // 🧩 Cas 1 : pas de path -> image par défaut
-      if (!path) {
+    // 🧩 Cas 1 : pas de path -> image par défaut
+    if (!path) {
+      const fallback = defaultImages[bucket] || null;
+      setMediaUrl(fallback);
+      setMediaType('image');
+      setErrorState(!fallback);
+      setLoading(false);
+      return;
+    }
+
+    // 🧩 Cas 2 : URL complète Supabase signée (avec token)
+    if (path.startsWith('https://neswuuicqesslduqwzck.supabase.co')) {
+      setMediaUrl(path);
+      setMediaType('image');
+      setLoading(false);
+      return;
+    }
+
+    // 🧩 Cas 3 : autre URL complète (BunnyCDN ou blob local)
+    if (path.startsWith('http') || path.startsWith('blob:')) {
+      setMediaUrl(path);
+      const fileExt = path.split('.').pop().toLowerCase();
+      const isVideo = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(fileExt);
+      setMediaType(isVideo ? 'video' : 'image');
+      setLoading(false);
+      return;
+    }
+
+    // 🧩 Cas 4 : chemin relatif Supabase → création d’URL signée temporaire
+    try {
+      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
+      if (error || !data?.signedUrl) {
+        console.warn(`⚠️ Média introuvable ou non signé dans ${bucket}/${path}`);
         const fallback = defaultImages[bucket] || null;
         setMediaUrl(fallback);
         setMediaType('image');
         setErrorState(!fallback);
-        setLoading(false);
-        return;
+      } else {
+        setMediaUrl(data.signedUrl);
+        const fileExt = path.split('.').pop().toLowerCase();
+        setMediaType(['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(fileExt) ? 'video' : 'image');
       }
+    } catch (err) {
+      console.error(`❌ Erreur MediaDisplay (${bucket}/${path}):`, err.message);
+      const fallback = defaultImages[bucket] || null;
+      setMediaUrl(fallback);
+      setMediaType('image');
+      setErrorState(!fallback);
+    } finally {
+      setLoading(false);
+    }
+  }; // ✅ ← ici on ferme bien la fonction fetchMedia
 
-      // 🧩 Cas 2 : URL complète Supabase signée (avec token)
-if (path.startsWith('https://neswuuicqesslduqwzck.supabase.co')) {
-  setMediaUrl(path);
-  setMediaType('image');
-  setLoading(false);
-  return;
-}
-
-// 🧩 Cas 3 : autre URL complète (BunnyCDN ou blob local)
-if (path.startsWith('http') || path.startsWith('blob:')) {
-  setMediaUrl(path);
-  const fileExt = path.split('.').pop().toLowerCase();
-  const isVideo = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(fileExt);
-  setMediaType(isVideo ? 'video' : 'image');
-  setLoading(false);
-  return;
-}
-
-// 🧩 Cas 4 : chemin relatif Supabase → création d’URL signée temporaire
-try {
-  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
-  if (error || !data?.signedUrl) {
-    console.warn(`⚠️ Média introuvable ou non signé dans ${bucket}/${path}`);
-    const fallback = defaultImages[bucket] || null;
-    setMediaUrl(fallback);
-    setMediaType('image');
-    setErrorState(!fallback);
-  } else {
-    setMediaUrl(data.signedUrl);
-    const fileExt = path.split('.').pop().toLowerCase();
-    setMediaType(['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(fileExt) ? 'video' : 'image');
-  }
-} catch (err) {
-  console.error(`❌ Erreur MediaDisplay (${bucket}/${path}):`, err.message);
-  const fallback = defaultImages[bucket] || null;
-  setMediaUrl(fallback);
-  setMediaType('image');
-  setErrorState(!fallback);
-} finally {
-  setLoading(false);
-}
-    fetchMedia();
-  }, [path, bucket]);
+  fetchMedia();
+}, [path, bucket]);
 
   if (loading) {
     return (
