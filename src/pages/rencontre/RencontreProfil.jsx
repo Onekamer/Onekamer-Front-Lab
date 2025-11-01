@@ -28,16 +28,6 @@ const ChoiceButton = ({ value, selectedValue, onSelect, children }) => (
     </Button>
 );
 
-// 🧩 Fonction utilitaire pour résoudre correctement l’URL CDN/Supabase
-  <div className="flex flex-col items-start">
-    <div className="flex items-center text-sm text-gray-500 gap-2">
-      <Icon className="h-4 w-4" />
-      <span>{label}</span>
-    </div>
-    <p className="font-semibold text-gray-800 mt-1">{value || '-'}</p>
-  </div>
-);
-
 const ArrayDetailItem = ({ icon: Icon, label, values }) => (
     <div className="flex flex-col items-start col-span-2 md:col-span-3">
         <div className="flex items-center text-sm text-gray-500 gap-2">
