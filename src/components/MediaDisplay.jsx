@@ -22,56 +22,46 @@ const MediaDisplay = ({ bucket, path, alt, className }) => {
       setErrorState(false);
       setMediaUrl(null);
 
+      // 🧩 Cas 1 : pas de path -> image par défaut
       if (!path) {
-        setMediaUrl(defaultImages[bucket] || null);
+        const fallback = defaultImages[bucket] || null;
+        setMediaUrl(fallback);
         setMediaType('image');
+        setErrorState(!fallback);
         setLoading(false);
-        if (!defaultImages[bucket]) {
-          setErrorState(true);
-        }
         return;
       }
-      
+
+      // 🧩 Cas 2 : URL déjà complète (signée ou CDN)
       if (path.startsWith('http') || path.startsWith('blob:')) {
         setMediaUrl(path);
-        const isVideo = path.startsWith('blob:video') || path.endsWith('.mp4') || path.endsWith('.webm') || path.endsWith('.ogg');
+        const fileExt = path.split('.').pop().toLowerCase();
+        const isVideo = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(fileExt);
         setMediaType(isVideo ? 'video' : 'image');
         setLoading(false);
         return;
       }
 
+      // 🧩 Cas 3 : chemin relatif Supabase → création d’URL signée temporaire
       try {
-        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600); // 1 hour expiry
-
-        if (error) {
-          if (error.message.includes('not found')) {
-            console.warn(`Media not found in bucket "${bucket}" at path "${path}", using default.`);
-            setMediaUrl(defaultImages[bucket] || null);
-            setMediaType('image');
-             if (!defaultImages[bucket]) {
-               setErrorState(true);
-             }
-          } else {
-            throw error;
-          }
-        } else if (data && data.signedUrl) {
+        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
+        if (error || !data?.signedUrl) {
+          console.warn(`⚠️ Média introuvable ou non signé dans ${bucket}/${path}`);
+          const fallback = defaultImages[bucket] || null;
+          setMediaUrl(fallback);
+          setMediaType('image');
+          setErrorState(!fallback);
+        } else {
           setMediaUrl(data.signedUrl);
           const fileExt = path.split('.').pop().toLowerCase();
-          if (['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(fileExt)) {
-            setMediaType('video');
-          } else {
-            setMediaType('image');
-          }
-        } else {
-          throw new Error('Could not get signed URL.');
+          setMediaType(['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(fileExt) ? 'video' : 'image');
         }
-      } catch (error) {
-        console.error(`Error fetching signed media URL for path "${path}" in bucket "${bucket}":`, error.message);
-        setMediaUrl(defaultImages[bucket] || null);
+      } catch (err) {
+        console.error(`❌ Erreur MediaDisplay (${bucket}/${path}):`, err.message);
+        const fallback = defaultImages[bucket] || null;
+        setMediaUrl(fallback);
         setMediaType('image');
-        if (!defaultImages[bucket]) {
-          setErrorState(true);
-        }
+        setErrorState(!fallback);
       } finally {
         setLoading(false);
       }
@@ -101,7 +91,7 @@ const MediaDisplay = ({ bucket, path, alt, className }) => {
     return <video src={mediaUrl} controls className={className} playsInline />;
   }
 
-  return <img src={mediaUrl} alt={alt} className={className} />;
+  return <img src={mediaUrl} alt={alt || 'image'} className={className} />;
 };
 
 export default MediaDisplay;
