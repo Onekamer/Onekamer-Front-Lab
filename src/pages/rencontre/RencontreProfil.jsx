@@ -412,7 +412,7 @@ if (imageFile) {
                     {galleryPhotos.length > 0 && (
                       <div className="mt-6 space-y-3">
                         <h3 className="font-semibold text-gray-800">Mes photos</h3>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
   {(() => {
     const normalizePhotoPath = (photo) => {
       if (!photo) return null;
@@ -469,7 +469,7 @@ if (imageFile) {
   })()}
 </div>
 </div>
-))}
+)}
 </div>
 
                 <div className="space-y-2">
