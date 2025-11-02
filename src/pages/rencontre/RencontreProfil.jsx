@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import imageCompression from 'browser-image-compression';
 import MediaDisplay from '@/components/MediaDisplay';
 import { Switch } from "@/components/ui/switch";
+import { normalizeMediaUrl, normalizeMediaArray } from "@/utils/normalizeMediaUrl";
 
 const ChoiceButton = ({ value, selectedValue, onSelect, children }) => (
     <Button
@@ -95,12 +96,27 @@ const RencontreProfil = () => {
       setIsEditing(true);
       setHasProfile(false);
       if (userProfile?.avatar_url) {
-        setImagePreview(userProfile.avatar_url);
+        setImagePreview(normalizeMediaUrl(userProfile.avatar_url));
       }
-      setProfile(p => ({ ...p, image_url: userProfile?.avatar_url, name: userProfile?.username, user_id: user.id }))
+      setProfile(p => ({
+        ...p,
+        image_url: normalizeMediaUrl(userProfile?.avatar_url),
+        name: userProfile?.username,
+        user_id: user.id,
+      }));
     } else if (data) {
-      setProfile(prev => ({...prev, ...data, photos: Array.isArray(data.photos) ? data.photos : []}));
-      setImagePreview(data.image_url);
+      const normalizedImageUrl = normalizeMediaUrl(data.image_url);
+      const normalizedPhotos = normalizeMediaArray(
+        Array.isArray(data.photos) ? data.photos : []
+      );
+
+      setProfile(prev => ({
+        ...prev,
+        ...data,
+        image_url: normalizedImageUrl,
+        photos: normalizedPhotos,
+      }));
+      setImagePreview(normalizedImageUrl);
       setHasProfile(true);
     } else if (error) {
        toast({ title: 'Erreur', description: 'Impossible de charger votre profil Rencontre.', variant: 'destructive' });
@@ -282,7 +298,8 @@ if (imageFile) {
     }
 
     const data = await res.json();
-    if (data.url) imageUrl = data.url;
+    if (data.url) imageUrl = normalizeMediaUrl(data.url);
+    else if (data.full_url) imageUrl = normalizeMediaUrl(data.full_url);
   }
 
   // 🖼️ Upload des images de la galerie
@@ -316,12 +333,19 @@ if (imageFile) {
     }
 
     const data = await res.json();
-    if (data.url) uploadedGalleryUrls.push(data.url);
+    if (data.url) {
+      uploadedGalleryUrls.push(normalizeMediaUrl(data.url));
+    } else if (data.full_url) {
+      uploadedGalleryUrls.push(normalizeMediaUrl(data.full_url));
+    }
   }
 
   // 🔗 Fusion des anciennes et nouvelles images
-  const finalGallery = [...(profile.photos || []), ...uploadedGalleryUrls];
-  const coverImage = imageUrl || finalGallery[0] || null;
+  const finalGallery = normalizeMediaArray([
+    ...(profile.photos || []),
+    ...uploadedGalleryUrls,
+  ]);
+  const coverImage = normalizeMediaUrl(imageUrl || finalGallery[0] || null);
 
   const { created_at, id, pays, ville, ...rest } = profile;
 
@@ -381,9 +405,12 @@ if (imageFile) {
   if (!isEditing) {
     const enfantValue = `${profile.enfant}${profile.enfant === 'Oui' && profile.show_nombre_enfant ? ` (${profile.nombre_enfant || 'N/A'})` : ''}`;
     const galleryPhotos = (() => {
-      const existing = Array.isArray(profile.photos) ? profile.photos.filter(Boolean) : [];
-      if (profile.image_url && !existing.includes(profile.image_url)) {
-        return [profile.image_url, ...existing];
+      const existing = normalizeMediaArray(
+        Array.isArray(profile.photos) ? profile.photos.filter(Boolean) : []
+      );
+      const normalizedCover = normalizeMediaUrl(profile.image_url);
+      if (normalizedCover && !existing.includes(normalizedCover)) {
+        return [normalizedCover, ...existing];
       }
       return existing;
     })();
