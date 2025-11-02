@@ -413,15 +413,64 @@ if (imageFile) {
                       <div className="mt-6 space-y-3">
                         <h3 className="font-semibold text-gray-800">Mes photos</h3>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                          {galleryPhotos.slice(0, 6).map((photo, index) => (
-                            <div key={`${photo}-${index}`} className="aspect-square rounded-lg overflow-hidden border border-gray-200">
-                              <MediaDisplay bucket="rencontres" path={photo} alt={`${profile.name} - Photo ${index + 1}`} className="w-full h-full object-cover" />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                </div>
+  {(() => {
+    const normalizePhotoPath = (photo) => {
+      if (!photo) return null;
+      console.log("🧩 Chemin brut :", photo);
+
+      // Si déjà une URL complète (Supabase signée, BunnyCDN, etc.)
+      if (photo.startsWith("http")) {
+        console.log("✅ URL complète :", photo);
+        return photo;
+      }
+
+      // Si doublon "rencontres/rencontres/"
+      if (photo.startsWith("rencontres/rencontres/")) {
+        const cleaned = photo.replace(/^rencontres\//, "");
+        console.log("🧹 Nettoyage doublon ->", cleaned);
+        return cleaned;
+      }
+
+      // Si commence par "rencontres/"
+      if (photo.startsWith("rencontres/")) {
+        console.log("✅ Chemin correct :", photo);
+        return photo;
+      }
+
+      // Sinon on préfixe proprement
+      const prefixed = `rencontres/${photo}`;
+      console.log("📦 Préfixé automatiquement ->", prefixed);
+      return prefixed;
+    };
+
+    console.log("🖼️ Liste complète des photos galerie :", galleryPhotos);
+
+    return galleryPhotos.slice(0, 6).map((photo, index) => {
+      const normalizedPath = normalizePhotoPath(photo);
+      if (!normalizedPath) {
+        console.warn("⚠️ Photo ignorée (chemin vide ou invalide) :", photo);
+        return null;
+      }
+
+      return (
+        <div
+          key={`${photo}-${index}`}
+          className="aspect-square rounded-lg overflow-hidden border border-gray-200"
+        >
+          <MediaDisplay
+            bucket="rencontres"
+            path={normalizedPath}
+            alt={`${profile.name} - Photo ${index + 1}`}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      );
+    });
+  })()}
+</div>
+</div>
+))}
+</div>
 
                 <div className="space-y-2">
                     {profile.bio && (
