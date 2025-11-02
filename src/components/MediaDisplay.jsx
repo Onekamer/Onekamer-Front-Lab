@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/customSupabaseClient';
 import { Loader2, ImageOff } from 'lucide-react';
 
+// 🧩 Images par défaut locales pour les buckets sans CDN
 const defaultImages = {
   annonces: 'https://horizons-cdn.hostinger.com/2838c69a-ba17-4f74-8eef-55777dbe8ec3/deafb02734097cfca203ab9aad10f6ba.png',
   evenements: 'https://horizons-cdn.hostinger.com/2838c69a-ba17-4f74-8eef-55777dbe8ec3/e3c7a83af237fb7227a561adbdc2fb56.png',
@@ -23,54 +23,53 @@ const MediaDisplay = ({ bucket, path, alt, className }) => {
       setErrorState(false);
       setMediaUrl(null);
 
-      // 🧩 Cas 1 : pas de path -> image par défaut
+      // 🧩 Aucun fichier → image par défaut selon le bucket
       if (!path) {
-        const fallback = defaultImages[bucket] || null;
-        setMediaUrl(fallback);
+        setMediaUrl(defaultImages[bucket] || null);
         setMediaType('image');
-        setErrorState(!fallback);
         setLoading(false);
+        if (!defaultImages[bucket]) setErrorState(true);
         return;
       }
 
-      // 🧩 Cas 2 : URL déjà signée Supabase (avec token)
-      if (path.includes('supabase.co/storage/v1/object')) {
+      // 🧠 Si le chemin est une URL complète (BunnyCDN / lien absolu / blob)
+      if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('blob:')) {
         setMediaUrl(path);
-        setMediaType('image');
-        setLoading(false);
-        return;
-      }
-
-      // 🧩 Cas 3 : autre URL complète (BunnyCDN, blob local, etc.)
-      if (path.startsWith('http') || path.startsWith('blob:')) {
-        setMediaUrl(path);
-        const fileExt = path.split('.').pop().toLowerCase();
-        const isVideo = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(fileExt);
+        const isVideo =
+          path.endsWith('.mp4') ||
+          path.endsWith('.webm') ||
+          path.endsWith('.ogg') ||
+          path.startsWith('blob:video');
         setMediaType(isVideo ? 'video' : 'image');
         setLoading(false);
         return;
       }
 
-      // 🧩 Cas 4 : chemin relatif Supabase → création d’URL signée temporaire
+      // 🔐 Sinon : charger depuis Supabase Storage (cas des uploads directs)
       try {
-        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
-        if (error || !data?.signedUrl) {
-          console.warn(`⚠️ Média introuvable ou non signé dans ${bucket}/${path}`);
-          const fallback = defaultImages[bucket] || null;
-          setMediaUrl(fallback);
-          setMediaType('image');
-          setErrorState(!fallback);
-        } else {
+        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600); // 1h
+
+        if (error) {
+          if (error.message.includes('not found')) {
+            console.warn(`❌ Média introuvable dans "${bucket}" → fallback par défaut`);
+            setMediaUrl(defaultImages[bucket] || null);
+            setMediaType('image');
+            if (!defaultImages[bucket]) setErrorState(true);
+          } else {
+            throw error;
+          }
+        } else if (data?.signedUrl) {
           setMediaUrl(data.signedUrl);
-          const fileExt = path.split('.').pop().toLowerCase();
-          setMediaType(['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(fileExt) ? 'video' : 'image');
+          const ext = path.split('.').pop().toLowerCase();
+          setMediaType(['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(ext) ? 'video' : 'image');
+        } else {
+          throw new Error('Aucune URL signée générée.');
         }
       } catch (err) {
-        console.error(`❌ Erreur MediaDisplay (${bucket}/${path}):`, err.message);
-        const fallback = defaultImages[bucket] || null;
-        setMediaUrl(fallback);
+        console.error(`Erreur récupération média (${bucket}/${path}) :`, err.message);
+        setMediaUrl(defaultImages[bucket] || null);
         setMediaType('image');
-        setErrorState(!fallback);
+        if (!defaultImages[bucket]) setErrorState(true);
       } finally {
         setLoading(false);
       }
@@ -79,6 +78,7 @@ const MediaDisplay = ({ bucket, path, alt, className }) => {
     fetchMedia();
   }, [path, bucket]);
 
+  // 🌀 Loading state
   if (loading) {
     return (
       <div className={`flex items-center justify-center bg-gray-200 ${className}`}>
@@ -87,6 +87,7 @@ const MediaDisplay = ({ bucket, path, alt, className }) => {
     );
   }
 
+  // ❌ Erreur ou média absent
   if (errorState || !mediaUrl) {
     return (
       <div className={`flex flex-col items-center justify-center bg-gray-200 ${className}`}>
@@ -96,30 +97,36 @@ const MediaDisplay = ({ bucket, path, alt, className }) => {
     );
   }
 
+  // 🎥 Vidéo
   if (mediaType === 'video') {
     return (
       <video
-        key={mediaUrl}
         src={mediaUrl}
         controls
-        className={className}
         playsInline
+        className={className}
+        onError={(e) => {
+          console.warn('Erreur chargement vidéo, fallback image.');
+          e.target.poster = defaultImages[bucket] || defaultImages.annonces;
+        }}
       />
     );
   }
 
+  // 🖼️ Image
   return (
     <img
-      key={mediaUrl}
       src={mediaUrl}
-      alt={alt || 'image'}
-      className={`${className} w-full h-auto object-cover`}
+      alt={alt || 'Média'}
+      className={className}
       onError={(e) => {
-        console.warn('⚠️ Erreur de rendu image :', mediaUrl);
-        e.currentTarget.src = defaultImages[bucket] || '';
+        console.warn('Erreur chargement image, fallback image par défaut.');
+        e.target.src = defaultImages[bucket] || defaultImages.annonces;
       }}
     />
   );
 };
 
 export default MediaDisplay;
+
+
