@@ -76,15 +76,24 @@ const SupportCenter = () => {
 
   useEffect(() => {
     const searchUsers = async () => {
-      if (debouncedSearchQuery.length < 2) {
+      const sanitizedQuery = debouncedSearchQuery.trim().replace(/^@+/, '');
+
+      if (sanitizedQuery.length < 2) {
         setSearchResults([]);
         return;
       }
+
+      // Escape special characters that could break the ILIKE query
+      const escapedQuery = sanitizedQuery
+        .replace(/[%_]/g, '\\$&')
+        .replace(/'/g, "''");
+      const likeQuery = `%${escapedQuery}%`;
+
       setSearchLoading(true);
       const { data, error } = await supabase
         .from('profiles')
         .select('id, username, full_name, avatar_url')
-        .or(`username.ilike.%${debouncedSearchQuery}%,full_name.ilike.%${debouncedSearchQuery}%`)
+        .or(`username.ilike.${likeQuery},full_name.ilike.${likeQuery},email.ilike.${likeQuery}`)
         .limit(10);
 
       if (error) {
