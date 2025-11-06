@@ -14,7 +14,7 @@ localhost+*-key.pem
 
 # Éditeurs et environnements locaux
 .vscode/
-.windsurf/
+!.windsurf/
 .cursor/
 .idea/
 *.code-workspace

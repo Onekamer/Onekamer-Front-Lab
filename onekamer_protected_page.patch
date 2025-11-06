@@ -1,0 +1,66 @@
+diff --git a/src/hooks/useProtectedPage.js b/src/hooks/useProtectedPage.js
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/hooks/useProtectedPage.js
+@@
++import { useEffect } from "react";
++import { useNavigate } from "react-router-dom";
++import { useAuth } from "@/contexts/SupabaseAuthContext";
++
++// Hook global pour protéger une page et éviter les erreurs Supabase
++export const useProtectedPage = () => {
++  const { session } = useAuth();
++  const navigate = useNavigate();
++
++  useEffect(() => {
++    if (!session) {
++      console.clear();
++      navigate("/login", { replace: true });
++    }
++  }, [session, navigate]);
++
++  return session;
++};
+diff --git a/src/pages/annonces/Annonces.jsx b/src/pages/annonces/Annonces.jsx
+index 5b6a123..b91c456 100644
+--- a/src/pages/annonces/Annonces.jsx
++++ b/src/pages/annonces/Annonces.jsx
+@@
+ import { supabase } from "@/lib/customSupabaseClient";
+ import { Button } from "@/components/ui/button";
+ import { Card, CardContent } from "@/components/ui/card";
+ import { Loader2 } from "lucide-react";
++import { useProtectedPage } from "@/hooks/useProtectedPage";
+
+ const Annonces = () => {
++  const session = useProtectedPage();
++  if (!session) return null;
+diff --git a/src/pages/evenements/Evenements.jsx b/src/pages/evenements/Evenements.jsx
+index 7e7a1a2..ac2c83f 100644
+--- a/src/pages/evenements/Evenements.jsx
++++ b/src/pages/evenements/Evenements.jsx
+@@
+ import { supabase } from "@/lib/customSupabaseClient";
+ import { Button } from "@/components/ui/button";
+ import { Card, CardContent } from "@/components/ui/card";
+ import { Loader2 } from "lucide-react";
++import { useProtectedPage } from "@/hooks/useProtectedPage";
+
+ const Evenements = () => {
++  const session = useProtectedPage();
++  if (!session) return null;
+diff --git a/src/pages/faitsdivers/FaitsDivers.jsx b/src/pages/faitsdivers/FaitsDivers.jsx
+index 3e4d5a3..d2b8c01 100644
+--- a/src/pages/faitsdivers/FaitsDivers.jsx
++++ b/src/pages/faitsdivers/FaitsDivers.jsx
+@@
+ import { supabase } from "@/lib/customSupabaseClient";
+ import { Button } from "@/components/ui/button";
+ import { Card, CardContent } from "@/components/ui/card";
+ import { Loader2 } from "lucide-react";
++import { useProtectedPage } from "@/hooks/useProtectedPage";
+
+ const FaitsDivers = () => {
++  const session = useProtectedPage();
++  if (!session) return null;

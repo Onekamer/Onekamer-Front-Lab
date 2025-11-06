@@ -271,15 +271,21 @@ const CommentSection = ({ articleId }) => {
       .channel(`comments-fait-divers-${articleId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'faits_divers_comments', filter: `fait_divers_id=eq.${articleId}` },
         async (payload) => {
+          if (!user) {
+            setComments((prev) => [...prev, payload.new]);
+            return;
+          }
           const { data: profileData, error: profileError } = await supabase
             .from('profiles').select('id, username, avatar_url').eq('id', payload.new.user_id).single();
-          if (!profileError) {
+          if (!profileError && profileData) {
             setComments((prev) => [...prev, { ...payload.new, user: profileData }]);
+          } else {
+            setComments((prev) => [...prev, payload.new]);
           }
         }
       ).subscribe();
     return () => supabase.removeChannel(channel);
-  }, [articleId, fetchComments]);
+  }, [articleId, fetchComments, user]);
 
   const handleAddComment = async (e) => {
     e.preventDefault();
