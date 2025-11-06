@@ -1,11 +1,25 @@
 import path from 'node:path';
 import react from '@vitejs/plugin-react';
 import { createLogger, defineConfig } from 'vite';
+import fs from 'fs';
 import inlineEditPlugin from './plugins/visual-editor/vite-plugin-react-inline-editor.js';
 import editModeDevPlugin from './plugins/visual-editor/vite-plugin-edit-mode.js';
 import iframeRouteRestorationPlugin from './plugins/vite-plugin-iframe-route-restoration.js';
 
 const isDev = process.env.NODE_ENV !== 'production';
+
+// ====== AJOUT HTTPS LOCAL (mkcert) ======
+const httpsConfig = (() => {
+  try {
+    const key = fs.readFileSync('./localhost+1-key.pem');
+    const cert = fs.readFileSync('./localhost+1.pem');
+    return { key, cert };
+  } catch (err) {
+    console.warn('⚠️ Certificats HTTPS non trouvés, Vite démarrera en HTTP.');
+    return false;
+  }
+})();
+// ========================================
 
 const configHorizonsViteErrorHandler = `
 const observer = new MutationObserver((mutations) => {
@@ -105,7 +119,6 @@ const originalFetch = window.fetch;
 window.fetch = function(...args) {
 	const url = args[0] instanceof Request ? args[0].url : args[0];
 
-	// Skip WebSocket URLs
 	if (url.startsWith('ws:') || url.startsWith('wss:')) {
 		return originalFetch.apply(this, args);
 	}
@@ -114,25 +127,23 @@ window.fetch = function(...args) {
 		.then(async response => {
 			const contentType = response.headers.get('Content-Type') || '';
 
-			// Exclude HTML document responses
 			const isDocumentResponse =
 				contentType.includes('text/html') ||
 				contentType.includes('application/xhtml+xml');
 
 			if (!response.ok && !isDocumentResponse) {
-					const responseClone = response.clone();
-					const errorFromRes = await responseClone.text();
-					const requestUrl = response.url;
-					console.error(\`Fetch error from \${requestUrl}: \${errorFromRes}\`);
+				const responseClone = response.clone();
+				const errorFromRes = await responseClone.text();
+				const requestUrl = response.url;
+				console.error(\`Fetch error from \${requestUrl}: \${errorFromRes}\`);
 			}
 
 			return response;
 		})
 		.catch(error => {
-			if (!url.match(/\.html?$/i)) {
+			if (!url.match(/\\.html?$/i)) {
 				console.error(error);
 			}
-
 			throw error;
 		});
 };
@@ -142,19 +153,16 @@ const configNavigationHandler = `
 if (window.navigation && window.self !== window.top) {
 	window.navigation.addEventListener('navigate', (event) => {
 		const url = event.destination.url;
-
 		try {
 			const destinationUrl = new URL(url);
 			const destinationOrigin = destinationUrl.origin;
 			const currentOrigin = window.location.origin;
-
 			if (destinationOrigin === currentOrigin) {
 				return;
 			}
 		} catch (error) {
 			return;
 		}
-
 		window.parent.postMessage({
 			type: 'horizons-navigation-error',
 			url,
@@ -181,7 +189,7 @@ const addTransformIndexHtml = {
 			},
 			{
 				tag: 'script',
-				attrs: {type: 'module'},
+				attrs: { type: 'module' },
 				children: configHorizonsConsoleErrroHandler,
 				injectTo: 'head',
 			},
@@ -200,44 +208,35 @@ const addTransformIndexHtml = {
 		];
 
 		if (!isDev && process.env.TEMPLATE_BANNER_SCRIPT_URL && process.env.TEMPLATE_REDIRECT_URL) {
-			tags.push(
-				{
-					tag: 'script',
-					attrs: {
-						src: process.env.TEMPLATE_BANNER_SCRIPT_URL,
-						'template-redirect-url': process.env.TEMPLATE_REDIRECT_URL,
-					},
-					injectTo: 'head',
-				}
-			);
+			tags.push({
+				tag: 'script',
+				attrs: {
+					src: process.env.TEMPLATE_BANNER_SCRIPT_URL,
+					'template-redirect-url': process.env.TEMPLATE_REDIRECT_URL,
+				},
+				injectTo: 'head',
+			});
 		}
 
-		return {
-			html,
-			tags,
-		};
+		return { html, tags };
 	},
 };
 
 console.warn = () => {};
 
-const logger = createLogger()
-const loggerError = logger.error
-
+const logger = createLogger();
+const loggerError = logger.error;
 logger.error = (msg, options) => {
-	if (options?.error?.toString().includes('CssSyntaxError: [postcss]')) {
-		return;
-	}
-
+	if (options?.error?.toString().includes('CssSyntaxError: [postcss]')) return;
 	loggerError(msg, options);
-}
+};
 
 export default defineConfig({
 	customLogger: logger,
 	plugins: [
 		...(isDev ? [inlineEditPlugin(), editModeDevPlugin(), iframeRouteRestorationPlugin()] : []),
 		react(),
-		addTransformIndexHtml
+		addTransformIndexHtml,
 	],
 	server: {
 		cors: true,
@@ -245,9 +244,12 @@ export default defineConfig({
 			'Cross-Origin-Embedder-Policy': 'credentialless',
 		},
 		allowedHosts: true,
+		https: httpsConfig || false, // ← ici on active le HTTPS mkcert
+		host: true,
+		port: 5173,
 	},
 	resolve: {
-		extensions: ['.jsx', '.js', '.tsx', '.ts', '.json', ],
+		extensions: ['.jsx', '.js', '.tsx', '.ts', '.json'],
 		alias: {
 			'@': path.resolve(__dirname, './src'),
 		},
@@ -258,8 +260,8 @@ export default defineConfig({
 				'@babel/parser',
 				'@babel/traverse',
 				'@babel/generator',
-				'@babel/types'
-			]
-		}
-	}
+				'@babel/types',
+			],
+		},
+	},
 });
