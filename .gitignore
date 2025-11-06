@@ -1,1 +1,26 @@
-node_modules
+# Dépendances et build
+node_modules/
+dist/
+.vite/
+
+# Fichiers temporaires et logs
+*.log
+*.lock
+.DS_Store
+
+# Certificats locaux mkcert
+localhost+*.pem
+localhost+*-key.pem
+
+# Éditeurs et environnements locaux
+.vscode/
+.windsurf/
+.cursor/
+.idea/
+*.code-workspace
+
+# Fichiers d'environnement
+.env
+.env.local
+.env.*
+
