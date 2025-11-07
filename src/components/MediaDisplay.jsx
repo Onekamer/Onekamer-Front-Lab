@@ -8,6 +8,7 @@ const defaultImages = {
   partenaires: "https://horizons-cdn.hostinger.com/2838c69a-ba17-4f74-8eef-55777dbe8ec3/fbbe30b8a750bf10ddf4da2c7de7bfd3.png",
   groupes: "https://horizons-cdn.hostinger.com/2838c69a-ba17-4f74-8eef-55777dbe8ec3/0d1b14eb0b6bbb002d83d44342b4afd2.png",
   faits_divers: "https://horizons-cdn.hostinger.com/2838c69a-ba17-4f74-8eef-55777dbe8ec3/3426b67577181940ee97b83de9829d6d.png",
+  rencontres: "https://horizons-cdn.hostinger.com/2838c69a-ba17-4f74-8eef-55777dbe8ec3/deafb02734097cfca203ab9aad10f6ba.png",
 };
 
 const MediaDisplay = ({ bucket, path, alt, className }) => {
@@ -37,17 +38,31 @@ const MediaDisplay = ({ bucket, path, alt, className }) => {
         return;
       }
 
-      // ✅ Sinon, Supabase storage
+      // ✅ Sinon, Supabase storage (normalisation du chemin)
       try {
-        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
+        let p = path || "";
+        p = p.replace(/^\/+/, "");
+        // ✅ Préfixe automatique si le chemin ne contient pas le nom du bucket
+        if (!p.startsWith("http") && bucket && !p.startsWith(`${bucket}/`)) {
+          p = `${bucket}/${p}`;
+        }
+        // ✅ Déduplication éventuelle 'bucket/bucket/...'
+        if (bucket && p.startsWith(`${bucket}/${bucket}/`)) {
+          p = p.replace(new RegExp(`^${bucket}/`), "");
+        }
+        console.log("🔏 Signature Supabase:", { bucket, path: p });
+        if (p.startsWith("rencontres/rencontres/")) {
+          p = p.replace(/^rencontres\//, "");
+        }
+        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(p, 3600);
         if (error) throw error;
         setMediaUrl(data.signedUrl);
-        const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(path);
+        const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(p);
         setMediaType(isVideo ? "video" : "image");
       } catch (err) {
         console.warn("⚠️ Erreur media Supabase:", err.message);
-        setMediaUrl(defaultImages[bucket]);
-        setError(true);
+        setMediaUrl(defaultImages[bucket] || null);
+        setError(false);
       } finally {
         setLoading(false);
       }
