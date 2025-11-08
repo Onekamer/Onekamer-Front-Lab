@@ -1,53 +1,54 @@
  import React, { useState, useEffect } from 'react';
- import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
- import { Helmet } from 'react-helmet';
- import { Toaster } from '@/components/ui/toaster';
- import Header from '@/components/layout/Header';
- import BottomNav from '@/components/layout/BottomNav';
- import Home from '@/pages/Home';
- import Annonces from '@/pages/Annonces';
- import Partenaires from '@/pages/Partenaires';
- import Echange from '@/pages/Echange';
- import Evenements from '@/pages/Evenements';
- import Rencontre from '@/pages/Rencontre';
- import FaitsDivers from '@/pages/FaitsDivers';
- import Groupes from '@/pages/Groupes';
- import GroupeDetail from '@/pages/GroupeDetail';
- import CreateGroupe from '@/pages/groupes/CreateGroupe';
- import GroupInvitations from '@/pages/groupes/GroupInvitations';
- import OKCoins from '@/pages/OKCoins';
- import Forfaits from '@/pages/Forfaits';
- import Compte from '@/pages/Compte';
- import Publier from '@/pages/Publier';
- import Rechercher from '@/pages/Rechercher';
- import Messages from '@/pages/Messages';
- import { AuthProvider, useAuth } from '@/contexts/SupabaseAuthContext';
- import ModifierProfil from '@/pages/compte/ModifierProfil';
- import Notifications from '@/pages/compte/Notifications';
- import Confidentialite from '@/pages/compte/Confidentialite';
- import Favoris from '@/pages/compte/Favoris';
- import CreateAnnonce from '@/pages/publier/CreateAnnonce';
- import CreateEvenement from '@/pages/publier/CreateEvenement';
- import ProposerPartenaire from '@/pages/publier/ProposerPartenaire';
- import UserProfile from '@/pages/UserProfile';
- import RencontreMessages from '@/pages/rencontre/RencontreMessages';
- import ConversationDetail from '@/pages/rencontre/ConversationDetail';
- import RencontreProfil from '@/pages/rencontre/RencontreProfil';
- import AuthPage from '@/pages/Auth';
- import PaiementSuccess from '@/pages/PaiementSuccess';
- import PaiementAnnule from '@/pages/PaiementAnnule';
- import MerciVerification from '@/pages/MerciVerification';
- import VerificationSMS from '@/pages/VerificationSMS';
- import ChartePopup from '@/components/ChartePopup';
- import { useCharteValidation } from '@/hooks/useCharteValidation';
- import { applyAutoAccessProtection } from '@/lib/autoAccessWrapper';
- import ResetPassword from '@/pages/ResetPassword';
- import OneSignalInitializer from '@/OneSignalInitializer';
- import SupportCenter from '@/pages/SupportCenter';
- import CguPage from '@/pages/Cgu';
- import RgpdPage from '@/pages/Rgpd';
- import MentionsLegalesPage from '@/pages/MentionLegales';
- import Landing from '@/pages/Landing';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet';
+import { Toaster } from '@/components/ui/toaster';
+import Header from '@/components/layout/Header';
+import BottomNav from '@/components/layout/BottomNav';
+import Home from '@/pages/Home';
+import Annonces from '@/pages/Annonces';
+import Partenaires from '@/pages/Partenaires';
+import Echange from '@/pages/Echange';
+import Evenements from '@/pages/Evenements';
+import Rencontre from '@/pages/Rencontre';
+import FaitsDivers from '@/pages/FaitsDivers';
+import Groupes from '@/pages/Groupes';
+import GroupeDetail from '@/pages/GroupeDetail';
+import CreateGroupe from '@/pages/groupes/CreateGroupe';
+import GroupInvitations from '@/pages/groupes/GroupInvitations';
+import OKCoins from '@/pages/OKCoins';
+import Forfaits from '@/pages/Forfaits';
+import Compte from '@/pages/Compte';
+import Publier from '@/pages/Publier';
+import Rechercher from '@/pages/Rechercher';
+import Messages from '@/pages/Messages';
+import { AuthProvider, useAuth } from '@/contexts/SupabaseAuthContext';
+import ModifierProfil from '@/pages/compte/ModifierProfil';
+import Notifications from '@/pages/compte/Notifications';
+import Confidentialite from '@/pages/compte/Confidentialite';
+import Favoris from '@/pages/compte/Favoris';
+import CreateAnnonce from '@/pages/publier/CreateAnnonce';
+import CreateEvenement from '@/pages/publier/CreateEvenement';
+import ProposerPartenaire from '@/pages/publier/ProposerPartenaire';
+import UserProfile from '@/pages/UserProfile';
+import RencontreMessages from '@/pages/rencontre/RencontreMessages';
+import ConversationDetail from '@/pages/rencontre/ConversationDetail';
+import RencontreProfil from '@/pages/rencontre/RencontreProfil';
+import AuthPage from '@/pages/Auth';
+import PaiementSuccess from '@/pages/PaiementSuccess';
+import PaiementAnnule from '@/pages/PaiementAnnule';
+import MerciVerification from '@/pages/MerciVerification';
+import VerificationSMS from '@/pages/VerificationSMS';
+import ChartePopup from '@/components/ChartePopup';
+import { useCharteValidation } from '@/hooks/useCharteValidation';
+import { applyAutoAccessProtection } from '@/lib/autoAccessWrapper';
+import ResetPassword from '@/pages/ResetPassword';
+import OneSignalInitializer from '@/OneSignalInitializer';
+import SupportCenter from '@/pages/SupportCenter';
+import CguPage from '@/pages/Cgu';
+import RgpdPage from '@/pages/Rgpd';
+import MentionsLegalesPage from '@/pages/MentionLegales';
+import Landing from '@/pages/Landing';
+import PublicHeader from '@/pages/public/PublicHeader';
 
 const AppLayout = () => {
   const { profile } = useAuth();
@@ -67,7 +68,8 @@ const AppContent = () => {
   const { showCharte, acceptCharte } = useCharteValidation();
   const { session } = useAuth();
   const location = useLocation();
-  const isLanding = !session && location.pathname === '/';
+  const publicPaths = ['/', '/cgu', '/rgpd', '/mentions-legales'];
+  const isPublic = !session && publicPaths.includes(location.pathname);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   useEffect(() => {
@@ -81,11 +83,14 @@ const AppContent = () => {
 
   return (
     <>
-      {!isLanding && <Header deferredPrompt={deferredPrompt} />}
+      {!isPublic ? <Header deferredPrompt={deferredPrompt} /> : <PublicHeader />}
       <AppLayout />
-      {isLanding ? (
+      {isPublic ? (
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/cgu" element={<CguPage />} />
+          <Route path="/rgpd" element={<RgpdPage />} />
+          <Route path="/mentions-legales" element={<MentionsLegalesPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       ) : (
@@ -136,7 +141,7 @@ const AppContent = () => {
       )}
 
       <ChartePopup show={showCharte} onAccept={acceptCharte} />
-      {!isLanding && <BottomNav />}
+      {!isPublic && <BottomNav />}
     </>
   );
 }
