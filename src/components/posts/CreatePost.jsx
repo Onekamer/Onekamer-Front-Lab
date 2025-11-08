@@ -91,7 +91,7 @@ const AudioPlayer = ({ src, onCanPlay }) => {
     );
 };
 
-const CreatePost = () => {
+const CreatePost = ({ onPublished }) => {
   const { user, profile } = useAuth();
   const [postText, setPostText] = useState('');
   const [mediaFile, setMediaFile] = useState(null);
@@ -539,6 +539,7 @@ const CreatePost = () => {
               console.error('Erreur notification OneSignal (commentaire audio):', notificationError);
             }
           }
+          try { onPublished && onPublished({ kind: 'audio_post', item: insertedComment }); } catch (_) {}
       } else { 
           let postData = {
             user_id: user.id,
@@ -576,6 +577,7 @@ const CreatePost = () => {
               console.error('Erreur notification OneSignal (mentions):', notificationError);
             }
           }
+          try { onPublished && onPublished({ kind: 'post', item: insertedPost }); } catch (_) {}
       }
 
       toast({
@@ -587,6 +589,7 @@ const CreatePost = () => {
       if(editableDivRef.current) editableDivRef.current.innerHTML = '';
       handleRemoveMedia();
       handleRemoveAudio();
+      try { onPublished && onPublished({ kind: 'refresh' }); } catch (_) {}
     } catch (error) {
       console.error('Erreur de publication :', error.message);
       toast({

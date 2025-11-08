@@ -1,5 +1,6 @@
 const BUNNY_HOST_CORRECTIONS = {
-  "onekamer-media-cdn.b-cdn.net": "onekamer-media.b-cdn.net",
+  // Remap uniquement l'ancien domaine vers l'actuel
+  "cdn.onekamer.co": "onekamer-media-cdn.b-cdn.net",
 };
 
 const collapseDuplicateSlashes = (value) => {
@@ -40,18 +41,18 @@ export const normalizeMediaUrl = (rawUrl) => {
 
   try {
     const parsed = new URL(candidate);
-    const correctedHost =
-      BUNNY_HOST_CORRECTIONS[parsed.hostname] || parsed.hostname;
+    const correctedHost = BUNNY_HOST_CORRECTIONS[parsed.hostname] || parsed.hostname;
     parsed.hostname = correctedHost;
     parsed.protocol = 'https:';
     parsed.pathname = collapseDuplicateSlashes(parsed.pathname);
     return parsed.toString();
   } catch (error) {
-    const corrected = candidate.replace(
-      'onekamer-media-cdn.b-cdn.net',
-      BUNNY_HOST_CORRECTIONS['onekamer-media-cdn.b-cdn.net'] ||
-        'onekamer-media.b-cdn.net'
-    );
+    let corrected = candidate
+      .replace(
+        'cdn.onekamer.co',
+        BUNNY_HOST_CORRECTIONS['cdn.onekamer.co'] ||
+          'onekamer-media-cdn.b-cdn.net'
+      );
     return collapseDuplicateSlashes(corrected);
   }
 };

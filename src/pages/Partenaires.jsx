@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button } from "@/components/ui/button";
+import MediaDisplay from "@/components/MediaDisplay";
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/customSupabaseClient';
@@ -39,27 +40,7 @@ const PartenaireDetail = ({ partenaire, onBack, onRecommander }) => {
         </Button>
         <Card className="shadow-xl rounded-2xl">
           {partenaire.media_url && (
-            <img
-              src={partenaire.media_url}
-              alt={partenaire.name || "Partenaire"}
-              className="w-full h-48 object-cover rounded-t-2xl"
-              onError={(e) => {
-                const industry = partenaire.partenaires_categories?.industrie?.toLowerCase() || partenaire.partenaires_categories?.nom?.toLowerCase() || "";
-                let fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_mode.png";
-
-                if (industry.includes("restauration")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_restauration.png";
-                else if (industry.includes("finance")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_finances.png";
-                else if (industry.includes("immobilier")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_immobilier.png";
-                else if (industry.includes("santé") || industry.includes("bien-être") || industry.includes("beaute")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_bien-etre.png";
-                else if (industry.includes("technologie") || industry.includes("numérique")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_technologies.png";
-                else if (industry.includes("formation") || industry.includes("éducation")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_formations.png";
-                else if (industry.includes("mode") || industry.includes("commerce")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_mode.png";
-                else if (industry.includes("culture") || industry.includes("événementiel")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_culture_evenementiel.png";
-                else if (industry.includes("transport")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_transport.png";
-
-                e.target.src = fallback;
-              }}
-            />
+            <MediaDisplay bucket="partenaires" path={partenaire.media_url} alt={partenaire.name || "Partenaire"} className="w-full h-48 object-cover rounded-t-2xl" />
           )}
           <CardHeader>
             <div className="flex justify-between items-start">
@@ -233,36 +214,12 @@ const Partenaires = () => {
               >
                 <Card className="relative overflow-hidden hover:shadow-xl transition-shadow h-full flex flex-col group">
                   <div className="h-40 w-full relative">
-                    <img
-                      src={partenaire.media_url}
+                    <MediaDisplay
+                      bucket="partenaires"
+                      path={partenaire.media_url}
                       alt={partenaire.name || "Partenaire"}
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        const industry = partenaire.partenaires_categories?.industrie?.toLowerCase() || partenaire.partenaires_categories?.nom?.toLowerCase() || "";
-                        let fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_mode.png";
-
-                        if (industry.includes("restauration")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_restauration.png";
-                        else if (industry.includes("finance")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_finances.png";
-                        else if (industry.includes("immobilier")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_immobilier.png";
-                        else if (industry.includes("santé") || industry.includes("bien-être") || industry.includes("beaute")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_bien-etre.png";
-                        else if (industry.includes("technologie") || industry.includes("numérique")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_technologies.png";
-                        else if (industry.includes("formation") || industry.includes("éducation")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_formations.png";
-                        else if (industry.includes("mode") || industry.includes("commerce")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_mode.png";
-                        else if (industry.includes("culture") || industry.includes("événementiel")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_culture_evenementiel.png";
-                        else if (industry.includes("transport")) fallback = "https://onekamer-media-cdn.b-cdn.net/partenaires/default_partenaires_transport.png";
-
-                        e.target.src = fallback;
-                      }}
                     />
-                    <div className="absolute top-2 left-2 bg-red-600 text-white text-xs px-2 py-1 rounded-full">
-                      {partenaire.partenaires_categories?.nom || 'Général'}
-                    </div>
-                    <div className="absolute top-2 right-2 flex space-x-1">
-                      <FavoriteButton contentType="partenaire" contentId={partenaire.id} className="text-white hover:text-yellow-400" />
-                      <Button variant="ghost" size="icon" className="text-white hover:text-blue-400">
-                        <Share2 className="w-5 h-5" />
-                      </Button>
-                    </div>
                   </div>
                   <CardHeader className="p-4">
                     <CardTitle className="text-lg font-semibold">{partenaire.name}</CardTitle>

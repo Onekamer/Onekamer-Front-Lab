@@ -433,10 +433,8 @@ const RencontreProfil = () => {
     const enfantValue = `${profile.enfant}${profile.enfant === 'Oui' && profile.show_nombre_enfant ? ` (${profile.nombre_enfant || 'N/A'})` : ''}`;
     const galleryPhotos = (() => {
       const existing = Array.isArray(profile.photos) ? profile.photos.filter(Boolean) : [];
-      if (profile.image_url && !existing.includes(profile.image_url)) {
-        return [profile.image_url, ...existing];
-      }
-      return existing;
+      // 🚫 Ne pas dupliquer la photo de profil (image_url) dans la galerie
+      return profile.image_url ? existing.filter((p) => p !== profile.image_url) : existing;
     })();
 
     return (
@@ -452,9 +450,34 @@ const RencontreProfil = () => {
             </div>
             <Card className="p-4 md:p-6 space-y-6">
                 <div className="text-center">
-                    <div className="w-32 h-32 rounded-full mx-auto mb-4 overflow-hidden border-4 border-green-200 cursor-pointer" onClick={() => { if (profile.image_url) { setLightboxPath(profile.image_url); setLightboxOpen(true); } }}>
-                      <MediaDisplay bucket="rencontres" path={profile.image_url} alt={profile.name} className="w-full h-full object-cover" />
-                    </div>
+                    {(() => {
+                      const coverCandidate = (() => {
+                        const existing = Array.isArray(profile.photos) ? profile.photos.filter(Boolean) : [];
+                        // Utilise d'abord l'aperçu signé si présent (fiable), sinon image_url, sinon 1ère galerie
+                        return (imagePreview || profile.image_url || existing[0] || null);
+                      })();
+                      const normalizePhotoPath = (photo) => {
+                        if (!photo) return null;
+                        if (typeof photo !== 'string') return null;
+                        if (photo.startsWith('http')) return photo;
+                        if (photo.startsWith('rencontres/rencontres/')) return photo.replace(/^rencontres\//, '');
+                        if (photo.startsWith('rencontres/')) return photo;
+                        return `rencontres/${photo}`;
+                      };
+                      const coverPath = normalizePhotoPath(coverCandidate);
+                      return (
+                        <div
+                          className="w-32 h-32 rounded-full mx-auto mb-4 overflow-hidden border-4 border-green-200 cursor-pointer"
+                          onClick={() => { if (coverPath) { setLightboxPath(coverPath); setLightboxOpen(true); } }}
+                        >
+                          {/https?:\/\//.test(coverPath || '') ? (
+                            <img src={coverPath} alt={profile.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <MediaDisplay bucket="rencontres" path={coverPath} alt={profile.name} className="w-full h-full object-cover" />
+                          )}
+                        </div>
+                      );
+                    })()}
                     <h2 className="text-3xl font-bold text-gray-800">{profile.name?.split(' ')[0]}, {profile.age}</h2>
                     <div className="flex items-center justify-center flex-wrap gap-x-4 gap-y-1 text-gray-500 text-sm mt-2">
                       <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {profile.ville?.nom || profile.city}</span>

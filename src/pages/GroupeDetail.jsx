@@ -129,13 +129,15 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
       const renderContent = () => {
         const c = msg.message_contenu || '';
         const isHttp = /^https?:\/\//i.test(c);
-        const isAudio = /(\.webm|\.ogg|\.m4a|\.mp3|\.mp4)(\?|$)/i.test(c);
+        // Ne pas classer .mp4 comme audio
+        const isAudio = /(\.webm$|\.ogg$|\.m4a$|\.mp3$)/i.test(c.split('?')[0] || '');
         const isImage = /(\.png|\.jpg|\.jpeg|\.gif|\.webp|\.avif)(\?|$)/i.test(c);
         const isVideo = /(\.mp4|\.webm|\.ogg|\.mov)(\?|$)/i.test(c);
         if (isHttp) {
-          if (isAudio) return <AudioPlayer src={c} initialDuration={msg.audio_duration || 0} />;
-          if (isImage) return <img src={c} alt="Média partagé" className="rounded-lg max-h-80" />;
+          // Priorité à la vidéo lorsque l'extension est ambiguë (.webm/.ogg peuvent être vidéo ou audio)
           if (isVideo) return <video src={c} controls className="rounded-lg max-h-80" />;
+          if (isImage) return <img src={c} alt="Média partagé" className="rounded-lg max-h-80" />;
+          if (isAudio) return <AudioPlayer src={c} initialDuration={msg.audio_duration || 0} />;
         }
         // Legacy path in Supabase storage
         try {

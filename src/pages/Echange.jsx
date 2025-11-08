@@ -312,6 +312,21 @@ const CommentSection = ({ postId }) => {
     });
   }, []);
 
+  const handlePublished = useCallback((payload) => {
+    if (!payload) return fetchFeed();
+    if (payload.kind === 'post') {
+      // normalize to include author for UI
+      const item = { ...payload.item, author: payload.item.profiles || payload.item.author };
+      setFeedItems((curr) => [{ ...normalizeAudioEntry(item), feed_type: 'post' }, ...curr]);
+      return;
+    }
+    if (payload.kind === 'audio_post') {
+      setFeedItems((curr) => [{ ...normalizeAudioEntry(payload.item), feed_type: 'audio_post' }, ...curr]);
+      return;
+    }
+    fetchFeed();
+  }, [fetchFeed]);
+
   const fetchComments = useCallback(async () => {
     setLoadingComments(true);
 
@@ -975,7 +990,7 @@ const Echange = () => {
     }
 
     const combinedFeed = [
-      ...(postsData || []).map(p => ({ ...normalizeAudioEntry(p), feed_type: 'post' })),
+      ...(postsData || []).map(p => ({ ...normalizeAudioEntry({ ...p, author: p.profiles }), feed_type: 'post' })),
       ...(audioData || []).map(a => ({ ...normalizeAudioEntry(a), feed_type: 'audio_post' }))
     ];
 
@@ -1046,7 +1061,7 @@ const Echange = () => {
 
         {user && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <CreatePost />
+            <CreatePost onPublished={fetchFeed} />
           </motion.div>
         )}
 
