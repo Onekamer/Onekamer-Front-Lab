@@ -42,7 +42,6 @@ import ChartePopup from '@/components/ChartePopup';
 import { useCharteValidation } from '@/hooks/useCharteValidation';
 import { applyAutoAccessProtection } from '@/lib/autoAccessWrapper';
 import ResetPassword from '@/pages/ResetPassword';
-import OneSignalInitializer from '@/OneSignalInitializer';
 import SupportCenter from '@/pages/SupportCenter';
 import CguPage from '@/pages/Cgu';
 import RgpdPage from '@/pages/Rgpd';
@@ -156,9 +155,6 @@ function App() {
           <link rel="manifest" href="/manifest.json" />
           <meta name="theme-color" content="#2BA84A" />
         </Helmet>
-        
-        <OneSignalInitializer />
-
         <div className="min-h-screen bg-gradient-to-br from-[#FDF9F9] to-[#CDE1D5] pb-20">
           <AppContent />
         </div>
