@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
     import { supabase } from '@/lib/customSupabaseClient';
     import { useToast } from '@/components/ui/use-toast';
+    import { subscribeForPush } from '@/lib/push/subscribeForPush';
 
     const AuthContext = createContext(undefined);
 
@@ -118,6 +119,22 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 
         return () => subscription.unsubscribe();
       }, [handleSession]);
+
+      // Abonnement automatique Web Push (Option C) après login
+      useEffect(() => {
+        const provider = import.meta.env.VITE_NOTIFICATIONS_PROVIDER || 'onesignal';
+        if (provider !== 'supabase_light') return;
+        if (!user) return;
+
+        (async () => {
+          try {
+            const result = await subscribeForPush(user.id);
+            if (result?.error) console.warn('Push subscribe error:', result.error);
+          } catch (e) {
+            console.warn('Push subscribe failed:', e?.message || e);
+          }
+        })();
+      }, [user]);
 
       const refreshBalance = useCallback(async () => {
         if (user) {

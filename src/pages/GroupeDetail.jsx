@@ -379,14 +379,27 @@ const GroupeDetail = () => {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('folder', folder);
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/upload`, { method: 'POST', body: formData });
+        const controller = new AbortController();
+        const timeoutMs = 60000; // 60s pour cold start/connexion mobile
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        let response;
+        try {
+          response = await fetch(`${import.meta.env.VITE_API_URL}/upload`, { method: 'POST', body: formData, signal: controller.signal });
+        } catch (e) {
+          if (e.name === 'AbortError') {
+            throw new Error(`Délai dépassé lors de l’upload (${Math.floor(timeoutMs/1000)}s). Réessaie dans quelques secondes.`);
+          }
+          throw new Error(`Échec réseau vers le serveur d’upload (${import.meta.env.VITE_API_URL}). ${e.message || ''}`.trim());
+        } finally {
+          clearTimeout(timer);
+        }
         const text = await response.text();
         let data = null;
         if (text) {
           try { data = JSON.parse(text); } catch { throw new Error("Réponse inattendue du serveur d'upload"); }
         }
         if (!response.ok || !data?.success) {
-          const message = data?.message || `Erreur d’upload BunnyCDN (code ${response.status})`;
+          const message = data?.message || data?.error || `Erreur d’upload BunnyCDN (code ${response.status})`;
           throw new Error(message);
         }
         return data.url;

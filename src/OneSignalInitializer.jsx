@@ -2,9 +2,13 @@ import React, { useEffect, useState } from 'react';
 import OneSignal from 'react-onesignal';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 
+const PROVIDER = import.meta.env.VITE_NOTIFICATIONS_PROVIDER || 'onesignal';
 const ONE_SIGNAL_APP_ID = 'a122b55d-7627-4bc9-aeaf-1d6d9a6a50b5';
 
 const OneSignalInitializer = () => {
+  if (PROVIDER === 'supabase_light') {
+    return null;
+  }
   const { user } = useAuth();
   const [initialized, setInitialized] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
