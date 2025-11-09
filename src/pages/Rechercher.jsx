@@ -131,7 +131,7 @@ const Rechercher = () => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const [suggestions, setSuggestions] = useState([]);
+  const [suggestions, setSuggestions] = useState([]); // [{type, data}]
   const [suggestLoading, setSuggestLoading] = useState(false);
   const debounceRef = useRef(null);
 
@@ -215,10 +215,10 @@ const Rechercher = () => {
 
   }, [searchTerm, filter]);
 
-  // Autocomplete en temps réel pour Rencontres (aussi visible quand filtre = all)
+  // Autocomplete en temps réel (sections multiples quand filtre = all)
   useEffect(() => {
-    // affichage suggestions uniquement si filtre Rencontres ou Tout
-    if (!(filter === 'rencontres' || filter === 'all')) {
+    // suggestions visibles pour tous les filtres; si all → on cumule
+    if (!filter) {
       setSuggestions([]);
       return;
     }
@@ -232,27 +232,54 @@ const Rechercher = () => {
       setSuggestLoading(true);
       const like = `%${term}%`;
       try {
-        // 1) match sur rencontres.name
-        const q1 = supabase
-          .from('rencontres')
-          .select('id, user_id, name, image_url, profiles(username, avatar_url)')
-          .ilike('name', like)
-          .limit(8);
+        const promises = [];
+        const push = (p, type) => promises.push(p.then(res => ({ type, res })).catch(() => ({ type, res: { data: [], error: null } })));
 
-        // 2) match sur profiles.username avec jointure inner
-        const q2 = supabase
-          .from('rencontres')
-          .select('id, user_id, name, image_url, profiles!inner(username, avatar_url)')
-          .ilike('profiles.username', like)
-          .limit(8);
+        const want = (t) => filter === 'all' || filter === t;
 
-        const [r1, r2] = await Promise.all([q1, q2]);
-        const arr1 = Array.isArray(r1.data) ? r1.data : [];
-        const arr2 = Array.isArray(r2.data) ? r2.data : [];
-        // fusion unique par id
-        const map = new Map();
-        [...arr1, ...arr2].forEach(it => { if (it && it.id && !map.has(it.id)) map.set(it.id, it); });
-        const merged = Array.from(map.values()).slice(0, 8);
+        if (want('rencontres')) {
+          const qR1 = supabase.from('rencontres').select('id, user_id, name, image_url, profiles(username, avatar_url)').ilike('name', like).limit(5);
+          const qR2 = supabase.from('rencontres').select('id, user_id, name, image_url, profiles!inner(username, avatar_url)').ilike('profiles.username', like).limit(5);
+          push(qR1, 'rencontres');
+          push(qR2, 'rencontres');
+        }
+        if (want('annonces')) {
+          const q = supabase.from('annonces').select('id, titre, description, media_url').ilike('titre', like).limit(5);
+          push(q, 'annonces');
+        }
+        if (want('partenaires')) {
+          const q = supabase.from('partenaires').select('id, name, media_url, address').ilike('name', like).limit(5);
+          push(q, 'partenaires');
+        }
+        if (want('evenements')) {
+          const q = supabase.from('evenements').select('id, title, media_url, date, location').ilike('title', like).limit(5);
+          push(q, 'evenements');
+        }
+        if (want('posts')) {
+          const q = supabase.from('posts').select('id, content, profiles(username, avatar_url)').ilike('content', like).limit(5);
+          push(q, 'posts');
+        }
+        if (want('faits_divers')) {
+          const q = supabase.from('faits_divers').select('id, title, image_url').ilike('title', like).limit(5);
+          push(q, 'faits_divers');
+        }
+
+        const responses = await Promise.all(promises);
+        const list = [];
+        responses.forEach(({ type, res }) => {
+          const arr = Array.isArray(res?.data) ? res.data : [];
+          arr.forEach((d) => list.push({ type, data: d }));
+        });
+
+        // déduplique pour rencontres (doublons R1/R2)
+        const seenRencontre = new Set();
+        const merged = list.filter((item) => {
+          if (item.type !== 'rencontres') return true;
+          if (seenRencontre.has(item.data.id)) return false;
+          seenRencontre.add(item.data.id);
+          return true;
+        }).slice(0, 12);
+
         setSuggestions(merged);
       } catch (e) {
         setSuggestions([]);
@@ -299,25 +326,91 @@ const Rechercher = () => {
               </Button>
             </div>
 
-            {(filter === 'rencontres' || filter === 'all') && searchTerm.trim() && (
+            {searchTerm.trim() && suggestions.length >= 0 && (
               <div className="space-y-2">
                 {suggestLoading && (
                   <div className="text-sm text-gray-500">Chargement...</div>
                 )}
                 {!suggestLoading && suggestions.length > 0 && (
                   <div className="space-y-2">
-                    {suggestions.map((s) => (
-                      <div key={s.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
-                           onClick={() => navigate(`/rencontre?rid=${s.id}`)}>
-                        <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
-                          <MediaDisplay bucket="avatars" path={s.profiles?.avatar_url} alt={s.profiles?.username || s.name} className="w-full h-full object-cover" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold truncate">{s.profiles?.username || s.name}</div>
-                          <div className="text-xs text-gray-600 truncate">{s.name}</div>
-                        </div>
-                      </div>
-                    ))}
+                    {suggestions.map(({type, data}) => {
+                      switch (type) {
+                        case 'rencontres':
+                          return (
+                            <div key={`r-${data.id}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/rencontre?rid=${data.id}`)}>
+                              <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+                                <MediaDisplay bucket="avatars" path={data.profiles?.avatar_url} alt={data.profiles?.username || data.name} className="w-full h-full object-cover" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold truncate">{data.profiles?.username || data.name}</div>
+                                <div className="text-xs text-gray-600 truncate">Profil Rencontre</div>
+                              </div>
+                            </div>
+                          );
+                        case 'annonces':
+                          return (
+                            <div key={`a-${data.id}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => navigate('/annonces')}>
+                              <div className="w-10 h-10 rounded overflow-hidden bg-gray-200 flex-shrink-0">
+                                <MediaDisplay bucket="annonces" path={data.media_url} alt={data.titre} className="w-full h-full object-cover" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold truncate">{data.titre}</div>
+                                <div className="text-xs text-gray-600 truncate">Annonce</div>
+                              </div>
+                            </div>
+                          );
+                        case 'partenaires':
+                          return (
+                            <div key={`p-${data.id}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => navigate('/partenaires')}>
+                              <div className="w-10 h-10 rounded overflow-hidden bg-gray-200 flex-shrink-0">
+                                <MediaDisplay bucket="partenaires" path={data.media_url} alt={data.name} className="w-full h-full object-cover" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold truncate">{data.name}</div>
+                                <div className="text-xs text-gray-600 truncate">Partenaire</div>
+                              </div>
+                            </div>
+                          );
+                        case 'evenements':
+                          return (
+                            <div key={`e-${data.id}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => navigate('/evenements')}>
+                              <div className="w-10 h-10 rounded overflow-hidden bg-gray-200 flex-shrink-0">
+                                <MediaDisplay bucket="evenements" path={data.media_url} alt={data.title} className="w-full h-full object-cover" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold truncate">{data.title}</div>
+                                <div className="text-xs text-gray-600 truncate">Événement</div>
+                              </div>
+                            </div>
+                          );
+                        case 'posts':
+                          return (
+                            <div key={`po-${data.id}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => navigate('/echange')}>
+                              <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+                                <MediaDisplay bucket="avatars" path={data.profiles?.avatar_url} alt={data.profiles?.username} className="w-full h-full object-cover" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold truncate">{data.profiles?.username}</div>
+                                <div className="text-xs text-gray-600 truncate">Post</div>
+                              </div>
+                            </div>
+                          );
+                        case 'faits_divers':
+                          return (
+                            <div key={`fd-${data.id}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => navigate('/faits-divers')}>
+                              <div className="w-10 h-10 rounded overflow-hidden bg-gray-200 flex-shrink-0">
+                                <MediaDisplay bucket="faits_divers" path={data.image_url} alt={data.title} className="w-full h-full object-cover" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold truncate">{data.title}</div>
+                                <div className="text-xs text-gray-600 truncate">Fait Divers</div>
+                              </div>
+                            </div>
+                          );
+                        default:
+                          return null;
+                      }
+                    })}
                   </div>
                 )}
               </div>
