@@ -9,9 +9,9 @@ const Landing = () => {
   return (
     <div className="min-h-screen bg-white text-black">
       <Helmet>
-        <title>OneKamer – La communauté de la diaspora camerounaise</title>
+        <title>OneKamer.co – Le premier repère de la communauté camerounaise</title>
         <meta name="description" content="Rejoignez OneKamer, la plateforme où actualités, rencontres, événements et opportunités se rencontrent." />
-        <meta property="og:title" content="OneKamer – La communauté de la diaspora camerounaise" />
+        <meta property="og:title" content="OneKamer.co – Le premier repère de la communauté camerounaise" />
         <meta property="og:description" content="Actualités, rencontres, événements et opportunités de la diaspora camerounaise." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={window.location.origin} />
@@ -45,7 +45,7 @@ const Landing = () => {
         <div className="mx-auto max-w-6xl px-4 py-12 md:py-20">
         <div className="max-w-3xl">
           <h1 className="text-3xl md:text-5xl font-extrabold leading-tight text-black">
-            OneKamer, la communauté de la diaspora camerounaise
+            OneKamer.co, le premier repère de la communauté camerounaise
           </h1>
           <p className="mt-4 text-lg md:text-xl text-gray-700">
             Rejoignez la plateforme où actualités, rencontres, événements et opportunités se rencontrent.
