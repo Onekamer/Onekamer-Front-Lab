@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
@@ -41,12 +41,18 @@ const SupportCenter = () => {
   const [category, setCategory] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const anchorRef = useRef(null);
+  const [anchorRect, setAnchorRect] = useState(null);
 
-  const debouncedSearchQuery = useDebounce(searchQuery, 400);
+  const debouncedSearchQuery = useDebounce(searchQuery, 250);
 
   const handleSearch = useCallback((event) => {
     event?.preventDefault();
-    setOpen((prev) => !prev);
+    setOpen(true);
+    // met à jour la position du panneau
+    if (anchorRef.current) {
+      setAnchorRect(anchorRef.current.getBoundingClientRect());
+    }
   }, []);
 
   useEffect(() => {
@@ -54,6 +60,23 @@ const SupportCenter = () => {
       setSearchQuery('');
       setSearchResults([]);
     }
+  }, [open]);
+
+  // Met à jour la position du panneau sur scroll/resize pendant l'ouverture
+  useEffect(() => {
+    if (!open) return;
+    const update = () => {
+      if (anchorRef.current) {
+        setAnchorRect(anchorRef.current.getBoundingClientRect());
+      }
+    };
+    update();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
   }, [open]);
 
   useEffect(() => {
@@ -78,7 +101,7 @@ const SupportCenter = () => {
     const searchUsers = async () => {
       const sanitizedQuery = debouncedSearchQuery.trim().replace(/^@+/, '');
 
-      if (sanitizedQuery.length < 2) {
+      if (sanitizedQuery.length < 1) {
         setSearchResults([]);
         return;
       }
@@ -90,17 +113,45 @@ const SupportCenter = () => {
       const likeQuery = `%${escapedQuery}%`;
 
       setSearchLoading(true);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, username, full_name, avatar_url')
-        .or(`username.ilike.${likeQuery},full_name.ilike.${likeQuery},email.ilike.${likeQuery}`)
-        .limit(10);
-
-      if (error) {
+      try {
+        const q1 = supabase
+          .from('profiles')
+          .select('id, username, full_name, avatar_url')
+          .ilike('username', likeQuery)
+          .limit(10);
+        const q2 = supabase
+          .from('profiles')
+          .select('id, username, full_name, avatar_url')
+          .ilike('full_name', likeQuery)
+          .limit(10);
+        const q3 = supabase
+          .from('profiles')
+          .select('id, username, full_name, avatar_url')
+          .ilike('email', likeQuery)
+          .limit(10);
+        const [r1, r2, r3] = await Promise.all([q1, q2, q3]);
+        const arr1 = Array.isArray(r1.data) ? r1.data : [];
+        const arr2 = Array.isArray(r2.data) ? r2.data : [];
+        const arr3 = Array.isArray(r3.data) ? r3.data : [];
+        // Fusion unique par id
+        const map = new Map();
+        [...arr1, ...arr2, ...arr3].forEach(u => { if (u && u.id && !map.has(u.id)) map.set(u.id, u); });
+        const merged = Array.from(map.values());
+        // Prioriser les correspondances sur username qui commencent par la requête
+        const qLower = sanitizedQuery.toLowerCase();
+        const sorted = merged.slice().sort((a, b) => {
+          const aUser = (a.username || '').toLowerCase();
+          const bUser = (b.username || '').toLowerCase();
+          const aStarts = aUser.startsWith(qLower) ? 0 : 1;
+          const bStarts = bUser.startsWith(qLower) ? 0 : 1;
+          if (aStarts !== bStarts) return aStarts - bStarts;
+          return aUser.localeCompare(bUser);
+        });
+        setSearchResults(sorted);
+      } catch (error) {
         console.error('Error searching users:', error);
         toast({ variant: 'destructive', title: 'Erreur de recherche' });
-      } else {
-        setSearchResults(data);
+        setSearchResults([]);
       }
       setSearchLoading(false);
     };
@@ -177,7 +228,7 @@ const SupportCenter = () => {
               Utilisateur à signaler <span className="text-red-500">*</span>
             </label>
 
-            <div className="relative">
+            <div className="relative" ref={anchorRef}>
               <Button
                 type="button"
                 variant="outline"
@@ -206,51 +257,47 @@ const SupportCenter = () => {
               </Button>
 
               {open && (
-                <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-md border border-gray-200 bg-white shadow-xl">
-                  <Command>
-                    <CommandInput
+                <div className="absolute z-50 mt-2 w-full rounded-md border border-gray-200 bg-white shadow-xl">
+                  <div className="p-2">
+                    <Input
                       value={searchQuery}
-                      onValueChange={setSearchQuery}
-                      placeholder="Tape le nom d’un utilisateur"
+                      onChange={(e) => { setSearchQuery(e.target.value); if (!open) setOpen(true); }}
+                      placeholder="Tape le username (ex: @anna)"
                       autoFocus
                     />
-                    <CommandList>
-                      {searchLoading ? (
-                        <div className="flex items-center gap-2 px-3 py-4 text-sm text-gray-500">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Recherche en cours...
-                        </div>
-                      ) : (
-                        <>
-                          <CommandEmpty>Aucun utilisateur trouvé.</CommandEmpty>
-                          <CommandGroup heading="Utilisateurs">
-                            {searchResults.map((result) => (
-                              <CommandItem
-                                key={result.id}
-                                onSelect={() => handleSelectUser(result)}
-                                className="flex items-center gap-2"
-                              >
-                                <Avatar className="h-6 w-6">
-                                  <AvatarImage src={result.avatar_url} alt={result.username} />
-                                  <AvatarFallback>
-                                    {result.username?.[0]?.toUpperCase() || result.full_name?.[0]?.toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex flex-col">
-                                  <span className="text-sm font-medium text-gray-900">
-                                    {result.username || result.full_name}
-                                  </span>
-                                  {result.username && result.full_name && result.username !== result.full_name && (
-                                    <span className="text-xs text-gray-500">{result.full_name}</span>
-                                  )}
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </>
-                      )}
-                    </CommandList>
-                  </Command>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {searchLoading ? (
+                      <div className="flex items-center gap-2 px-3 py-4 text-sm text-gray-500">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Recherche en cours...
+                      </div>
+                    ) : searchResults.length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-gray-500">Aucun utilisateur trouvé.</div>
+                    ) : (
+                      searchResults.map((result) => (
+                        <button
+                          key={result.id}
+                          type="button"
+                          onClick={() => handleSelectUser(result)}
+                          className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={result.avatar_url} alt={result.username} />
+                            <AvatarFallback>
+                              {result.username?.[0]?.toUpperCase() || result.full_name?.[0]?.toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-gray-900">{result.username || result.full_name}</span>
+                            {result.username && result.full_name && result.username !== result.full_name && (
+                              <span className="text-xs text-gray-500">{result.full_name}</span>
+                            )}
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
                 </div>
               )}
             </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
     import { Helmet } from 'react-helmet';
     import { motion, AnimatePresence } from 'framer-motion';
     import { Card, CardContent } from '@/components/ui/card';
@@ -204,6 +204,9 @@ import React, { useState, useEffect, useCallback } from 'react';
   const [loading, setLoading] = useState(true);
   const [selectedAnnonce, setSelectedAnnonce] = useState(null);
   const [searchTerm, setSearchTerm] = useState(''); // ✅ Correction ici
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const suggestDebounceRef = useRef(null);
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -295,6 +298,29 @@ import React, { useState, useEffect, useCallback } from 'react';
         (annonce.villes?.nom?.toLowerCase() || '').includes(searchTerm.toLowerCase())
       );
 
+      // Autocomplete en temps réel (Annonces uniquement)
+      useEffect(() => {
+        if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current);
+        const term = searchTerm.trim();
+        if (!term) { setSuggestions([]); return; }
+        suggestDebounceRef.current = setTimeout(async () => {
+          setSuggestLoading(true);
+          const like = `%${term}%`;
+          try {
+            const { data, error } = await supabase
+              .from('view_annonces_accessible')
+              .select('id, titre, media_url')
+              .ilike('titre', like)
+              .limit(8);
+            setSuggestions(!error && Array.isArray(data) ? data : []);
+          } catch {
+            setSuggestions([]);
+          }
+          setSuggestLoading(false);
+        }, 250);
+        return () => { if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current); };
+      }, [searchTerm]);
+
       return (
   <>
     <Helmet>
@@ -326,6 +352,29 @@ import React, { useState, useEffect, useCallback } from 'react';
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#6B6B6B]" />
                 <Input placeholder="Rechercher une annonce..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10"/>
+                {searchTerm.trim() && (
+                  <div className="mt-2 space-y-2">
+                    {suggestLoading && (
+                      <div className="text-sm text-gray-500">Chargement...</div>
+                    )}
+                    {!suggestLoading && suggestions.length > 0 && (
+                      <div className="space-y-2">
+                        {suggestions.map((s) => (
+                          <div key={s.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+                               onClick={() => setSearchTerm(s.titre)}>
+                            <div className="w-10 h-10 rounded overflow-hidden bg-gray-200 flex-shrink-0">
+                              <MediaDisplay bucket="annonces" path={s.media_url} alt={s.titre} className="w-full h-full object-cover" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold truncate">{s.titre}</div>
+                              <div className="text-xs text-gray-600 truncate">Annonce</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </motion.div>
 

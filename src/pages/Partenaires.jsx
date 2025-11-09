@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -87,6 +87,9 @@ const Partenaires = () => {
   const [partenaires, setPartenaires] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const suggestDebounceRef = useRef(null);
   const [selectedPartenaire, setSelectedPartenaire] = useState(null);
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
@@ -129,6 +132,29 @@ const Partenaires = () => {
   useEffect(() => {
     fetchPartenaires();
   }, [fetchPartenaires]);
+
+  // Autocomplete en temps réel (Partenaires uniquement)
+  useEffect(() => {
+    if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current);
+    const term = searchTerm.trim();
+    if (!term) { setSuggestions([]); return; }
+    suggestDebounceRef.current = setTimeout(async () => {
+      setSuggestLoading(true);
+      const like = `%${term}%`;
+      try {
+        const { data, error } = await supabase
+          .from('view_partenaires_accessible')
+          .select('id, name, media_url, address')
+          .ilike('name', like)
+          .limit(8);
+        setSuggestions(!error && Array.isArray(data) ? data : []);
+      } catch {
+        setSuggestions([]);
+      }
+      setSuggestLoading(false);
+    }, 250);
+    return () => { if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current); };
+  }, [searchTerm]);
 
   const handleProposerClick = async () => {
     if (!user) {
@@ -195,6 +221,28 @@ const Partenaires = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
           />
+          {searchTerm.trim() && (
+            <div className="mt-2 space-y-2">
+              {suggestLoading && (
+                <div className="text-sm text-gray-500">Chargement...</div>
+              )}
+              {!suggestLoading && suggestions.length > 0 && (
+                <div className="space-y-2">
+                  {suggestions.map((s) => (
+                    <div key={s.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => setSearchTerm(s.name)}>
+                      <div className="w-10 h-10 rounded overflow-hidden bg-gray-200 flex-shrink-0">
+                        <MediaDisplay bucket="partenaires" path={s.media_url} alt={s.name} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold truncate">{s.name}</div>
+                        <div className="text-xs text-gray-600 truncate">Partenaire</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         
         {loading ? (
