@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
     import { useParams, useNavigate } from 'react-router-dom';
     import { Card, CardContent } from '@/components/ui/card';
     import { Button } from '@/components/ui/button';
-    import { ArrowLeft, Send, Loader2, Heart, Mic, Square, X, Image as ImageIcon } from 'lucide-react';
+    import { ArrowLeft, Send, Loader2, Heart, Mic, Square, X, Image as ImageIcon, Trash2 } from 'lucide-react';
     import { Textarea } from '@/components/ui/textarea';
     import { useToast } from '@/components/ui/use-toast';
     import { supabase } from '@/lib/customSupabaseClient';
@@ -75,194 +75,215 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
       );
     };
 
-    const MessageItem = ({ msg, currentUserId, groupId, onActionComplete }) => {
-      const { user } = useAuth();
-      const { toast } = useToast();
-      const [isLiked, setIsLiked] = useState(false);
-      const [likesCount, setLikesCount] = useState(msg.likes_count || 0);
+const MessageItem = ({ msg, currentUserId, groupId, onActionComplete }) => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [isLiked, setIsLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(msg.likes_count || 0);
 
-      const checkLiked = useCallback(async () => {
-        if (!user || !msg.message_id) return;
-        const { data, error } = await supabase
-          .from('group_message_likes')
-          .select('id')
-          .eq('message_id', msg.message_id)
-          .eq('user_id', user.id)
-          .maybeSingle();
+  const checkLiked = useCallback(async () => {
+    if (!user || !msg.message_id) return;
+    const { data, error } = await supabase
+      .from('group_message_likes')
+      .select('id')
+      .eq('message_id', msg.message_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
 
-        if (!error && data) {
-          setIsLiked(true);
-        }
-      }, [user, msg.message_id]);
-      
-      useEffect(() => {
-        if (!msg.is_system_message) {
-          checkLiked();
-        }
-      }, [checkLiked, msg.is_system_message]);
+    if (!error && data) {
+      setIsLiked(true);
+    }
+  }, [user, msg.message_id]);
 
-      const handleLike = async () => {
-        if (!user || !msg.message_id) {
-          toast({ title: 'Connectez-vous pour aimer ce message.', variant: 'destructive'});
-          return;
-        }
+  useEffect(() => {
+    if (!msg.is_system_message) {
+      checkLiked();
+    }
+  }, [checkLiked, msg.is_system_message]);
 
-        const currentlyLiked = isLiked;
-        setIsLiked(!currentlyLiked);
-        setLikesCount(prev => currentlyLiked ? prev - 1 : prev + 1);
+  const handleLike = async () => {
+    if (!user || !msg.message_id) {
+      toast({ title: 'Connectez-vous pour aimer ce message.', variant: 'destructive'});
+      return;
+    }
 
-        if (currentlyLiked) {
-          await supabase.from('group_message_likes').delete().match({ message_id: msg.message_id, user_id: user.id });
-        } else {
-          await supabase.from('group_message_likes').insert({ message_id: msg.message_id, user_id: user.id });
-        }
-      };
-      
-      if (msg.is_system_message) {
-        return (
-            <div className="text-center my-4">
-                <p className="text-sm text-green-600 bg-green-100 rounded-full px-3 py-1 inline-block">{msg.message_contenu}</p>
-            </div>
-        );
-      }
+    const currentlyLiked = isLiked;
+    setIsLiked(!currentlyLiked);
+    setLikesCount(prev => currentlyLiked ? prev - 1 : prev + 1);
 
-      const renderContent = () => {
-        const c = msg.message_contenu || '';
-        const isHttp = /^https?:\/\//i.test(c);
-        // Ne pas classer .mp4 comme audio
-        const isAudio = /(\.webm$|\.ogg$|\.m4a$|\.mp3$)/i.test(c.split('?')[0] || '');
-        const isImage = /(\.png|\.jpg|\.jpeg|\.gif|\.webp|\.avif)(\?|$)/i.test(c);
-        const isVideo = /(\.mp4|\.webm|\.ogg|\.mov)(\?|$)/i.test(c);
-        if (isHttp) {
-          // Priorité à la vidéo lorsque l'extension est ambiguë (.webm/.ogg peuvent être vidéo ou audio)
-          if (isVideo) return <video src={c} controls className="rounded-lg max-h-80" />;
-          if (isImage) return <img src={c} alt="Média partagé" className="rounded-lg max-h-80" />;
-          if (isAudio) return <AudioPlayer src={c} initialDuration={msg.audio_duration || 0} />;
-        }
-        // Legacy path in Supabase storage
-        try {
-          const isMediaPath = c && c.includes('/');
-          if (isMediaPath) {
-            return <MediaDisplay bucket="groupes" path={c} alt="Média partagé" className="rounded-lg max-h-80 cursor-pointer" />;
-          }
-        } catch (e) {}
-        return <p className="text-gray-800">{c}</p>;
-      };
+    if (currentlyLiked) {
+      await supabase.from('group_message_likes').delete().match({ message_id: msg.message_id, user_id: user.id });
+    } else {
+      await supabase.from('group_message_likes').insert({ message_id: msg.message_id, user_id: user.id });
+    }
+  };
 
-      const isMyMessage = msg.sender_id === currentUserId;
+  const handleDelete = async () => {
+    if (!user || !msg.message_id || user.id !== msg.sender_id) return;
+    const ok = window.confirm('Supprimer cette publication ?');
+    if (!ok) return;
+    const { error } = await supabase
+      .from('messages_groupes')
+      .delete()
+      .match({ id: msg.message_id, sender_id: user.id });
+    if (error) {
+      toast({ title: 'Erreur', description: "Suppression impossible.", variant: 'destructive' });
+    } else {
+      toast({ title: 'Supprimé', description: 'Votre publication a été supprimée.' });
+      onActionComplete?.();
+    }
+  };
 
-      return (
-          <Card className="bg-white/80 backdrop-blur-sm border-none shadow-sm mb-4">
-              <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                      <Avatar>
-                          <AvatarImage src={msg.sender_avatar} />
-                          <AvatarFallback>{msg.sender_username?.[0] || '?'}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                          <div>
-                              <p className="font-bold">{msg.sender_username || 'Utilisateur inconnu'}</p>
-                              <p className="text-xs text-gray-500">
-                                {formatDistanceToNow(new Date(msg.message_date), { addSuffix: true, locale: fr })}
-                              </p>
-                          </div>
-                           <div className="mt-3">
-                              {renderContent()}
-                          </div>
-                      </div>
-                  </div>
-                  <div className="flex items-center gap-4 text-[#6B6B6B] mt-3 pl-12">
-                      <button
-                        className={`flex items-center gap-2 hover:text-[#E0222A] transition-colors ${isLiked ? 'text-[#E0222A]' : ''}`}
-                        onClick={handleLike}
-                      >
-                        <Heart className={`h-5 w-5 ${isLiked ? 'fill-current' : ''}`} />
-                        <span>{likesCount}</span>
-                      </button>
-                      {!isMyMessage && msg.sender_id && (
-                        <DonationDialog receiverId={msg.sender_id} receiverName={msg.sender_username} groupId={groupId} onDonationComplete={onActionComplete} />
-                      )}
-                  </div>
-              </CardContent>
-          </Card>
-      )
-    };
-    
-    const GroupeDetail = () => {
-      const { groupId } = useParams();
-      const navigate = useNavigate();
-      const { user, session, loading: authLoading } = useAuth();
-      const { toast } = useToast();
-      const [groupData, setGroupData] = useState([]);
-      const [messages, setMessages] = useState([]);
-      const [loading, setLoading] = useState(true);
-      const [newMessage, setNewMessage] = useState('');
-      const [joinRequestStatus, setJoinRequestStatus] = useState('idle');
-      // Media attach state
-      const [mediaFile, setMediaFile] = useState(null);
-      const [mediaPreviewUrl, setMediaPreviewUrl] = useState(null);
-      const mediaInputRef = useRef(null);
-      // Audio recording state
-      const [isRecording, setIsRecording] = useState(false);
-      const [audioBlob, setAudioBlob] = useState(null);
-      const [recordingTime, setRecordingTime] = useState(0);
-      const mediaRecorderRef = useRef(null);
-      const audioChunksRef = useRef([]);
-      const recorderPromiseRef = useRef(null);
-      const mimeRef = useRef(null);
-      const recordingIntervalRef = useRef(null);
-      const messagesEndRef = useRef(null);
-    
-      const fetchGroupData = useCallback(async () => {
-        if (!user || !session) {
-          setLoading(false);
-          return;
-        }
+  if (msg.is_system_message) {
+    return (
+      <div className="text-center my-4">
+        <p className="text-sm text-green-600 bg-green-100 rounded-full px-3 py-1 inline-block">{msg.message_contenu}</p>
+      </div>
+    );
+  }
 
-        const { data, error } = await supabase
+  const renderContent = () => {
+    const c = msg.message_contenu || '';
+    const isHttp = /^https?:\/\//i.test(c);
+    const baseImg = 'block w-full rounded-xl max-h-[70vh] object-cover';
+    const baseVid = 'block w-full rounded-xl max-h-[70vh] h-auto object-cover';
+    const isAudio = /(\.webm$|\.ogg$|\.m4a$|\.mp3$)/i.test((c.split('?')[0] || ''));
+    const isImage = /(\.png|\.jpg|\.jpeg|\.gif|\.webp|\.avif)(\?|$)/i.test(c);
+    const isVideo = /(\.mp4|\.webm|\.ogg|\.mov)(\?|$)/i.test(c);
+    if (isHttp) {
+      if (isVideo) return <video src={c} controls playsInline className={baseVid} />;
+      if (isImage) return <img src={c} alt="Média partagé" className={baseImg} />;
+      if (isAudio) return <AudioPlayer src={c} initialDuration={msg.audio_duration || 0} />;
+    }
+    try {
+      const isMediaPath = c && c.includes('/');
+      if (isMediaPath) return <MediaDisplay bucket="groupes" path={c} alt="Média partagé" className={`${baseVid} cursor-pointer`} />;
+    } catch {}
+    return <p className="text-gray-800">{c}</p>;
+  };
+
+  const isMyMessage = msg.sender_id === currentUserId;
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-none shadow-sm mb-4">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <Avatar>
+            <AvatarImage src={msg.sender_avatar} />
+            <AvatarFallback>{msg.sender_username?.[0] || '?'}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1">
+            <p className="font-bold">{msg.sender_username || 'Utilisateur inconnu'}</p>
+            <p className="text-xs text-gray-500">{formatDistanceToNow(new Date(msg.message_date), { addSuffix: true, locale: fr })}</p>
+          </div>
+        </div>
+        <div className="mt-3">{renderContent()}</div>
+        <div className="flex items-center gap-4 text-[#6B6B6B] mt-3">
+          <button
+            className={`flex items-center gap-2 hover:text-[#E0222A] transition-colors ${isLiked ? 'text-[#E0222A]' : ''}`}
+            onClick={handleLike}
+          >
+            <Heart className={`h-5 w-5 ${isLiked ? 'fill-current' : ''}`} />
+            <span>{likesCount}</span>
+          </button>
+          {isMyMessage && (
+            <button
+              className="flex items-center gap-2 hover:text-red-600 transition-colors"
+              onClick={handleDelete}
+            >
+              <Trash2 className="h-5 w-5" />
+              <span>Supprimer</span>
+            </button>
+          )}
+          {!isMyMessage && msg.sender_id && (
+            <DonationDialog receiverId={msg.sender_id} receiverName={msg.sender_username} groupId={groupId} onDonationComplete={onActionComplete} />
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+const GroupeDetail = () => {
+  const { groupId } = useParams();
+  const navigate = useNavigate();
+  const { user, session, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+  const [groupData, setGroupData] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [newMessage, setNewMessage] = useState('');
+  const [joinRequestStatus, setJoinRequestStatus] = useState('idle');
+  const [sending, setSending] = useState(false);
+  // Media attach state
+  const [mediaFile, setMediaFile] = useState(null);
+  const [mediaPreviewUrl, setMediaPreviewUrl] = useState(null);
+  const mediaInputRef = useRef(null);
+  // Audio recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recorderPromiseRef = useRef(null);
+  const mimeRef = useRef(null);
+  const recordingIntervalRef = useRef(null);
+  const messagesEndRef = useRef(null);
+
+  const fetchGroupData = useCallback(async () => {
+    if (!user || !session) {
+      setLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase
             .from('vue_groupes_complete')
             .select('*')
             .eq('groupe_id', groupId)
             .order('message_date', { ascending: true });
 
-        if (error) {
-            console.error('Erreur chargement vue:', error);
-            toast({ title: 'Erreur', description: 'Groupe introuvable ou erreur de chargement.', variant: 'destructive' });
-            navigate('/groupes');
-            setLoading(false);
-            return;
-        }
+    if (error) {
+      console.error('Erreur chargement vue:', error);
+      toast({ title: 'Erreur', description: 'Groupe introuvable ou erreur de chargement.', variant: 'destructive' });
+      navigate('/groupes');
+      setLoading(false);
+      return;
+    }
         
-        if (data.length === 0) {
-           const { data: groupOnlyData, error: groupOnlyError } = await supabase.from('groupes').select('*').eq('id', groupId).single();
-           if(groupOnlyError || !groupOnlyData){
-             toast({ title: 'Erreur', description: 'Groupe introuvable.', variant: 'destructive' });
-             navigate('/groupes');
-             setLoading(false);
-             return;
-           }
-           setGroupData([{
-             groupe_id: groupOnlyData.id,
-             groupe_nom: groupOnlyData.nom,
-             groupe_description: groupOnlyData.description,
-             groupe_prive: groupOnlyData.est_prive,
-             groupe_fondateur_id: groupOnlyData.fondateur_id,
-             groupe_image_url: groupOnlyData.image_url,
-           }]);
-           setMessages([]);
-        } else {
-            setGroupData(data);
-            const uniqueMessages = new Map();
-            data.forEach(row => {
-                if (row.message_id && !uniqueMessages.has(row.message_id)) {
-                    uniqueMessages.set(row.message_id, row);
-                }
-            });
-            setMessages(Array.from(uniqueMessages.values()));
-        }
-
+    if (data.length === 0) {
+      const { data: groupOnlyData, error: groupOnlyError } = await supabase
+        .from('groupes')
+        .select('*')
+        .eq('id', groupId)
+        .single();
+      if (groupOnlyError || !groupOnlyData) {
+        toast({ title: 'Erreur', description: 'Groupe introuvable.', variant: 'destructive' });
+        navigate('/groupes');
         setLoading(false);
-    }, [groupId, user, session, navigate, toast]);
+        return;
+      }
+      setGroupData([{
+        groupe_id: groupOnlyData.id,
+        groupe_nom: groupOnlyData.nom,
+        groupe_description: groupOnlyData.description,
+        groupe_prive: groupOnlyData.est_prive,
+        groupe_fondateur_id: groupOnlyData.fondateur_id,
+        groupe_image_url: groupOnlyData.image_url,
+      }]);
+      setMessages([]);
+    } else {
+      setGroupData(data);
+      const uniqueMessages = new Map();
+      data.forEach(row => {
+        if (row.message_id && !uniqueMessages.has(row.message_id)) {
+          uniqueMessages.set(row.message_id, row);
+        }
+      });
+      setMessages(Array.from(uniqueMessages.values()));
+    }
+
+    setLoading(false);
+  }, [groupId, user, session, navigate, toast]);
 
       useEffect(() => {
         if (!authLoading) {
@@ -425,7 +446,8 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
       };
 
       const handleSendMessage = async () => {
-        if (!user) return;
+        if (!user || sending) return;
+        setSending(true);
         // If audio present (or pending), upload audio and send URL
         let finalBlob = audioBlob;
         if (!finalBlob && recorderPromiseRef.current) finalBlob = await recorderPromiseRef.current;
@@ -433,6 +455,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
         if (finalBlob) {
           if (!finalBlob || finalBlob.size < 2000) {
             toast({ title: 'Erreur audio', description: "Audio vide ou trop court.", variant: 'destructive' });
+            setSending(false);
             return;
           }
           const { ext, type } = mimeRef.current || { ext: 'webm', type: finalBlob.type || 'audio/webm' };
@@ -447,9 +470,11 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
             });
             if (error) throw error;
             handleRemoveAudio();
+            toast({ title: 'Envoyé', description: 'Audio publié.' });
           } catch (e) {
             toast({ title: 'Erreur', description: e.message || 'Envoi audio impossible.', variant: 'destructive' });
           }
+          setSending(false);
           return;
         }
 
@@ -465,13 +490,15 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
             if (error) throw error;
             handleRemoveMedia();
             setNewMessage('');
+            toast({ title: 'Envoyé', description: 'Média publié.' });
           } catch (e) {
             toast({ title: 'Erreur', description: e.message || 'Envoi média impossible.', variant: 'destructive' });
           }
+          setSending(false);
           return;
         }
 
-        if (!newMessage.trim()) return;
+        if (!newMessage.trim()) { setSending(false); return; }
         const { error } = await supabase.from('messages_groupes').insert({
           groupe_id: groupId,
           sender_id: user.id,
@@ -481,7 +508,9 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
             toast({ title: 'Erreur', description: 'Impossible d\'envoyer le message.', variant: 'destructive' });
         } else {
             setNewMessage('');
+            toast({ title: 'Envoyé', description: 'Message publié.' });
         }
+        setSending(false);
       };
 
       const handleRequestToJoin = async () => {
@@ -616,7 +645,9 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
                             }}
                           />
                         )}
-                        <Button onClick={handleSendMessage} size="icon" className="bg-[#2BA84A] rounded-full shrink-0" disabled={!newMessage.trim() && !audioBlob && !recorderPromiseRef.current && !mediaFile}><Send className="h-5 w-5" /></Button>
+                        <Button onClick={handleSendMessage} size="icon" className="bg-[#2BA84A] rounded-full shrink-0" disabled={sending || (!newMessage.trim() && !audioBlob && !recorderPromiseRef.current && !mediaFile)}>
+                          {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                        </Button>
                       </div>
                       {(mediaPreviewUrl || audioBlob) && (
                         <div className="relative p-2 bg-gray-100 rounded-lg mt-2">
