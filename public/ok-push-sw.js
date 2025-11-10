@@ -10,7 +10,7 @@ self.addEventListener('push', (event) => {
     const title = data.title || 'OneKamer';
     const body = data.body || data.message || 'Nouvelle notification';
     const icon = data.icon || 'https://onekamer-media-cdn.b-cdn.net/logo/IMG_0885%202.PNG';
-    const badge = data.badge || icon; // badge optionnel (monochrome recommandé)
+    const badge = data.badge || 'https://onekamer-media-cdn.b-cdn.net/favicon-32x32.png'; // badge optionnel (monochrome recommandé)
     const url = data.url || (data.data && data.data.url) || '/';
 
     const options = {
