@@ -23,7 +23,22 @@ self.addEventListener('push', (event) => {
       requireInteraction: Boolean(data.requireInteraction),
     };
 
-    event.waitUntil(self.registration.showNotification(title, options));
+    // Affiche la notification et notifie les clients (onglets) pour MAJ UI
+    event.waitUntil(
+      Promise.all([
+        self.registration.showNotification(title, options),
+        (async () => {
+          try {
+            const clientList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+            clientList.forEach((client) => {
+              client.postMessage({ type: 'NEW_PUSH', payload: { title, body, url, data } });
+            });
+          } catch (_e) {
+            // ignore
+          }
+        })(),
+      ])
+    );
   } catch (e) {
     // fallback minimaliste
     event.waitUntil(self.registration.showNotification('OneKamer', {
