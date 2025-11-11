@@ -38,6 +38,16 @@ const Notifications = () => {
     }
   };
 
+  const handleEnableThisDevice = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      await subscribe();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleUnsubscribe = async () => {
     setLoading(true);
     await unsubscribe();
@@ -113,9 +123,15 @@ const Notifications = () => {
                     </Button>
                   </div>
                   <div className="pt-2">
-                    <Button disabled={loading} onClick={handleDisableThisDevice} variant="outline" className="w-full">
-                      Désactiver sur cet appareil
-                    </Button>
+                    {subscribed ? (
+                      <Button disabled={loading} onClick={handleDisableThisDevice} variant="outline" className="w-full">
+                        Désactiver sur cet appareil
+                      </Button>
+                    ) : (
+                      <Button disabled={loading} onClick={handleEnableThisDevice} variant="outline" className="w-full">
+                        Activer sur cet appareil
+                      </Button>
+                    )}
                   </div>
                 </>
               )}
