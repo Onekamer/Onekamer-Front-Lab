@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
     import { Helmet } from 'react-helmet';
-    import { useParams, useNavigate } from 'react-router-dom';
+    import { useParams, useNavigate, useLocation } from 'react-router-dom';
     import { Card, CardContent } from '@/components/ui/card';
     import { Button } from '@/components/ui/button';
     import { ArrowLeft, Send, Loader2, Heart, Mic, Square, X, Image as ImageIcon, Trash2 } from 'lucide-react';
@@ -230,6 +230,10 @@ const GroupeDetail = () => {
   const recordingIntervalRef = useRef(null);
   const messagesEndRef = useRef(null);
   const [liveStatus, setLiveStatus] = useState({ isLive: false, roomName: null, hostUserId: null });
+  const [tabValue, setTabValue] = useState('messages');
+  const location = useLocation();
+  const [joinRequests, setJoinRequests] = useState([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
   const [joining, setJoining] = useState(false);
   const [isInRoom, setIsInRoom] = useState(false);
   const [isHost, setIsHost] = useState(false);
@@ -758,11 +762,12 @@ const GroupeDetail = () => {
               </div>
             </div>
             
-            <Tabs defaultValue="messages" className="flex-grow flex flex-col overflow-hidden">
+            <Tabs value={tabValue} onValueChange={setTabValue} className="flex-grow flex flex-col overflow-hidden">
               <div className="flex-shrink-0">
-                <TabsList className="grid w-full grid-cols-3 mx-auto max-w-md">
+                <TabsList className="grid w-full grid-cols-4 mx-auto max-w-md">
                   <TabsTrigger value="messages">Messages</TabsTrigger>
                   <TabsTrigger value="members">Membres</TabsTrigger>
+                  {(currentUserRole === 'admin' || currentUserRole === 'fondateur') && <TabsTrigger value="requests">Demandes</TabsTrigger>}
                   {(currentUserRole === 'admin' || currentUserRole === 'fondateur') && <TabsTrigger value="admin">Admin</TabsTrigger>}
                 </TabsList>
               </div>
@@ -866,6 +871,34 @@ const GroupeDetail = () => {
               <TabsContent value="members" className="flex-grow overflow-y-auto p-4">
                 <GroupMembers members={members} currentUserRole={currentUserRole} currentUserId={user.id} groupId={groupId} onMemberUpdate={fetchGroupData} />
               </TabsContent>
+
+              {(currentUserRole === 'admin' || currentUserRole === 'fondateur') && (
+                <TabsContent value="requests" className="flex-grow overflow-y-auto p-4">
+                  {loadingRequests ? (
+                    <div className="flex justify-center items-center h-32"><Loader2 className="h-6 w-6 animate-spin"/></div>
+                  ) : (
+                    <div className="space-y-3">
+                      {joinRequests.length === 0 ? (
+                        <p className="text-gray-500 text-center">Aucune demande en attente.</p>
+                      ) : (
+                        joinRequests.map((r) => (
+                          <div key={r.id} className="flex items-center justify-between p-3 rounded-lg border">
+                            <div>
+                              <p className="font-semibold">Demandeur</p>
+                              <p className="text-xs text-gray-500">{r.requester_id}</p>
+                              <p className="text-xs text-gray-400">{new Date(r.created_at).toLocaleString()}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" className="bg-[#2BA84A]" onClick={() => handleApproveRequest(r.id)}>Accepter</Button>
+                              <Button size="sm" variant="destructive" onClick={() => handleDenyRequest(r.id)}>Refuser</Button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </TabsContent>
+              )}
 
               {(currentUserRole === 'admin' || currentUserRole === 'fondateur') && (
                 <TabsContent value="admin" className="flex-grow overflow-y-auto p-4">
