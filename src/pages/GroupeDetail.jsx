@@ -663,21 +663,13 @@ const GroupeDetail = () => {
               return;
           }
           setJoinRequestStatus('loading');
-          try {
-            const res = await fetch(`${API_API.replace(/\/$/, '')}/groups/${groupId}/join-request`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ requesterId: user.id })
-            });
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok || json?.error) {
-              throw new Error(json?.error || 'Échec de la demande');
-            }
-            toast({ title: 'Demande envoyée', description: 'Votre demande a été envoyée au fondateur du groupe.' });
-            setJoinRequestStatus('sent');
-          } catch (e) {
-            toast({ title: 'Erreur', description: e?.message || 'Impossible d\'envoyer la demande', variant: 'destructive' });
-            setJoinRequestStatus('error');
+          const { error } = await supabase.rpc('request_to_join_group', { p_group_id: groupId });
+          if (error) {
+              toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
+              setJoinRequestStatus('error');
+          } else {
+              toast({ title: 'Demande envoyée', description: 'Votre demande a été envoyée au fondateur du groupe.' });
+              setJoinRequestStatus('sent');
           }
       }
 
@@ -719,7 +711,7 @@ const GroupeDetail = () => {
       if (loading || authLoading) return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>;
       if (!groupInfo) return null;
     
-      if (!isMember) {
+      if (!isMember && groupInfo.groupe_prive) {
         return (
           <>
             <Helmet><title>Rejoindre {groupInfo.groupe_nom}</title></Helmet>
