@@ -92,7 +92,7 @@ export function useNotifications(userId) {
 
   // Attache un listener SW pour réagir aux nouveaux push
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
     if (swListenerAttached.current) return
 
     const handler = (event) => {
@@ -109,12 +109,12 @@ export function useNotifications(userId) {
         }
       } catch (_) {}
     }
-    window.addEventListener('message', handler)
+    navigator.serviceWorker.addEventListener('message', handler)
     swListenerAttached.current = true
 
     return () => {
       try {
-        window.removeEventListener('message', handler)
+        navigator.serviceWorker.removeEventListener('message', handler)
         swListenerAttached.current = false
       } catch (_) {}
     }
