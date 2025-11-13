@@ -58,9 +58,7 @@ export function useWebPush(userId) {
           message: 'Notification de test',
           targetUserIds: [userId],
           data: { type: 'test' },
-          url: 'https://onekamer.co',
-          icon: 'https://onekamer-media-cdn.b-cdn.net/logo/IMG_0885%202.PNG',
-          badge: 'https://onekamer-media-cdn.b-cdn.net/favicon-32x32.png'
+          url: 'https://onekamer.co'
         })
       })
       const json = await res.json().catch(() => null)

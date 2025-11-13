@@ -120,8 +120,9 @@ const Notifications = () => {
                 </div>
                 <div className="origin-right scale-90 sm:scale-75">
                   <Switch
-                    checked={!bellHidden}
+                    checked={featureBell && !bellHidden}
                     onCheckedChange={(v) => setBellHidden(!v)}
+                    disabled={!featureBell}
                     className="data-[state=checked]:bg-[#2BA84A] data-[state=unchecked]:bg-gray-300"
                   />
                 </div>
