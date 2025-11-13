@@ -6,7 +6,7 @@ import '@/index.css';
 // ============================================================
 // ✅ Service Worker global (PWA) + OneSignal Android fix
 // ============================================================
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     // Service Worker classique pour PWA (sw.js)
     navigator.serviceWorker
@@ -35,13 +35,6 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
       }).catch(() => {});
     }
   });
-}
-
-// En développement: s'assurer qu'aucun Service Worker ne reste enregistré
-if (!import.meta.env.PROD && 'serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then((regs) => {
-    regs.forEach((r) => r.unregister());
-  }).catch(() => {});
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(

@@ -446,16 +446,6 @@ const CommentSection = ({ postId }) => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     console.log("✅ Micro autorisé :", stream.getAudioTracks().length, "piste(s)");
 
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const dest = ctx.createMediaStreamDestination();
-      osc.connect(dest);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.05);
-      try { ctx.close(); } catch {}
-    } catch {}
-
     const chosenMime = pickSupportedMime();
     mimeRef.current = chosenMime;
 
@@ -463,15 +453,13 @@ const CommentSection = ({ postId }) => {
     const recordingDone = new Promise(resolve => (resolveRecording = resolve));
     recorderPromiseRef.current = recordingDone;
 
-    const supportedMimeType = window.MediaRecorder?.isTypeSupported?.(chosenMime.type)
+    const supportedMimeType = MediaRecorder.isTypeSupported(chosenMime.type)
       ? chosenMime.type
-      : undefined;
+      : "audio/mp4";
 
-    console.log("🎚️ Type MIME utilisé :", supportedMimeType || "auto");
+    console.log("🎚️ Type MIME utilisé :", supportedMimeType);
 
-    const recorder = supportedMimeType
-      ? new MediaRecorder(stream, { mimeType: supportedMimeType })
-      : new MediaRecorder(stream);
+    const recorder = new MediaRecorder(stream, { mimeType: supportedMimeType });
     audioChunksRef.current = [];
 
     recorder.ondataavailable = (event) => {
@@ -501,9 +489,8 @@ const CommentSection = ({ postId }) => {
 
       await new Promise((resolve) => setTimeout(resolve, 300));
 
-      const fallbackChunkType = (audioChunksRef.current?.[0]?.type || 'audio/webm').split(';')[0];
       const audioBlob = new Blob(audioChunksRef.current, {
-        type: (supportedMimeType || fallbackChunkType).split(";")[0],
+        type: supportedMimeType.split(";")[0],
       });
       console.log("💾 Taille finale du blob :", audioBlob.size, "octets");
 
@@ -660,8 +647,7 @@ const CommentSection = ({ postId }) => {
         } else if (finalAudioBlob) {
             const { type: mimeType, ext } = mimeRef.current || { type: finalAudioBlob.type || 'audio/webm', ext: 'webm' };
             const normalizedType = mimeType.split(";")[0];
-            const durationHint = Math.max(0, recordedDurationRef.current || lastRecordingTimeRef.current || recordingTime || 0);
-            if (!finalAudioBlob || (finalAudioBlob.size < 800 && durationHint < 1)) {
+            if (!finalAudioBlob || finalAudioBlob.size < 2000) {
                 toast({ title: 'Erreur audio', description: "L’audio semble vide ou trop court. Réessayez.", variant: 'destructive' });
                 return;
             }
