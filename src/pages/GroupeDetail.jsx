@@ -234,7 +234,6 @@ const GroupeDetail = () => {
   const location = useLocation();
   const [joinRequests, setJoinRequests] = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
-  const [requesterProfiles, setRequesterProfiles] = useState({});
   const [joining, setJoining] = useState(false);
   const [isInRoom, setIsInRoom] = useState(false);
   const [isHost, setIsHost] = useState(false);
@@ -265,27 +264,8 @@ const GroupeDetail = () => {
       if (error) {
         console.error('Erreur chargement demandes:', error);
         setJoinRequests([]);
-        setRequesterProfiles({});
       } else {
-        const requests = data || [];
-        setJoinRequests(requests);
-        // Charger les profils des demandeurs
-        const ids = Array.from(new Set(requests.map(r => r.requester_id).filter(Boolean)));
-        if (ids.length > 0) {
-          const { data: profs, error: perr } = await supabase
-            .from('profiles')
-            .select('id, username, avatar_url')
-            .in('id', ids);
-          if (!perr && Array.isArray(profs)) {
-            const map = {};
-            for (const p of profs) map[p.id] = { username: p.username, avatar_url: p.avatar_url };
-            setRequesterProfiles(map);
-          } else {
-            setRequesterProfiles({});
-          }
-        } else {
-          setRequesterProfiles({});
-        }
+        setJoinRequests(data || []);
       }
     } finally {
       setLoadingRequests(false);
@@ -973,27 +953,19 @@ const GroupeDetail = () => {
                       {joinRequests.length === 0 ? (
                         <p className="text-gray-500 text-center">Aucune demande en attente.</p>
                       ) : (
-                        joinRequests.map((r) => {
-                          const prof = requesterProfiles[r.requester_id] || {};
-                          return (
-                            <div key={r.id} className="flex items-center justify-between p-3 rounded-lg border">
-                              <div className="flex items-center gap-3">
-                                <Avatar>
-                                  <AvatarImage src={prof.avatar_url} />
-                                  <AvatarFallback>{(prof.username?.[0] || 'U').toUpperCase()}</AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <p className="font-semibold">{prof.username || 'Utilisateur'}</p>
-                                  <p className="text-xs text-gray-400">{new Date(r.created_at).toLocaleString()}</p>
-                                </div>
-                              </div>
-                              <div className="flex gap-2">
-                                <Button size="sm" className="bg-[#2BA84A]" onClick={() => handleApproveRequest(r.id)}>Accepter</Button>
-                                <Button size="sm" variant="destructive" onClick={() => handleDenyRequest(r.id)}>Refuser</Button>
-                              </div>
+                        joinRequests.map((r) => (
+                          <div key={r.id} className="flex items-center justify-between p-3 rounded-lg border">
+                            <div>
+                              <p className="font-semibold">Demandeur</p>
+                              <p className="text-xs text-gray-500">{r.requester_id}</p>
+                              <p className="text-xs text-gray-400">{new Date(r.created_at).toLocaleString()}</p>
                             </div>
-                          );
-                        })
+                            <div className="flex gap-2">
+                              <Button size="sm" className="bg-[#2BA84A]" onClick={() => handleApproveRequest(r.id)}>Accepter</Button>
+                              <Button size="sm" variant="destructive" onClick={() => handleDenyRequest(r.id)}>Refuser</Button>
+                            </div>
+                          </div>
+                        ))
                       )}
                     </div>
                   )}
