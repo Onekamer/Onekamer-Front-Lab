@@ -3,9 +3,6 @@
   "type": "module",
   "version": "1.0.0",
   "private": true,
-  "author": "William Soppo & Annaëlle Bilounga",
-  "company": "OneKamer SAS",
-  "license": "Propriété privée - Tous droits réservés",
   "scripts": {
     "dev": "vite --host :: --port 3000",
     "build": "vite build",
