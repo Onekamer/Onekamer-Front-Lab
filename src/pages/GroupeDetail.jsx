@@ -241,7 +241,6 @@ const GroupeDetail = () => {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const livekitRoomRef = useRef(null);
-  const remoteAudioRef = useRef(null);
   const RAW_API = import.meta.env.VITE_API_URL || '';
   const API_API = RAW_API.endsWith('/api') ? RAW_API : `${RAW_API.replace(/\/+$/, '')}/api`;
 
@@ -475,7 +474,7 @@ const GroupeDetail = () => {
 
   const connectToRoom = async ({ roomName, roleHost }) => {
     await ensureLivekitLoaded();
-    const { Room, createLocalTracks, createLocalAudioTrack, createLocalVideoTrack } = window.LivekitClient;
+    const { Room, createLocalTracks } = window.LivekitClient;
     const body = roleHost
       ? { userId: user.id, groupId, roomName }
       : { userId: user.id, groupId };
@@ -494,35 +493,17 @@ const GroupeDetail = () => {
           track.attach(remoteVideoRef.current);
         }
       }
-      if (track.kind === 'audio') {
-        if (remoteAudioRef.current) {
-          try { track.attach(remoteAudioRef.current); } catch {}
-        }
-      }
     });
     await room.connect(hostUrl, token);
-    try { await room.startAudio(); } catch {}
     setIsInRoom(true);
     setIsHost(!!roleHost);
 
     if (roleHost) {
-      try {
-        if (createLocalAudioTrack && createLocalVideoTrack) {
-          const aTrack = await createLocalAudioTrack();
-          const vTrack = await createLocalVideoTrack();
-          if (aTrack) await room.localParticipant.publishTrack(aTrack);
-          if (vTrack) await room.localParticipant.publishTrack(vTrack);
-          if (vTrack && localVideoRef.current) vTrack.attach(localVideoRef.current);
-        } else {
-          const tracks = await createLocalTracks({ audio: true, video: true });
-          for (const t of tracks) await room.localParticipant.publishTrack(t);
-          if (localVideoRef.current) {
-            const cam = tracks.find(t => t.kind === 'video');
-            if (cam) cam.attach(localVideoRef.current);
-          }
-        }
-      } catch (e) {
-        console.warn('Publication locale échouée:', e);
+      const tracks = await createLocalTracks({ audio: true, video: true });
+      for (const t of tracks) await room.localParticipant.publishTrack(t);
+      if (localVideoRef.current) {
+        const cam = tracks.find(t => t.kind === 'video');
+        if (cam) cam.attach(localVideoRef.current);
       }
     }
   };
@@ -531,19 +512,11 @@ const GroupeDetail = () => {
     try {
       const room = livekitRoomRef.current;
       if (room) {
-        try {
-          room.localParticipant?.tracks?.forEach(pub => {
-            try { pub.track?.detach?.(); } catch {}
-            try { pub.track?.stop?.(); } catch {}
-          });
-        } catch {}
         room.disconnect();
       }
     } catch {}
     setIsInRoom(false);
     setIsHost(false);
-    try { if (localVideoRef.current) localVideoRef.current.srcObject = null; } catch {}
-    try { if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null; } catch {}
   };
 
   const handleGoLive = async () => {
