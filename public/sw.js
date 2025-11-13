@@ -1,10 +1,9 @@
 /* eslint-env serviceworker */
 /* eslint-disable no-restricted-globals */
 
-const CACHE_NAME = 'onekamer-v1';
+const CACHE_NAME = 'onekamer-v2';
 const urlsToCache = [
   '/',
-  '/index.html',
   '/offline.html'
 ];
 
@@ -13,6 +12,7 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(urlsToCache))
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('push', (event) => {
@@ -72,6 +72,23 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
+});
+
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.mode === 'navigate') {
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(req);
+        return fresh;
+      } catch (e) {
+        const cache = await caches.open(CACHE_NAME);
+        const offline = await cache.match('/offline.html');
+        return offline || Response.error();
+      }
+    })());
+    return;
+  }
 });
