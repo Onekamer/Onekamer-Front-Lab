@@ -1,13 +1,9 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
-const PROVIDER = import.meta.env.VITE_NOTIFICATIONS_PROVIDER || 'onesignal';
 
 const resolveEndpoint = () => {
   if (!API_BASE_URL) {
-    console.warn('Aucune URL API configurée pour l’envoi des notifications.');
+    console.warn('Aucune URL API configurée pour l’envoi des notifications OneSignal.');
     return null;
-  }
-  if (PROVIDER === 'supabase_light') {
-    return `${API_BASE_URL}/notifications/dispatch`;
   }
   return `${API_BASE_URL}/notifications/onesignal`;
 };
@@ -31,13 +27,13 @@ const postNotification = async (payload = {}) => {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
-      console.error('Échec de l’appel API notifications:', response.status, errorText);
+      console.error('Échec de l’appel API OneSignal:', response.status, errorText);
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error('Impossible d’envoyer la notification:', error);
+    console.error('Impossible d’envoyer la notification OneSignal:', error);
     return false;
   }
 };
