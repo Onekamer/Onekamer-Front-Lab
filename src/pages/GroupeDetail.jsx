@@ -229,15 +229,6 @@ const GroupeDetail = () => {
   const mimeRef = useRef(null);
   const recordingIntervalRef = useRef(null);
   const messagesEndRef = useRef(null);
-  const [liveStatus, setLiveStatus] = useState({ isLive: false, roomName: null, hostUserId: null });
-  const [joining, setJoining] = useState(false);
-  const [isInRoom, setIsInRoom] = useState(false);
-  const [isHost, setIsHost] = useState(false);
-  const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
-  const livekitRoomRef = useRef(null);
-  const RAW_API = import.meta.env.VITE_API_URL || '';
-  const API_API = RAW_API.endsWith('/api') ? RAW_API : `${RAW_API.replace(/\/+$/, '')}/api`;
 
   const fetchGroupData = useCallback(async () => {
     if (!user || !session) {
@@ -294,30 +285,15 @@ const GroupeDetail = () => {
     setLoading(false);
   }, [groupId, user, session, navigate, toast]);
 
-  useEffect(() => {
-    if (!authLoading) {
-        if (user && session) {
-            fetchGroupData();
-        } else {
-            navigate('/auth');
+      useEffect(() => {
+        if (!authLoading) {
+            if (user && session) {
+                fetchGroupData();
+            } else {
+                navigate('/auth');
+            }
         }
-    }
-  }, [user, session, authLoading, fetchGroupData, navigate]);
-
-  useEffect(() => {
-    const fetchLive = async () => {
-      try {
-        const res = await fetch(`${API_API}/groups/${groupId}/live`);
-        const data = await res.json();
-        setLiveStatus({
-          isLive: !!data?.isLive,
-          roomName: data?.roomName || null,
-          hostUserId: data?.hostUserId || null,
-        });
-      } catch {}
-    };
-    if (groupId) fetchLive();
-  }, [groupId]);
+      }, [user, session, authLoading, fetchGroupData, navigate]);
     
       useEffect(() => {
         if (!user || !groupId) return;
@@ -362,113 +338,6 @@ const GroupeDetail = () => {
       useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }, [messages]);
-
-  const ensureLivekitLoaded = async () => {
-    if (window.LivekitClient) return true;
-    await new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js';
-      s.async = true;
-      s.onload = resolve;
-      s.onerror = () => reject(new Error('LiveKit CDN introuvable'));
-      document.head.appendChild(s);
-    });
-    return !!window.LivekitClient;
-  };
-
-  const connectToRoom = async ({ roomName, roleHost }) => {
-    await ensureLivekitLoaded();
-    const { Room, createLocalTracks } = window.LivekitClient;
-    const body = roleHost
-      ? { userId: user.id, groupId, roomName }
-      : { userId: user.id, groupId };
-    const resp = await fetch(`${API_API}/livekit/token`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-    });
-    const json = await resp.json();
-    if (!resp.ok) throw new Error(json?.error || 'Token LiveKit échec');
-    const { token, hostUrl } = json;
-
-    const room = new Room();
-    livekitRoomRef.current = room;
-    room.on('trackSubscribed', (track, publication, participant) => {
-      if (track.kind === 'video') {
-        if (remoteVideoRef.current) {
-          track.attach(remoteVideoRef.current);
-        }
-      }
-    });
-    await room.connect(hostUrl, token);
-    setIsInRoom(true);
-    setIsHost(!!roleHost);
-
-    if (roleHost) {
-      const tracks = await createLocalTracks({ audio: true, video: true });
-      for (const t of tracks) await room.localParticipant.publishTrack(t);
-      if (localVideoRef.current) {
-        const cam = tracks.find(t => t.kind === 'video');
-        if (cam) cam.attach(localVideoRef.current);
-      }
-    }
-  };
-
-  const leaveRoom = async () => {
-    try {
-      const room = livekitRoomRef.current;
-      if (room) {
-        room.disconnect();
-      }
-    } catch {}
-    setIsInRoom(false);
-    setIsHost(false);
-  };
-
-  const handleGoLive = async () => {
-    if (!user) return;
-    setJoining(true);
-    try {
-      const startRes = await fetch(`${API_API}/groups/${groupId}/live/start`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id })
-      });
-      const startJson = await startRes.json();
-      if (!startRes.ok) throw new Error(startJson?.error || 'Impossible de démarrer le live');
-      const rn = startJson.roomName;
-      setLiveStatus({ isLive: true, roomName: rn, hostUserId: user.id });
-      await connectToRoom({ roomName: rn, roleHost: true });
-      toast({ title: 'Live démarré' });
-    } catch (e) {
-      toast({ title: 'Erreur', description: e.message || 'Échec live', variant: 'destructive' });
-    } finally {
-      setJoining(false);
-    }
-  };
-
-  const handleWatchLive = async () => {
-    if (!liveStatus?.isLive || !liveStatus?.roomName) return;
-    setJoining(true);
-    try {
-      await connectToRoom({ roomName: liveStatus.roomName, roleHost: false });
-    } catch (e) {
-      toast({ title: 'Erreur', description: e.message || 'Échec connexion live', variant: 'destructive' });
-    } finally {
-      setJoining(false);
-    }
-  };
-
-  const handleStopLive = async () => {
-    if (!user) return;
-    try {
-      await fetch(`${API_API}/groups/${groupId}/live/stop`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id, reason: 'end' })
-      });
-    } catch {}
-    await leaveRoom();
-    setLiveStatus({ isLive: false, roomName: null, hostUserId: null });
-  };
-
-  useEffect(() => {
-    return () => { leaveRoom(); };
-  }, []);
 
       const pickSupportedMime = useCallback(() => {
         const ua = navigator.userAgent.toLowerCase();
@@ -760,30 +629,6 @@ const GroupeDetail = () => {
               </div>
               
               <TabsContent value="messages" className="flex-grow flex flex-col overflow-hidden">
-                <div className="flex-shrink-0 p-3 border-b bg-white">
-                  <div className="flex flex-col gap-2">
-                    { (currentUserRole === 'admin' || currentUserRole === 'fondateur') && !liveStatus.isLive && (
-                      <Button className="bg-[#2BA84A]" onClick={handleGoLive} disabled={joining}>{joining ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : 'Go Live'}</Button>
-                    )}
-                    { liveStatus.isLive && !isInRoom && (
-                      <Button variant="secondary" onClick={handleWatchLive} disabled={joining}>{joining ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : 'Regarder le Live'}</Button>
-                    )}
-                    { isInRoom && (
-                      <div className="flex items-center gap-2">
-                        <video ref={localVideoRef} autoPlay muted playsInline className="w-32 h-48 bg-black rounded"/>
-                        <video ref={remoteVideoRef} autoPlay playsInline className="flex-1 h-48 bg-black rounded"/>
-                        {isHost ? (
-                          <Button variant="destructive" onClick={handleStopLive}>Stop</Button>
-                        ) : (
-                          <Button variant="destructive" onClick={leaveRoom}>Quitter</Button>
-                        )}
-                      </div>
-                    )}
-                    { liveStatus.isLive && !isInRoom && (
-                      <p className="text-sm text-green-600">Live en cours</p>
-                    )}
-                  </div>
-                </div>
                 <div className="flex-grow overflow-y-auto flex flex-col">
                   <div className="p-4 space-y-2">
                     {messages.map(msg => <MessageItem key={msg.message_id} msg={msg} currentUserId={user.id} groupId={groupId} onActionComplete={fetchGroupData} />)}
