@@ -988,7 +988,6 @@ const GroupeDetail = () => {
                                 </div>
                               </div>
                               <div className="flex gap-2">
-                                <Button size="sm" variant="ghost" onClick={() => navigate(`/profil/${r.requester_id}`)}>Profil</Button>
                                 <Button size="sm" className="bg-[#2BA84A]" onClick={() => handleApproveRequest(r.id)}>Accepter</Button>
                                 <Button size="sm" variant="destructive" onClick={() => handleDenyRequest(r.id)}>Refuser</Button>
                               </div>
