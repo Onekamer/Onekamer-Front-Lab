@@ -179,7 +179,7 @@ const MediaDisplay = ({ bucket, path, alt, className }) => {
   }
 
   if (mediaType === "video") {
-    return <video src={mediaUrl} controls playsInline className={`block w-full ${className || ''}`} />;
+    return <video src={mediaUrl} controls className={className} />;
   }
 
   return (
