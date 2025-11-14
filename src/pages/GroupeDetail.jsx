@@ -516,7 +516,10 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
 
         try {
           setIsStartingCall(true);
-          const apiUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+          const rawApi = import.meta.env.VITE_API_URL;
+          const apiUrl = (rawApi || '').replace(/\/$/, '');
+          console.log('[GroupCall] handleStartGroupCall click', { rawApi, apiUrl, groupId, userId: user.id });
+
           const response = await fetch(`${apiUrl}/groups/${groupId}/call/start`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -526,11 +529,14 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
           let data = null;
           try {
             data = await response.json();
-          } catch (_) {}
+          } catch (e) {
+            console.warn('[GroupCall] Impossible de parser la réponse JSON de /call/start', e);
+          }
 
           if (!response.ok) {
             const message = data?.error || "Impossible de démarrer l'appel.";
             toast({ title: 'Erreur appel', description: message, variant: 'destructive' });
+            console.error('[GroupCall] Erreur HTTP start call', { status: response.status, data });
             return;
           }
           const roomName = data?.roomName || data?.room || data?.room_name || null;
@@ -538,7 +544,7 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
           const url = data?.url || data?.serverUrl || data?.livekitUrl;
 
           if (!token || !url) {
-            console.error('Réponse start call incomplète:', data);
+            console.error('[GroupCall] Réponse start call incomplète:', data);
             toast({
               title: 'Erreur appel',
               description: "Réponse du serveur incomplète pour démarrer l'appel.",
@@ -550,14 +556,14 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
           setCurrentCall({ roomName, token, url });
           setIsInCall(true);
 
-          console.log('✅ Appel de groupe démarré', data);
+          console.log('✅ [GroupCall] Appel de groupe démarré', { roomName, tokenPresent: !!token, url });
           toast({
             title: 'Appel démarré',
             description: 'Connexion à la salle en cours...',
             variant: 'default',
           });
         } catch (e) {
-          console.error('❌ Erreur start group call:', e);
+          console.error('❌ [GroupCall] Erreur start group call:', e);
           toast({
             title: 'Erreur',
             description: e?.message || "Erreur interne lors du démarrage de l'appel.",
