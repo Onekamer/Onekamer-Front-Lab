@@ -1,30 +1,31 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-    import { Helmet } from 'react-helmet';
-    import { useParams, useNavigate } from 'react-router-dom';
-    import { Card, CardContent } from '@/components/ui/card';
-    import { Button } from '@/components/ui/button';
-    import { ArrowLeft, Send, Loader2, Heart, Mic, Square, X, Image as ImageIcon } from 'lucide-react';
-    import { Textarea } from '@/components/ui/textarea';
-    import { useToast } from '@/components/ui/use-toast';
-    import { supabase } from '@/lib/customSupabaseClient';
-    import { useAuth } from '@/contexts/SupabaseAuthContext';
-    import MediaDisplay from '@/components/MediaDisplay';
-    import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-    import DonationDialog from '@/components/DonationDialog';
-    import { formatDistanceToNow } from 'date-fns';
-    import { fr } from 'date-fns/locale';
-    import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-    import GroupMembers from '@/pages/groupes/GroupMembers';
-    import GroupAdmin from '@/pages/groupes/GroupAdmin';
-    import { uploadAudioFile } from '@/utils/audioStorage';
+import { Helmet } from 'react-helmet';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, Send, Loader2, Heart, Mic, Square, X, Image as ImageIcon, Phone } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/lib/customSupabaseClient';
+import { useAuth } from '@/contexts/SupabaseAuthContext';
+import MediaDisplay from '@/components/MediaDisplay';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import DonationDialog from '@/components/DonationDialog';
+import { formatDistanceToNow } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import GroupMembers from '@/pages/groupes/GroupMembers';
+import GroupAdmin from '@/pages/groupes/GroupAdmin';
+import { uploadAudioFile } from '@/utils/audioStorage';
+import GroupAudioCall from '@/components/GroupAudioCall';
 
-    const AudioPlayer = ({ src, initialDuration = 0 }) => {
-      const audioRef = useRef(null);
-      const [isPlaying, setIsPlaying] = useState(false);
-      const [duration, setDuration] = useState(initialDuration);
-      const [currentTime, setCurrentTime] = useState(0);
-      const [isLoading, setIsLoading] = useState(true);
+const AudioPlayer = ({ src, initialDuration = 0 }) => {
+  const audioRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(initialDuration);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
       const togglePlayPause = () => {
         if (!audioRef.current) return;
@@ -198,6 +199,9 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
       const [loading, setLoading] = useState(true);
       const [newMessage, setNewMessage] = useState('');
       const [joinRequestStatus, setJoinRequestStatus] = useState('idle');
+      const [isStartingCall, setIsStartingCall] = useState(false);
+      const [currentCall, setCurrentCall] = useState(null);
+      const [isInCall, setIsInCall] = useState(false);
       // Media attach state
       const [mediaFile, setMediaFile] = useState(null);
       const [mediaPreviewUrl, setMediaPreviewUrl] = useState(null);
@@ -500,6 +504,70 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
           }
       }
 
+      const handleStartGroupCall = async () => {
+        if (!user) {
+          toast({
+            title: 'Connexion requise',
+            description: 'Veuillez vous connecter pour démarrer un appel.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        try {
+          setIsStartingCall(true);
+          const apiUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+          const response = await fetch(`${apiUrl}/groups/${groupId}/call/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id }),
+          });
+
+          let data = null;
+          try {
+            data = await response.json();
+          } catch (_) {}
+
+          if (!response.ok) {
+            const message = data?.error || "Impossible de démarrer l'appel.";
+            toast({ title: 'Erreur appel', description: message, variant: 'destructive' });
+            return;
+          }
+          const roomName = data?.roomName || data?.room || data?.room_name || null;
+          const token = data?.token;
+          const url = data?.url || data?.serverUrl || data?.livekitUrl;
+
+          if (!token || !url) {
+            console.error('Réponse start call incomplète:', data);
+            toast({
+              title: 'Erreur appel',
+              description: "Réponse du serveur incomplète pour démarrer l'appel.",
+              variant: 'destructive',
+            });
+            return;
+          }
+
+          setCurrentCall({ roomName, token, url });
+          setIsInCall(true);
+
+          console.log('✅ Appel de groupe démarré', data);
+          toast({
+            title: 'Appel démarré',
+            description: 'Connexion à la salle en cours...',
+            variant: 'default',
+          });
+        } catch (e) {
+          console.error('❌ Erreur start group call:', e);
+          toast({
+            title: 'Erreur',
+            description: e?.message || "Erreur interne lors du démarrage de l'appel.",
+            variant: 'destructive',
+          });
+        } finally {
+          setIsStartingCall(false);
+        }
+      };
+
       const groupInfo = useMemo(() => groupData?.[0], [groupData]);
 
       const members = useMemo(() => {
@@ -532,6 +600,9 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 
       const isMember = useMemo(() => {
          if (!groupData || !user) return false;
+         const info = groupData[0];
+         // Le fondateur est toujours considéré comme membre du groupe
+         if (info?.groupe_fondateur_id === user.id) return true;
          return groupData.some(row => row.membre_id === user.id);
       }, [groupData, user]);
 
@@ -573,7 +644,24 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
                   <h1 className="font-bold text-lg">{groupInfo.groupe_nom}</h1>
                   <p className="text-sm text-gray-500">{members.length} membres</p>
                 </div>
-                <div className="w-10"></div>
+                <div className="flex items-center justify-end w-24">
+                  {isMember && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleStartGroupCall}
+                      disabled={isStartingCall}
+                      className="flex items-center gap-1"
+                    >
+                      {isStartingCall ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Phone className="h-4 w-4" />
+                      )}
+                      <span className="hidden sm:inline">Appel</span>
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
             
@@ -594,6 +682,17 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
                   </div>
                   {isMember && (
                     <div className="flex-shrink-0 p-3 border-t bg-gray-50">
+                      {isInCall && currentCall && (
+                        <GroupAudioCall
+                          url={currentCall.url}
+                          token={currentCall.token}
+                          roomName={currentCall.roomName}
+                          onLeave={() => {
+                            setIsInCall(false);
+                            setCurrentCall(null);
+                          }}
+                        />
+                      )}
                       <div className="flex items-center gap-2">
                         {isRecording ? (
                           <div className="flex items-center gap-2 w-full bg-gray-100 p-2 rounded-lg">
