@@ -119,29 +119,44 @@ const FiltersDialog = ({ filters, setFilters, onApply }) => {
   )
 }
 
-const DetailItem = ({ icon: Icon, label, value }) => (
-  <div className="flex flex-col items-start">
-    <div className="flex items-center text-sm text-gray-500 gap-2">
-      <Icon className="h-4 w-4" />
-      <span>{label}</span>
-    </div>
-    <p className="font-semibold text-gray-800 mt-1">{value || '-'}</p>
-  </div>
-);
+const DetailItem = ({ icon: Icon, label, value }) => {
+  const isEmpty =
+    value === null ||
+    value === undefined ||
+    (typeof value === 'string' && value.trim() === '');
 
-const ArrayDetailItem = ({ icon: Icon, label, values }) => (
-    <div className="flex flex-col items-start col-span-2 md:col-span-3">
-        <div className="flex items-center text-sm text-gray-500 gap-2">
-            <Icon className="h-4 w-4" />
-            <span>{label}</span>
-        </div>
-        <div className="flex flex-wrap gap-2 mt-1">
-            {(values && values.length > 0) ? values.map((item, index) => (
-                <span key={index} className="bg-gray-100 text-gray-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded-full">{item}</span>
-            )) : <p className="font-semibold text-gray-800">-</p>}
-        </div>
+  if (isEmpty) return null;
+
+  return (
+    <div className="flex flex-col items-start">
+      <div className="flex items-center text-sm text-gray-500 gap-2">
+        <Icon className="h-4 w-4" />
+        <span>{label}</span>
+      </div>
+      <p className="font-semibold text-gray-800 mt-1">{value}</p>
     </div>
-);
+  );
+};
+
+const ArrayDetailItem = ({ icon: Icon, label, values }) => {
+  const safeValues = Array.isArray(values) ? values.filter(Boolean) : [];
+
+  if (safeValues.length === 0) return null;
+
+  return (
+    <div className="flex flex-col items-start col-span-2 md:col-span-3">
+      <div className="flex items-center text-sm text-gray-500 gap-2">
+        <Icon className="h-4 w-4" />
+        <span>{label}</span>
+      </div>
+      <div className="flex flex-wrap gap-2 mt-1">
+        {safeValues.map((item, index) => (
+          <span key={index} className="bg-gray-100 text-gray-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded-full">{item}</span>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 
 const Rencontre = () => {
@@ -492,7 +507,7 @@ if (!myProfile && !searchParams.get('rid')) {
                     </div>
                   </div>
                   <CardContent className="p-6 space-y-4">
-                    <p className="text-gray-700 h-10 overflow-hidden">{currentProfile.bio}</p>
+                    <p className="text-gray-700">{currentProfile.bio}</p>
                     <div className="flex justify-around items-center pt-4">
                       <motion.button whileTap={{ scale: 0.9 }} onClick={() => handleAction(currentProfile.id, 'pass')} className="w-16 h-16 rounded-full flex items-center justify-center bg-white shadow-md"><X className="h-8 w-8 text-gray-500" /></motion.button>
                       <motion.button whileTap={{ scale: 0.9 }} onClick={() => handleAction(currentProfile.id, 'like')} className="w-20 h-20 rounded-full flex items-center justify-center bg-gradient-to-br from-green-500 to-emerald-500 shadow-lg"><Heart className="h-10 w-10 text-white" fill="white" /></motion.button>
