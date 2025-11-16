@@ -40,7 +40,7 @@ const MessagesPrives = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("rencontres_matches")
-      .select("*, user1:rencontres!user1_id(id, user_id, name, image_url), user2:rencontres!user2_id(id, user_id, name, image_url)")
+      .select("*, user1:rencontres!user1_id(id, user_id, name, image_url, photos), user2:rencontres!user2_id(id, user_id, name, image_url, photos)")
       .or(`user1_id.in.(${myRencontreId}),user2_id.in.(${myRencontreId})`)
       .order("created_at", { ascending: false });
 
@@ -145,6 +145,14 @@ const MessagesPrives = () => {
     return match.user1_id === myRencontreId ? match.user2 : match.user1;
   }
 
+  const getProfilePhoto = (profile) => {
+    if (!profile) return null;
+    const firstPhoto = Array.isArray(profile.photos) && profile.photos.length > 0 ? profile.photos[0] : null;
+    const candidates = [profile.image_url, firstPhoto].filter(Boolean);
+    const absolute = candidates.find((c) => typeof c === 'string' && /^https?:\/\//i.test(c));
+    return absolute || candidates[0] || null;
+  };
+
   return (
     <>
       <Helmet>
@@ -163,6 +171,7 @@ const MessagesPrives = () => {
           {matches.map((m) => {
               const otherUser = getOtherUserInMatch(m);
               if (!otherUser) return null;
+              const photo = getProfilePhoto(otherUser);
               return (
               <div
                 key={m.id}
@@ -172,8 +181,16 @@ const MessagesPrives = () => {
                 }`}
               >
                 <Avatar className="w-12 h-12">
-                  <MediaDisplay bucket="avatars" path={otherUser.image_url} alt={otherUser.name} className="w-full h-full object-cover" />
-                  <AvatarFallback>{otherUser.name?.charAt(0)}</AvatarFallback>
+                  {photo ? (
+                    <MediaDisplay
+                      bucket="rencontres"
+                      path={photo}
+                      alt={otherUser.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <AvatarFallback>{otherUser.name?.charAt(0)}</AvatarFallback>
+                  )}
                 </Avatar>
                 <div>
                     <p className="font-semibold">{otherUser.name}</p>
