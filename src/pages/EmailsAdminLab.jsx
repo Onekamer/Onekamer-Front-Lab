@@ -13,6 +13,7 @@ const EmailsAdminLab = () => {
   const [adminMessage, setAdminMessage] = useState('');
   const [adminEmails, setAdminEmails] = useState('');
   const [adminSending, setAdminSending] = useState(false);
+  const [segment, setSegment] = useState('all'); // all | free | standard | vip | custom
 
   if (!user || !profile) {
     return <Navigate to="/auth" replace />;
@@ -60,6 +61,24 @@ const EmailsAdminLab = () => {
             </div>
 
             <div className="space-y-1">
+              <label className="block font-medium">Destinataires</label>
+              <select
+                className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-500/40"
+                value={segment}
+                onChange={(e) => setSegment(e.target.value)}
+              >
+                <option value="all">Toute la base avec email</option>
+                <option value="free">Plans Free</option>
+                <option value="standard">Plans Standard</option>
+                <option value="vip">Plans VIP</option>
+                <option value="custom">Au choix (emails ci-dessous)</option>
+              </select>
+              <p className="text-xs text-gray-500">
+                Choisissez qui recevra cet email. "Au choix" permet de saisir les emails manuellement.
+              </p>
+            </div>
+
+            <div className="space-y-1">
               <label className="block font-medium">Message</label>
               <textarea
                 className="w-full border rounded px-3 py-2 text-sm min-h-[200px] focus:outline-none focus:ring focus:ring-green-500/40"
@@ -76,7 +95,13 @@ const EmailsAdminLab = () => {
                 value={adminEmails}
                 onChange={(e) => setAdminEmails(e.target.value)}
                 placeholder="ex: contact@onekamer.co, william@ndamboa.com"
+                disabled={segment !== 'custom'}
               />
+              {segment !== 'custom' && (
+                <p className="text-xs text-gray-500">
+                  Zone désactivée : les emails seront choisis automatiquement selon le segment.
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2">
@@ -98,10 +123,12 @@ const EmailsAdminLab = () => {
                     .map((e) => e.trim())
                     .filter((e) => e.length > 0);
 
-                  if (!adminSubject || !adminMessage || emails.length === 0) {
+                  if (!adminSubject || !adminMessage || (segment === 'custom' && emails.length === 0)) {
                     toast({
                       title: 'Champs incomplets',
-                      description: 'Sujet, message et au moins un email sont requis.',
+                      description: segment === 'custom'
+                        ? 'Sujet, message et au moins un email sont requis.'
+                        : 'Sujet et message sont requis.',
                       variant: 'destructive',
                     });
                     return;
@@ -118,7 +145,10 @@ const EmailsAdminLab = () => {
                       body: JSON.stringify({
                         subject: adminSubject,
                         message: adminMessage,
-                        emails,
+                        // Si segment = custom, on envoie la liste d'emails explicite.
+                        // Sinon, on laisse la sélection au backend via segment.
+                        emails: segment === 'custom' ? emails : [],
+                        segment: segment === 'custom' ? 'custom' : segment,
                       }),
                     });
 
@@ -129,7 +159,7 @@ const EmailsAdminLab = () => {
 
                     toast({
                       title: 'Emails créés',
-                      description: `${data.inserted || 0} emails en file (mode: ${data.mode || 'profiles'})`,
+                      description: `${data.inserted || 0} emails en file (cible: ${data.mode || 'all'})`,
                     });
                   } catch (error) {
                     console.error(error);
