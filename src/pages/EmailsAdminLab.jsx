@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
@@ -14,6 +14,8 @@ const EmailsAdminLab = () => {
   const [adminEmails, setAdminEmails] = useState('');
   const [adminSending, setAdminSending] = useState(false);
   const [segment, setSegment] = useState('all'); // all | free | standard | vip | custom
+  const [recipientCount, setRecipientCount] = useState(null);
+  const [countLoading, setCountLoading] = useState(false);
 
   if (!user || !profile) {
     return <Navigate to="/auth" replace />;
@@ -26,6 +28,61 @@ const EmailsAdminLab = () => {
 
   const adminApiToken = import.meta.env.VITE_ADMIN_API_TOKEN_LAB;
   const serverLabUrl = import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com';
+
+  // Met à jour le compteur de destinataires selon le segment choisi
+  useEffect(() => {
+    if (!adminApiToken) {
+      setRecipientCount(null);
+      return;
+    }
+
+    // Segment "custom" : on compte simplement les emails saisis
+    if (segment === 'custom') {
+      const emails = adminEmails
+        .split(',')
+        .map((e) => e.trim())
+        .filter((e) => e.length > 0);
+      setRecipientCount(emails.length);
+      setCountLoading(false);
+      return;
+    }
+
+    // Autres segments : appel backend
+    const controller = new AbortController();
+    const run = async () => {
+      try {
+        setCountLoading(true);
+        setRecipientCount(null);
+
+        const res = await fetch(`${serverLabUrl}/admin/email/count-segment`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-token': adminApiToken,
+          },
+          body: JSON.stringify({ segment }),
+          signal: controller.signal,
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.error || 'Erreur lors du comptage des destinataires');
+        }
+        setRecipientCount(typeof data.count === 'number' ? data.count : 0);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error(err);
+          setRecipientCount(null);
+        }
+      } finally {
+        setCountLoading(false);
+      }
+    };
+
+    run();
+
+    return () => controller.abort();
+  }, [segment, adminEmails, adminApiToken, serverLabUrl]);
 
   return (
     <>
@@ -61,6 +118,16 @@ const EmailsAdminLab = () => {
             </div>
 
             <div className="space-y-1">
+              <label className="block font-medium">Message</label>
+              <textarea
+                className="w-full border rounded px-3 py-2 text-sm min-h-[200px] focus:outline-none focus:ring focus:ring-green-500/40"
+                value={adminMessage}
+                onChange={(e) => setAdminMessage(e.target.value)}
+                placeholder="Contenu de l'email"
+              />
+            </div>
+
+            <div className="space-y-1">
               <label className="block font-medium">Destinataires</label>
               <select
                 className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-500/40"
@@ -76,16 +143,15 @@ const EmailsAdminLab = () => {
               <p className="text-xs text-gray-500">
                 Choisissez qui recevra cet email. "Au choix" permet de saisir les emails manuellement.
               </p>
-            </div>
-
-            <div className="space-y-1">
-              <label className="block font-medium">Message</label>
-              <textarea
-                className="w-full border rounded px-3 py-2 text-sm min-h-[200px] focus:outline-none focus:ring focus:ring-green-500/40"
-                value={adminMessage}
-                onChange={(e) => setAdminMessage(e.target.value)}
-                placeholder="Contenu de l'email"
-              />
+              {adminApiToken && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {segment === 'custom'
+                    ? `Destinataires saisis : ${recipientCount ?? 0}`
+                    : countLoading
+                    ? 'Calcul du nombre de destinataires…'
+                    : `Destinataires potentiels : ${recipientCount ?? 0}`}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1">
