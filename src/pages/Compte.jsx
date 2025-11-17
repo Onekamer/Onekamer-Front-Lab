@@ -211,18 +211,18 @@ const Compte = () => {
 
                       const data = await res.json();
                       if (!res.ok) {
-                        throw new Error(data?.error || 'Erreur lors de la création des jobs');
+                        throw new Error(data?.error || 'Erreur lors de la création des emails');
                       }
 
                       toast({
-                        title: "Jobs créés",
+                        title: "Emails créés",
                         description: `${data.inserted || 0} emails en file (mode: ${data.mode || 'profiles'})`,
                       });
                     } catch (error) {
                       console.error(error);
                       toast({
                         title: "Erreur",
-                        description: error.message || 'Impossible de créer les jobs emails.',
+                        description: error.message || 'Impossible de créer les emails.',
                         variant: "destructive",
                       });
                     } finally {
@@ -231,7 +231,7 @@ const Compte = () => {
                   }}
                   className="flex-1"
                 >
-                  {adminSending ? 'Envoi en cours...' : 'Créer les jobs emails'}
+                  {adminSending ? 'Envoi en cours...' : 'Créer les emails'}
                 </Button>
 
                 <Button
@@ -261,18 +261,18 @@ const Compte = () => {
 
                       const data = await res.json();
                       if (!res.ok) {
-                        throw new Error(data?.error || 'Erreur lors du traitement des jobs');
+                        throw new Error(data?.error || 'Erreur lors du traitement des emails');
                       }
 
                       toast({
                         title: "Traitement des emails",
-                        description: `Jobs: ${data.processed || 0}, erreurs: ${data.errors?.length || 0}`,
+                        description: `Emails envoyés: ${data.sent || 0}, erreurs: ${data.errors?.length || 0}`,
                       });
                     } catch (error) {
                       console.error(error);
                       toast({
                         title: "Erreur",
-                        description: error.message || 'Impossible de traiter les jobs emails.',
+                        description: error.message || 'Impossible de traiter les emails.',
                         variant: "destructive",
                       });
                     } finally {
@@ -281,7 +281,7 @@ const Compte = () => {
                   }}
                   className="flex-1"
                 >
-                  Traiter les jobs
+                  Traiter les emails
                 </Button>
               </div>
             </CardContent>
