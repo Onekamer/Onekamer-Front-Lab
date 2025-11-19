@@ -18,14 +18,43 @@ import React, { useState, useEffect } from 'react';
         const navigate = useNavigate();
         const { toast } = useToast();
 
+        // Robust session detection + detailed logs to debug iOS/Safari
         useEffect(() => {
-            const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-                if (event === 'PASSWORD_RECOVERY') {
+            console.debug('[ResetPassword] mount', {
+                href: window.location.href,
+                hash: window.location.hash,
+                search: window.location.search,
+                ua: navigator.userAgent,
+            });
+
+            let mounted = true;
+
+            async function checkSession(origin) {
+                const { data, error } = await supabase.auth.getSession();
+                console.debug('[ResetPassword] getSession', { origin, data, error });
+                if (!mounted) return;
+                if (data?.session) {
                     setHasSession(true);
+                }
+            }
+
+            // 1) initial check (detectSessionInUrl may have already run)
+            checkSession('initial');
+
+            // 2) delayed re-check to cover timing on iOS Safari
+            const t = setTimeout(() => checkSession('delayed-200ms'), 200);
+
+            // 3) subscribe to all relevant events
+            const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+                console.debug('[ResetPassword] onAuthStateChange', { event, session });
+                if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
+                    setHasSession(!!session);
                 }
             });
 
             return () => {
+                mounted = false;
+                clearTimeout(t);
                 subscription.unsubscribe();
             };
         }, []);
@@ -43,14 +72,28 @@ import React, { useState, useEffect } from 'react';
             setError('');
             setLoading(true);
 
-            const { error: updateError } = await supabase.auth.updateUser({ password });
+            // Safety timeout to avoid infinite spinner if the promise hangs on Safari
+            const safety = setTimeout(() => {
+                console.warn('[ResetPassword] updateUser taking too long (>15s)');
+            }, 15000);
 
-            setLoading(false);
-            if (updateError) {
-                toast({ title: 'Erreur', description: updateError.message, variant: 'destructive' });
-            } else {
-                toast({ title: 'Succès', description: 'Votre mot de passe a été mis à jour avec succès ✅' });
-                navigate('/auth');
+            try {
+                console.debug('[ResetPassword] calling supabase.auth.updateUser');
+                const { error: updateError, data } = await supabase.auth.updateUser({ password });
+                console.debug('[ResetPassword] updateUser response', { data, updateError });
+
+                if (updateError) {
+                    toast({ title: 'Erreur', description: updateError.message, variant: 'destructive' });
+                } else {
+                    toast({ title: 'Succès', description: 'Votre mot de passe a été mis à jour avec succès ✅' });
+                    navigate('/auth');
+                }
+            } catch (err) {
+                console.error('[ResetPassword] updateUser threw', err);
+                toast({ title: 'Erreur', description: 'Une erreur est survenue lors de la mise à jour du mot de passe.', variant: 'destructive' });
+            } finally {
+                clearTimeout(safety);
+                setLoading(false);
             }
         };
 
