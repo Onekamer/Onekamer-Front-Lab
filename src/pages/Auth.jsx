@@ -20,7 +20,7 @@ import React, { useState } from 'react';
             e.preventDefault();
             setLoading(true);
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: `${window.location.origin}/#/reset-password`,
+                redirectTo: `https://onekamer-front-lab.onrender.com/auth-callback`,
             });
             setLoading(false);
             if (error) {

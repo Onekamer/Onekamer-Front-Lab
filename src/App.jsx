@@ -43,6 +43,7 @@ import ChartePopup from '@/components/ChartePopup';
 import { useCharteValidation } from '@/hooks/useCharteValidation';
 import { applyAutoAccessProtection } from '@/lib/autoAccessWrapper';
 import ResetPassword from '@/pages/ResetPassword';
+import AuthCallback from '@/pages/AuthCallback';
 import SupportCenter from '@/pages/SupportCenter';
 import CguPage from '@/pages/Cgu';
 import RgpdPage from '@/pages/Rgpd';
@@ -128,6 +129,7 @@ const AppContent = () => {
           <Route path="/profil/:userId" element={<UserProfile />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/auth-callback" element={<AuthCallback />} />
           <Route path="/merci-verification" element={<MerciVerification />} />
           <Route path="/verification-sms" element={<VerificationSMS />} />
           <Route path="/paiement-success" element={<PaiementSuccess />} />
