@@ -30,12 +30,16 @@ const AuthCallback = () => {
     const token = sessionStorage.getItem('ok_reset_access_token') || params.access_token || '';
     const type = sessionStorage.getItem('ok_reset_type') || params.type || 'recovery';
 
-    if (token) {
-      const next = `/reset-password#access_token=${encodeURIComponent(token)}&type=${encodeURIComponent(type)}`;
-      navigate(next, { replace: true });
-    } else {
+    if (!token) {
       navigate('/auth', { replace: true });
+      return;
     }
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const redirectTo = encodeURIComponent(`${window.location.origin}/reset-password`);
+    const verifyUrl = `${supabaseUrl}/auth/v1/verify?token=${encodeURIComponent(token)}&type=${encodeURIComponent(type)}&redirect_to=${redirectTo}`;
+
+    window.location.replace(verifyUrl);
   };
 
   return (
