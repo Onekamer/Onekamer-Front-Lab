@@ -322,27 +322,13 @@ const GroupeDetail = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const pickSupportedMime = useCallback(() => {
-    const ua = navigator.userAgent.toLowerCase();
-    // ✅ iOS / Safari ou PWA iPhone -> MP4 obligatoire
-    if (ua.includes('iphone') || ua.includes('ipad') || (ua.includes('safari') && !ua.includes('chrome'))) {
-      return { type: 'audio/mp4;codecs=mp4a.40.2', ext: 'm4a' };
-    }
-    // ✅ Android / Chrome / Desktop -> WebM (Opus) préféré
-    if (window.MediaRecorder?.isTypeSupported?.('audio/webm;codecs=opus')) {
-      return { type: 'audio/webm;codecs=opus', ext: 'webm' };
-    }
-    // ✅ Fallback OGG
-    if (window.MediaRecorder?.isTypeSupported?.('audio/ogg;codecs=opus')) {
-      return { type: 'audio/ogg;codecs=opus', ext: 'ogg' };
-    }
-    // ✅ Fallback MP4
-    if (window.MediaRecorder?.isTypeSupported?.('audio/mp4;codecs=mp4a.40.2')) {
-      return { type: 'audio/mp4;codecs=mp4a.40.2', ext: 'm4a' };
-    }
-    // 🔙 Fallback ultime
-    return { type: 'audio/mp4;codecs=mp4a.40.2', ext: 'm4a' };
-  }, []);
+  const getMimeExtension = (mimeType) => {
+    if (mimeType.includes("mp4") || mimeType.includes("m4a")) return "m4a";
+    if (mimeType.includes("ogg")) return "ogg";
+    if (mimeType.includes("webm")) return "webm";
+    if (mimeType.includes("wav")) return "wav";
+    return "webm";
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -385,13 +371,13 @@ const GroupeDetail = () => {
       setAudioBlob(null);
       setRecordingTime(0);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const chosenMime = pickSupportedMime();
-      mimeRef.current = chosenMime;
+      const recorder = new MediaRecorder(stream); // Laisser le navigateur choisir
+      const actualMimeType = recorder.mimeType;
+      mimeRef.current = { type: actualMimeType, ext: getMimeExtension(actualMimeType) };
+
       let resolveRecording;
       const recordingDone = new Promise((resolve) => (resolveRecording = resolve));
       recorderPromiseRef.current = recordingDone;
-      const supportedMimeType = window.MediaRecorder?.isTypeSupported?.(chosenMime.type) ? chosenMime.type : undefined;
-      const recorder = supportedMimeType ? new MediaRecorder(stream, { mimeType: supportedMimeType }) : new MediaRecorder(stream);
       audioChunksRef.current = [];
       recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data); };
       recorder.onerror = (e) => { console.error('MediaRecorder error', e); resolveRecording(null); };
@@ -407,7 +393,7 @@ const GroupeDetail = () => {
         resolveRecording(blob);
       };
       await new Promise((r) => setTimeout(r, 300));
-      recorder.start(200);
+      recorder.start();
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
       recordingIntervalRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000);
