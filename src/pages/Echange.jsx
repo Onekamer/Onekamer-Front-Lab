@@ -408,13 +408,27 @@ const CommentSection = ({ postId }) => {
     }
   }
 
-  const getMimeExtension = (mimeType) => {
-    if (mimeType.includes("mp4") || mimeType.includes("m4a")) return "m4a";
-    if (mimeType.includes("ogg")) return "ogg";
-    if (mimeType.includes("webm")) return "webm";
-    if (mimeType.includes("wav")) return "wav";
-    return "webm"; // Default
-  };
+  const pickSupportedMime = useCallback(() => {
+    const ua = navigator.userAgent.toLowerCase();
+
+    // ✅ iOS / Safari ou PWA iPhone -> MP4 obligatoire
+    if (ua.includes("iphone") || ua.includes("ipad") || (ua.includes("safari") && !ua.includes("chrome"))) {
+      return { type: "audio/mp4;codecs=mp4a.40.2", ext: "m4a" };
+    }
+
+    // ✅ Android / Chrome / Desktop -> WebM (Opus) préféré
+    if (window.MediaRecorder?.isTypeSupported("audio/webm;codecs=opus")) {
+      return { type: "audio/webm;codecs=opus", ext: "webm" };
+    }
+
+    // ✅ Fallback OGG
+    if (window.MediaRecorder?.isTypeSupported("audio/ogg;codecs=opus")) {
+      return { type: "audio/ogg;codecs=opus", ext: "ogg" };
+    }
+
+    // 🔙 Fallback ultime
+    return { type: "audio/mp4;codecs=mp4a.40.2", ext: "m4a" };
+  }, []);
 
   const startRecording = async () => {
     try {
@@ -427,16 +441,20 @@ const CommentSection = ({ postId }) => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       console.log("✅ Micro autorisé :", stream.getAudioTracks().length, "piste(s)");
 
-      // 🔹 Laisser le navigateur choisir le format par défaut (meilleure compatibilité)
-      const recorder = new MediaRecorder(stream);
+      const chosenMime = pickSupportedMime();
+      mimeRef.current = chosenMime;
 
-      const actualMimeType = recorder.mimeType;
-      console.log("🎚️ Format natif choisi par le navigateur :", actualMimeType);
+      let resolveRecording;
+      const recordingDone = new Promise(resolve => (resolveRecording = resolve));
+      recorderPromiseRef.current = recordingDone;
 
-      mimeRef.current = {
-        type: actualMimeType,
-        ext: getMimeExtension(actualMimeType)
-      };
+      const supportedMimeType = MediaRecorder.isTypeSupported(chosenMime.type)
+        ? chosenMime.type
+        : "audio/mp4";
+
+      console.log("🎚️ Type MIME utilisé :", supportedMimeType);
+
+      const recorder = new MediaRecorder(stream, { mimeType: supportedMimeType });
       audioChunksRef.current = [];
 
       recorder.ondataavailable = (event) => {
@@ -467,7 +485,7 @@ const CommentSection = ({ postId }) => {
         await new Promise((resolve) => setTimeout(resolve, 300));
 
         const audioBlob = new Blob(audioChunksRef.current, {
-          type: mimeRef.current?.type || "audio/webm",
+          type: supportedMimeType.split(";")[0],
         });
         console.log("💾 Taille finale du blob :", audioBlob.size, "octets");
 
@@ -491,7 +509,7 @@ const CommentSection = ({ postId }) => {
       // ⚡ Fix mobile : attendre un court délai avant démarrage
       await new Promise((r) => setTimeout(r, 300));
 
-      // ✅ Retour à start() simple (pas de timeslice) pour éviter les bugs de durée
+      // ✅ Important : pas de timeslice pour éviter les problèmes de métadonnées (loading infini)
       recorder.start();
       console.log("⏺️ Enregistrement démarré avec format :", supportedMimeType);
 
@@ -715,7 +733,7 @@ const CommentSection = ({ postId }) => {
               ) : mediaPreviewUrl ? (
                 <video src={mediaPreviewUrl} controls className="w-full rounded object-cover" />
               ) : audioBlob ? (
-                <AudioPlayer src={URL.createObjectURL(audioBlob)} initialDuration={recordingTime} />
+                <AudioPlayer src={URL.createObjectURL(audioBlob)} />
               ) : null}
               <Button size="icon" variant="destructive" onClick={mediaPreviewUrl ? handleRemoveMedia : handleRemoveAudio} className="absolute -top-1 -right-1 h-5 w-5 rounded-full">
                 <X className="h-3 w-3" />
