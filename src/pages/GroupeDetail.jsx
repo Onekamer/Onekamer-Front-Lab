@@ -385,22 +385,37 @@ const GroupeDetail = () => {
       mimeRef.current = chosenMime;
       let resolveRecording;
       const recordingDone = new Promise((resolve) => (resolveRecording = resolve));
-      mediaRecorderRef.current = null;
-      resolveRecording(blob);
-    };
-    await new Promise((r) => setTimeout(r, 300));
-    recorder.start();
-    mediaRecorderRef.current = recorder;
-    setIsRecording(true);
-    recordingIntervalRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000);
-    setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, 120000);
-  } catch (err) {
-    console.error('Erreur microphone:', err);
-    toast({ title: "Erreur microphone", description: "Veuillez autoriser le micro.", variant: "destructive" });
-    setAudioBlob(null);
-    setRecordingTime(0);
-    recorderPromiseRef.current = null;
-    mimeRef.current = null;
+      recorderPromiseRef.current = recordingDone;
+      const supportedMimeType = window.MediaRecorder?.isTypeSupported?.(chosenMime.type) ? chosenMime.type : undefined;
+      const recorder = supportedMimeType ? new MediaRecorder(stream, { mimeType: supportedMimeType }) : new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data); };
+      recorder.onerror = (e) => { console.error('MediaRecorder error', e); resolveRecording(null); };
+      recorder.onstop = async () => {
+        clearInterval(recordingIntervalRef.current);
+        stream.getTracks().forEach((t) => t.stop());
+        await new Promise((r) => setTimeout(r, 300));
+        const finalType = (mimeRef.current?.type || 'audio/webm').split(';')[0];
+        const blob = new Blob(audioChunksRef.current, { type: finalType });
+        setAudioBlob(blob);
+        setIsRecording(false);
+        mediaRecorderRef.current = null;
+        resolveRecording(blob);
+      };
+      await new Promise((r) => setTimeout(r, 300));
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      recordingIntervalRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000);
+      setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, 120000);
+    } catch (err) {
+      console.error('Erreur microphone:', err);
+      toast({ title: "Erreur microphone", description: "Veuillez autoriser le micro.", variant: "destructive" });
+      setAudioBlob(null);
+      setRecordingTime(0);
+      recorderPromiseRef.current = null;
+      mimeRef.current = null;
+    }
   };
 
   const handleSendMessage = async () => {
