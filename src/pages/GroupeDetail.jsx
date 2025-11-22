@@ -328,17 +328,17 @@ const GroupeDetail = () => {
     if (ua.includes('iphone') || ua.includes('ipad') || (ua.includes('safari') && !ua.includes('chrome'))) {
       return { type: 'audio/mp4;codecs=mp4a.40.2', ext: 'm4a' };
     }
-    // ✅ Essayer MP4 sur Android/Chrome aussi
-    if (window.MediaRecorder?.isTypeSupported?.('audio/mp4;codecs=mp4a.40.2')) {
-      return { type: 'audio/mp4;codecs=mp4a.40.2', ext: 'm4a' };
-    }
-    // ✅ Fallback WebM (Opus)
+    // ✅ Android / Chrome / Desktop -> WebM (Opus) préféré
     if (window.MediaRecorder?.isTypeSupported?.('audio/webm;codecs=opus')) {
       return { type: 'audio/webm;codecs=opus', ext: 'webm' };
     }
     // ✅ Fallback OGG
     if (window.MediaRecorder?.isTypeSupported?.('audio/ogg;codecs=opus')) {
       return { type: 'audio/ogg;codecs=opus', ext: 'ogg' };
+    }
+    // ✅ Fallback MP4
+    if (window.MediaRecorder?.isTypeSupported?.('audio/mp4;codecs=mp4a.40.2')) {
+      return { type: 'audio/mp4;codecs=mp4a.40.2', ext: 'm4a' };
     }
     // 🔙 Fallback ultime
     return { type: 'audio/mp4;codecs=mp4a.40.2', ext: 'm4a' };
