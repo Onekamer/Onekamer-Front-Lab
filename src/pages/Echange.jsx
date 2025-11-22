@@ -456,328 +456,283 @@ const CommentSection = ({ postId }) => {
 
       const recorder = new MediaRecorder(stream, { mimeType: supportedMimeType });
       audioChunksRef.current = [];
-
-      recorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        } else {
-          console.warn("⚠️ Chunk vide détecté !");
-        }
-      };
-
-      recorder.onerror = (event) => {
-        console.error("❌ Erreur MediaRecorder :", event.error || event);
-        toast({
-          title: "Erreur d'enregistrement",
-          description: "Une erreur est survenue pendant la capture audio.",
+      title: "Erreur d'enregistrement",
+        description: "Une erreur est survenue pendant la capture audio.",
           variant: "destructive",
         });
-        resolveRecording?.(null);
-        recorderPromiseRef.current = null;
-      };
+    resolveRecording?.(null);
+    recorderPromiseRef.current = null;
+  };
 
-      recorder.onstop = async () => {
-        console.log("🛑 Enregistrement terminé, création du blob...");
-        clearInterval(recordingIntervalRef.current);
-        recordingIntervalRef.current = null;
-        stream.getTracks().forEach((t) => t.stop());
+  recorder.onstop = async () => {
+    console.log("🛑 Enregistrement terminé, création du blob...");
+    clearInterval(recordingIntervalRef.current);
+    recordingIntervalRef.current = null;
+    stream.getTracks().forEach((t) => t.stop());
 
-        await new Promise((resolve) => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
-        const audioBlob = new Blob(audioChunksRef.current, {
-          type: supportedMimeType.split(";")[0],
-        });
-        console.log("💾 Taille finale du blob :", audioBlob.size, "octets");
+    const audioBlob = new Blob(audioChunksRef.current, {
+      type: supportedMimeType.split(";")[0],
+    });
+    console.log("💾 Taille finale du blob :", audioBlob.size, "octets");
 
-        const fallbackDuration = Math.max(1, lastRecordingTimeRef.current || recordingTime);
-        const measuredDuration = await getBlobDuration(audioBlob, fallbackDuration);
-        const normalizedDuration = Math.max(1, Math.round(measuredDuration || fallbackDuration));
-        console.log("⏱️ Durée mesurée :", normalizedDuration, "sec");
+    const fallbackDuration = Math.max(1, lastRecordingTimeRef.current || recordingTime);
+    const measuredDuration = await getBlobDuration(audioBlob, fallbackDuration);
+    const normalizedDuration = Math.max(1, Math.round(measuredDuration || fallbackDuration));
+    console.log("⏱️ Durée mesurée :", normalizedDuration, "sec");
 
-        setRecordingTime(normalizedDuration);
-        recordedDurationRef.current = normalizedDuration;
-        lastRecordingTimeRef.current = normalizedDuration;
-        setAudioBlob(audioBlob);
-        setMediaFile(null);
-        setMediaPreviewUrl(null);
-        setIsRecording(false);
-        mediaRecorderRef.current = null;
-        resolveRecording(audioBlob);
-        recorderPromiseRef.current = Promise.resolve(audioBlob);
-      };
+    setRecordingTime(normalizedDuration);
+    recordedDurationRef.current = normalizedDuration;
+    lastRecordingTimeRef.current = normalizedDuration;
+    setAudioBlob(audioBlob);
+    setMediaFile(null);
+    setMediaPreviewUrl(null);
+    setIsRecording(false);
+    mediaRecorderRef.current = null;
+    resolveRecording(audioBlob);
+    recorderPromiseRef.current = Promise.resolve(audioBlob);
+  };
 
-      // ⚡ Fix mobile : attendre un court délai avant démarrage
-      await new Promise((r) => setTimeout(r, 300));
+  // ⚡ Fix mobile : attendre un court délai avant démarrage
+  await new Promise((r) => setTimeout(r, 300));
 
-      // ✅ Important : pas de timeslice pour éviter les problèmes de métadonnées (loading infini)
-      recorder.start();
-      console.log("⏺️ Enregistrement démarré avec format :", supportedMimeType);
+  // ✅ Important : pas de timeslice pour éviter les problèmes de métadonnées (loading infini)
+  recorder.start();
+  console.log("⏺️ Enregistrement démarré avec format :", supportedMimeType);
 
-      mediaRecorderRef.current = recorder;
-      setIsRecording(true);
-      recordingIntervalRef.current = setInterval(() => {
-        setRecordingTime((prev) => {
-          const next = prev + 1;
-          lastRecordingTimeRef.current = next;
-          return next;
-        });
-      }, 1000);
+  mediaRecorderRef.current = recorder;
+  setIsRecording(true);
+  recordingIntervalRef.current = setInterval(() => {
+    setRecordingTime((prev) => {
+      const next = prev + 1;
+      lastRecordingTimeRef.current = next;
+      return next;
+    });
+  }, 1000);
 
-      // ⏹️ Auto-stop après 120 secondes
-      setTimeout(() => {
-        if (recorder.state !== "inactive") {
-          console.log("⏹️ Arrêt automatique après 120s.");
-          recorder.stop();
-        }
-      }, 120000);
+  // ⏹️ Auto-stop après 120 secondes
+  setTimeout(() => {
+    if (recorder.state !== "inactive") {
+      console.log("⏹️ Arrêt automatique après 120s.");
+      recorder.stop();
+    }
+  }, 120000);
+} catch (error) {
+  console.error("❌ Erreur d'accès micro :", error);
+  toast({
+    title: "Erreur microphone",
+    description: "Veuillez autoriser le micro dans votre navigateur.",
+    variant: "destructive",
+  });
+  recorderPromiseRef.current = null;
+  const seconds = time % 60;
+  return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+}
+
+const handleRemoveAudio = () => {
+  setAudioBlob(null);
+  setRecordingTime(0);
+  lastRecordingTimeRef.current = 0;
+  recordedDurationRef.current = 0;
+  recorderPromiseRef.current = null;
+  mimeRef.current = null;
+};
+
+const uploadToBunny = async (file, folder) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("folder", folder);
+
+  const response = await fetch(`${import.meta.env.VITE_API_URL}/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  const text = await response.text();
+  let data = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
     } catch (error) {
-      console.error("❌ Erreur d'accès micro :", error);
-      toast({
-        title: "Erreur microphone",
-        description: "Veuillez autoriser le micro dans votre navigateur.",
-        variant: "destructive",
-      });
-      recorderPromiseRef.current = null;
-      recordedDurationRef.current = 0;
+      console.error("Réponse upload invalide:", text);
+      throw new Error("Réponse inattendue du serveur d'upload");
     }
-  };
-
-  const stopRecording = () => {
-    console.log("🧭 Arrêt manuel de l'enregistrement...");
-
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      try {
-        // Demande le dernier chunk avant de stopper
-        mediaRecorderRef.current.requestData?.();
-
-        setTimeout(() => {
-          if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-            console.log("⏹️ Enregistrement stoppé par l'utilisateur.");
-            mediaRecorderRef.current.stop();
-          }
-        }, 500); // petit délai pour laisser le dernier fragment audio arriver
-      } catch (error) {
-        console.error("❌ Erreur à l'arrêt de l'enregistrement :", error);
-      } finally {
-        // Nettoyage du timer de durée
-        clearInterval(recordingIntervalRef.current);
-        recordingIntervalRef.current = null;
-      }
-    } else {
-      console.warn("⚠️ Aucun enregistrement actif à arrêter.");
-    }
-  };
-
-
-  const formatRecordingTime = (time) => {
-    const minutes = Math.floor(time / 60);
-    const seconds = time % 60;
-    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   }
 
-  const handleRemoveAudio = () => {
-    setAudioBlob(null);
-    setRecordingTime(0);
-    lastRecordingTimeRef.current = 0;
-    recordedDurationRef.current = 0;
-    recorderPromiseRef.current = null;
-    mimeRef.current = null;
-  };
+  if (!response.ok || !data?.success) {
+    const message = data?.message || `Erreur d’upload BunnyCDN (code ${response.status})`;
+    throw new Error(message);
+  }
 
-  const uploadToBunny = async (file, folder) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("folder", folder);
+  return data.url;
+};
 
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/upload`, {
-      method: "POST",
-      body: formData,
-    });
+const handleAddComment = async (e) => {
+  e.preventDefault();
+  if (!newComment.trim() && !mediaFile && !audioBlob) return;
+  if (!user) {
+    toast({ title: 'Erreur', description: 'Vous devez être connecté.', variant: 'destructive' });
+    return;
+  }
 
-    const text = await response.text();
-    let data = null;
-    if (text) {
-      try {
-        data = JSON.parse(text);
-      } catch (error) {
-        console.error("Réponse upload invalide:", text);
-        throw new Error("Réponse inattendue du serveur d'upload");
+  setIsPostingComment(true);
+
+  try {
+    let media_url = null;
+    let media_type = null;
+    let audio_url = null;
+    let audio_duration = null;
+    let type = 'text';
+
+    let finalAudioBlob = audioBlob;
+    if (!finalAudioBlob && recorderPromiseRef.current) {
+      finalAudioBlob = await recorderPromiseRef.current;
+    }
+
+    if (mediaFile) {
+      media_url = await uploadToBunny(mediaFile, "comments");
+      media_type = mediaFile.type;
+      type = mediaFile.type.startsWith('image') ? 'image' : 'video';
+    } else if (finalAudioBlob) {
+      const { type: mimeType, ext } = mimeRef.current || { type: finalAudioBlob.type || 'audio/webm', ext: 'webm' };
+      const normalizedType = mimeType.split(";")[0];
+      if (!finalAudioBlob || finalAudioBlob.size < 2000) {
+        toast({ title: 'Erreur audio', description: "L’audio semble vide ou trop court. Réessayez.", variant: 'destructive' });
+        return;
       }
+      const audioFile = new File([finalAudioBlob], `audio-comment-${user.id}-${Date.now()}.${ext}`, { type: normalizedType || 'audio/webm' });
+      const { publicUrl } = await uploadAudioFile(audioFile, 'comments_audio');
+      audio_url = publicUrl;
+      const fallbackDuration = Math.max(1, recordedDurationRef.current || lastRecordingTimeRef.current || recordingTime || 1);
+      const measuredDuration = await getBlobDuration(finalAudioBlob, fallbackDuration);
+      const normalizedDuration = Math.max(1, Math.round(measuredDuration || fallbackDuration));
+      recordedDurationRef.current = normalizedDuration;
+      lastRecordingTimeRef.current = normalizedDuration;
+      setRecordingTime(normalizedDuration);
+      audio_duration = normalizedDuration;
+      recorderPromiseRef.current = null;
+      type = 'audio';
     }
 
-    if (!response.ok || !data?.success) {
-      const message = data?.message || `Erreur d’upload BunnyCDN (code ${response.status})`;
-      throw new Error(message);
-    }
+    const { error: insertError } = await supabase.from('comments').insert([{
+      content_id: postId,
+      content_type: 'post',
+      user_id: user.id,
+      content: newComment,
+      media_url,
+      media_type,
+      audio_url,
+      audio_duration,
+      type,
+    }]);
 
-    return data.url;
-  };
+    if (insertError) throw insertError;
 
-  const handleAddComment = async (e) => {
-    e.preventDefault();
-    if (!newComment.trim() && !mediaFile && !audioBlob) return;
-    if (!user) {
-      toast({ title: 'Erreur', description: 'Vous devez être connecté.', variant: 'destructive' });
-      return;
-    }
+    setNewComment('');
+    handleRemoveMedia();
+    handleRemoveAudio();
 
-    setIsPostingComment(true);
+  } catch (error) {
+    console.error('Error posting comment:', error);
+    toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
+  } finally {
+    setIsPostingComment(false);
+  }
+};
 
-    try {
-      let media_url = null;
-      let media_type = null;
-      let audio_url = null;
-      let audio_duration = null;
-      let type = 'text';
-
-      let finalAudioBlob = audioBlob;
-      if (!finalAudioBlob && recorderPromiseRef.current) {
-        finalAudioBlob = await recorderPromiseRef.current;
-      }
-
-      if (mediaFile) {
-        media_url = await uploadToBunny(mediaFile, "comments");
-        media_type = mediaFile.type;
-        type = mediaFile.type.startsWith('image') ? 'image' : 'video';
-      } else if (finalAudioBlob) {
-        const { type: mimeType, ext } = mimeRef.current || { type: finalAudioBlob.type || 'audio/webm', ext: 'webm' };
-        const normalizedType = mimeType.split(";")[0];
-        if (!finalAudioBlob || finalAudioBlob.size < 2000) {
-          toast({ title: 'Erreur audio', description: "L’audio semble vide ou trop court. Réessayez.", variant: 'destructive' });
-          return;
-        }
-        const audioFile = new File([finalAudioBlob], `audio-comment-${user.id}-${Date.now()}.${ext}`, { type: normalizedType || 'audio/webm' });
-        const { publicUrl } = await uploadAudioFile(audioFile, 'comments_audio');
-        audio_url = publicUrl;
-        const fallbackDuration = Math.max(1, recordedDurationRef.current || lastRecordingTimeRef.current || recordingTime || 1);
-        const measuredDuration = await getBlobDuration(finalAudioBlob, fallbackDuration);
-        const normalizedDuration = Math.max(1, Math.round(measuredDuration || fallbackDuration));
-        recordedDurationRef.current = normalizedDuration;
-        lastRecordingTimeRef.current = normalizedDuration;
-        setRecordingTime(normalizedDuration);
-        audio_duration = normalizedDuration;
-        recorderPromiseRef.current = null;
-        type = 'audio';
-      }
-
-      const { error: insertError } = await supabase.from('comments').insert([{
-        content_id: postId,
-        content_type: 'post',
-        user_id: user.id,
-        content: newComment,
-        media_url,
-        media_type,
-        audio_url,
-        audio_duration,
-        type,
-      }]);
-
-      if (insertError) throw insertError;
-
-      setNewComment('');
-      handleRemoveMedia();
-      handleRemoveAudio();
-
-    } catch (error) {
-      console.error('Error posting comment:', error);
-      toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
-    } finally {
-      setIsPostingComment(false);
-    }
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.2 }}
-      className="overflow-hidden"
-    >
-      <div className="pt-4 mt-4 border-t border-gray-200">
-        {loadingComments ? <Loader2 className="animate-spin" /> :
-          comments.length > 0 ? (
-            <div className="space-y-3 mb-4">
-              {comments.map((comment) => (
-                <div key={comment.id} className="flex gap-2 items-start">
-                  <div className="cursor-pointer" onClick={() => navigate(`/profil/${comment.author?.id}`)}>
-                    <CommentAvatar avatarPath={comment.author?.avatar_url} username={comment.author?.username} />
-                  </div>
-                  <div className="bg-gray-100 rounded-lg px-3 py-2 w-full">
-                    <p className="text-sm font-semibold cursor-pointer" onClick={() => navigate(`/profil/${comment.author?.id}`)}>{comment.author?.username}</p>
-                    {comment.type === 'audio' ? <AudioPlayer src={comment.audio_url} initialDuration={comment.audio_duration} /> : <p className="text-sm text-gray-700">{parseMentions(comment.content)}</p>}
-                    {comment.media_url && <CommentMedia url={comment.media_url} type={comment.media_type} />}
-                  </div>
+return (
+  <motion.div
+    initial={{ opacity: 0, y: -10 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -10 }}
+    transition={{ duration: 0.2 }}
+    className="overflow-hidden"
+  >
+    <div className="pt-4 mt-4 border-t border-gray-200">
+      {loadingComments ? <Loader2 className="animate-spin" /> :
+        comments.length > 0 ? (
+          <div className="space-y-3 mb-4">
+            {comments.map((comment) => (
+              <div key={comment.id} className="flex gap-2 items-start">
+                <div className="cursor-pointer" onClick={() => navigate(`/profil/${comment.author?.id}`)}>
+                  <CommentAvatar avatarPath={comment.author?.avatar_url} username={comment.author?.username} />
                 </div>
-              ))}
+                <div className="bg-gray-100 rounded-lg px-3 py-2 w-full">
+                  <p className="text-sm font-semibold cursor-pointer" onClick={() => navigate(`/profil/${comment.author?.id}`)}>{comment.author?.username}</p>
+                  {comment.type === 'audio' ? <AudioPlayer src={comment.audio_url} initialDuration={comment.audio_duration} /> : <p className="text-sm text-gray-700">{parseMentions(comment.content)}</p>}
+                  {comment.media_url && <CommentMedia url={comment.media_url} type={comment.media_type} />}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 italic mb-4">Aucun commentaire pour le moment</p>
+        )
+      }
+
+      <form onSubmit={handleAddComment} className="flex flex-col gap-2">
+        <div className="flex gap-2 items-center">
+          {isRecording ? (
+            <div className="flex items-center gap-2 w-full bg-gray-100 p-2 rounded-lg">
+              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+              <span className="text-sm text-red-500 font-mono">{formatRecordingTime(recordingTime)}</span>
             </div>
           ) : (
-            <p className="text-sm text-gray-400 italic mb-4">Aucun commentaire pour le moment</p>
-          )
-        }
+            <Input
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Écrire un commentaire..."
+              disabled={isPostingComment || !!audioBlob}
+            />
+          )}
+          <Button type="submit" size="icon" disabled={isPostingComment || (!newComment.trim() && !mediaFile && !audioBlob)}>
+            {isPostingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </Button>
+        </div>
 
-        <form onSubmit={handleAddComment} className="flex flex-col gap-2">
-          <div className="flex gap-2 items-center">
-            {isRecording ? (
-              <div className="flex items-center gap-2 w-full bg-gray-100 p-2 rounded-lg">
-                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                <span className="text-sm text-red-500 font-mono">{formatRecordingTime(recordingTime)}</span>
-              </div>
-            ) : (
-              <Input
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Écrire un commentaire..."
-                disabled={isPostingComment || !!audioBlob}
-              />
-            )}
-            <Button type="submit" size="icon" disabled={isPostingComment || (!newComment.trim() && !mediaFile && !audioBlob)}>
-              {isPostingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        {(mediaPreviewUrl || audioBlob) && (
+          <div className="relative p-2 bg-gray-100 rounded-lg">
+            {mediaPreviewUrl && mediaFile?.type.startsWith("image") ? (
+              <img src={mediaPreviewUrl} alt="preview" className="w-24 h-24 rounded object-cover" />
+            ) : mediaPreviewUrl ? (
+              <video src={mediaPreviewUrl} controls className="w-full rounded object-cover" />
+            ) : audioBlob ? (
+              <AudioPlayer src={URL.createObjectURL(audioBlob)} />
+            ) : null}
+            <Button size="icon" variant="destructive" onClick={mediaPreviewUrl ? handleRemoveMedia : handleRemoveAudio} className="absolute -top-1 -right-1 h-5 w-5 rounded-full">
+              <X className="h-3 w-3" />
             </Button>
           </div>
+        )}
 
-          {(mediaPreviewUrl || audioBlob) && (
-            <div className="relative p-2 bg-gray-100 rounded-lg">
-              {mediaPreviewUrl && mediaFile?.type.startsWith("image") ? (
-                <img src={mediaPreviewUrl} alt="preview" className="w-24 h-24 rounded object-cover" />
-              ) : mediaPreviewUrl ? (
-                <video src={mediaPreviewUrl} controls className="w-full rounded object-cover" />
-              ) : audioBlob ? (
-                <AudioPlayer src={URL.createObjectURL(audioBlob)} />
-              ) : null}
-              <Button size="icon" variant="destructive" onClick={mediaPreviewUrl ? handleRemoveMedia : handleRemoveAudio} className="absolute -top-1 -right-1 h-5 w-5 rounded-full">
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
+        <div className="flex">
+          {!isRecording && !audioBlob && (
+            <Button size="sm" type="button" variant="ghost" onClick={() => mediaInputRef.current?.click()} disabled={isPostingComment}>
+              <ImageIcon className="h-4 w-4 mr-2" />
+              Image/Vidéo
+            </Button>
           )}
+          <input type="file" ref={mediaInputRef} accept="image/*,video/*" className="hidden" onChange={handleFileChange} disabled={isRecording || !!audioBlob} />
 
-          <div className="flex">
-            {!isRecording && !audioBlob && (
-              <Button size="sm" type="button" variant="ghost" onClick={() => mediaInputRef.current?.click()} disabled={isPostingComment}>
-                <ImageIcon className="h-4 w-4 mr-2" />
-                Image/Vidéo
+          {!mediaFile && (
+            isRecording ? (
+              <Button size="sm" type="button" variant="destructive" onClick={stopRecording}>
+                <Square className="h-4 w-4 mr-2" /> Stop
               </Button>
-            )}
-            <input type="file" ref={mediaInputRef} accept="image/*,video/*" className="hidden" onChange={handleFileChange} disabled={isRecording || !!audioBlob} />
-
-            {!mediaFile && (
-              isRecording ? (
-                <Button size="sm" type="button" variant="destructive" onClick={stopRecording}>
-                  <Square className="h-4 w-4 mr-2" /> Stop
-                </Button>
-              ) : (
-                !audioBlob &&
-                <Button size="sm" type="button" variant="ghost" onClick={startRecording} disabled={isPostingComment}>
-                  <Mic className="h-4 w-4 mr-2" /> Audio
-                </Button>
-              )
-            )}
-          </div>
-        </form>
-      </div>
-    </motion.div>
-  );
-};
+            ) : (
+              !audioBlob &&
+              <Button size="sm" type="button" variant="ghost" onClick={startRecording} disabled={isPostingComment}>
+                <Mic className="h-4 w-4 mr-2" /> Audio
+              </Button>
+            )
+          )}
+        </div>
+      </form>
+    </div>
+  </motion.div>
+);
+  };
 
 
 const PostCard = ({ post, user, profile, onLike, onDelete, showComments, onToggleComments, refreshBalance }) => {
