@@ -715,25 +715,37 @@ const GroupeDetail = () => {
                   </div>
                   {(mediaPreviewUrl || audioBlob) && (
                     <div className="relative p-2 bg-gray-100 rounded-lg mt-2">
+                      {mediaPreviewUrl && mediaFile?.type?.startsWith('image') ? (
+                        <img src={mediaPreviewUrl} alt="preview" className="w-24 h-24 rounded object-cover" />
+                      ) : mediaPreviewUrl ? (
+                        <video src={mediaPreviewUrl} controls className="w-full rounded object-cover" />
+                      ) : audioBlob ? (
+                        <AudioPlayer src={URL.createObjectURL(audioBlob)} initialDuration={recordingTime} />
+                      ) : null}
+                      <Button size="icon" variant="destructive" onClick={mediaPreviewUrl ? handleRemoveMedia : handleRemoveAudio} className="absolute -top-1 -right-1 h-5 w-5 rounded-full"><X className="h-3 w-3" /></Button>
+                    </div>
+                  )}
+                  <div className="flex gap-2 mt-2">
+                    {!isRecording && !audioBlob && (
                       <Button size="sm" type="button" variant="ghost" onClick={() => mediaInputRef.current?.click()} disabled={!!audioBlob}>
                         <ImageIcon className="h-4 w-4 mr-2" /> Image/Vidéo
                       </Button>
                     )}
-                      <input type="file" ref={mediaInputRef} accept="image/*,video/*" className="hidden" onChange={handleFileChange} disabled={isRecording || !!audioBlob} />
-                      {!mediaFile && (
-                        !isRecording ? (
-                          !audioBlob && (
-                            <Button size="sm" type="button" variant="ghost" onClick={startRecording}>
-                              <Mic className="h-4 w-4 mr-2" /> Audio
-                            </Button>
-                          )
-                        ) : (
-                          <Button size="sm" type="button" variant="destructive" onClick={stopRecording}>
-                            <Square className="h-4 w-4 mr-2" /> Stop
+                    <input type="file" ref={mediaInputRef} accept="image/*,video/*" className="hidden" onChange={handleFileChange} disabled={isRecording || !!audioBlob} />
+                    {!mediaFile && (
+                      !isRecording ? (
+                        !audioBlob && (
+                          <Button size="sm" type="button" variant="ghost" onClick={startRecording}>
+                            <Mic className="h-4 w-4 mr-2" /> Audio
                           </Button>
                         )
-                      )}
-                    </div>
+                      ) : (
+                        <Button size="sm" type="button" variant="destructive" onClick={stopRecording}>
+                          <Square className="h-4 w-4 mr-2" /> Stop
+                        </Button>
+                      )
+                    )}
+                  </div>
                 </div>
               )}
             </div>
