@@ -328,7 +328,11 @@ const GroupeDetail = () => {
     if (ua.includes('iphone') || ua.includes('ipad') || (ua.includes('safari') && !ua.includes('chrome'))) {
       return { type: 'audio/mp4;codecs=mp4a.40.2', ext: 'm4a' };
     }
-    // ✅ Android / Chrome / Desktop -> WebM (Opus) préféré
+    // ✅ Essayer MP4 sur Android/Chrome aussi
+    if (window.MediaRecorder?.isTypeSupported?.('audio/mp4;codecs=mp4a.40.2')) {
+      return { type: 'audio/mp4;codecs=mp4a.40.2', ext: 'm4a' };
+    }
+    // ✅ Fallback WebM (Opus)
     if (window.MediaRecorder?.isTypeSupported?.('audio/webm;codecs=opus')) {
       return { type: 'audio/webm;codecs=opus', ext: 'webm' };
     }
@@ -720,7 +724,7 @@ const GroupeDetail = () => {
                       ) : mediaPreviewUrl ? (
                         <video src={mediaPreviewUrl} controls className="w-full rounded object-cover" />
                       ) : audioBlob ? (
-                        <AudioPlayer src={URL.createObjectURL(audioBlob)} />
+                        <AudioPlayer src={URL.createObjectURL(audioBlob)} initialDuration={recordingTime} />
                       ) : null}
                       <Button size="icon" variant="destructive" onClick={mediaPreviewUrl ? handleRemoveMedia : handleRemoveAudio} className="absolute -top-1 -right-1 h-5 w-5 rounded-full"><X className="h-3 w-3" /></Button>
                     </div>
