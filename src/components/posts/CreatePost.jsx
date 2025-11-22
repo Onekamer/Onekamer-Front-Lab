@@ -13,82 +13,82 @@ import { notifyMentions } from '@/services/oneSignalNotifications';
 import { extractUniqueMentions } from '@/utils/mentions';
 
 const AudioPlayer = ({ src, onCanPlay }) => {
-    const audioRef = useRef(null);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [duration, setDuration] = useState(0);
-    const [currentTime, setCurrentTime] = useState(0);
-    const [isLoading, setIsLoading] = useState(true);
+  const audioRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
-    const togglePlayPause = () => {
-        if (audioRef.current) {
-            if (isPlaying) {
-                audioRef.current.pause();
-            } else {
-                audioRef.current.play();
-            }
-            setIsPlaying(!isPlaying);
+  const togglePlayPause = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      const setAudioData = () => {
+        if (isFinite(audio.duration)) {
+          setDuration(audio.duration);
+          if (onCanPlay) onCanPlay(audio.duration);
         }
-    };
+        setCurrentTime(audio.currentTime);
+        setIsLoading(false);
+      }
+      const setAudioTime = () => setCurrentTime(audio.currentTime);
 
-    useEffect(() => {
-        const audio = audioRef.current;
-        if (audio) {
-            const setAudioData = () => {
-                if (isFinite(audio.duration)) {
-                    setDuration(audio.duration);
-                    if(onCanPlay) onCanPlay(audio.duration);
-                }
-                setCurrentTime(audio.currentTime);
-                setIsLoading(false);
-            }
-            const setAudioTime = () => setCurrentTime(audio.currentTime);
+      audio.addEventListener('loadeddata', setAudioData);
+      audio.addEventListener('timeupdate', setAudioTime);
+      audio.addEventListener('ended', () => setIsPlaying(false));
+      audio.addEventListener('canplaythrough', () => {
+        setIsLoading(false);
+        setAudioData();
+      });
 
-            audio.addEventListener('loadeddata', setAudioData);
-            audio.addEventListener('timeupdate', setAudioTime);
-            audio.addEventListener('ended', () => setIsPlaying(false));
-            audio.addEventListener('canplaythrough', () => {
-                setIsLoading(false);
-                setAudioData();
-            });
+      if (audio.readyState >= 2) {
+        setAudioData();
+      }
 
-            if (audio.readyState >= 2) {
-              setAudioData();
-            }
+      return () => {
+        audio.removeEventListener('loadeddata', setAudioData);
+        audio.removeEventListener('timeupdate', setAudioTime);
+        audio.removeEventListener('ended', () => setIsPlaying(false));
+        audio.removeEventListener('canplaythrough', () => {
+          setIsLoading(false);
+          setAudioData();
+        });
+      }
+    }
+  }, [src, onCanPlay]);
 
-            return () => {
-                audio.removeEventListener('loadeddata', setAudioData);
-                audio.removeEventListener('timeupdate', setAudioTime);
-                audio.removeEventListener('ended', () => setIsPlaying(false));
-                audio.removeEventListener('canplaythrough', () => {
-                    setIsLoading(false);
-                    setAudioData();
-                });
-            }
-        }
-    }, [src, onCanPlay]);
+  const formatTime = (time) => {
+    if (isNaN(time) || time === Infinity) return "0:00";
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
 
-    const formatTime = (time) => {
-        if (isNaN(time) || time === Infinity) return "0:00";
-        const minutes = Math.floor(time / 60);
-        const seconds = Math.floor(time % 60);
-        return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-    };
-
-    return (
-        <div className="flex items-center gap-2 bg-gray-200 rounded-full p-2 mt-2">
-            <audio ref={audioRef} src={src} preload="metadata"></audio>
-            <Button onClick={togglePlayPause} size="icon" className="rounded-full w-8 h-8" disabled={isLoading}>
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : (isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />)}
-            </Button>
-            <div className="w-full bg-gray-300 rounded-full h-1.5">
-                <div
-                    className="bg-blue-500 h-1.5 rounded-full"
-                    style={{ width: `${(currentTime / duration) * 100 || 0}%` }}
-                ></div>
-            </div>
-            <span className="text-xs text-gray-600 w-20 text-center">{formatTime(currentTime)} / {formatTime(duration)}</span>
-        </div>
-    );
+  return (
+    <div className="flex items-center gap-2 bg-gray-200 rounded-full p-2 mt-2">
+      <audio ref={audioRef} src={src} preload="metadata"></audio>
+      <Button onClick={togglePlayPause} size="icon" className="rounded-full w-8 h-8" disabled={isLoading}>
+        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />)}
+      </Button>
+      <div className="w-full bg-gray-300 rounded-full h-1.5">
+        <div
+          className="bg-blue-500 h-1.5 rounded-full"
+          style={{ width: `${(currentTime / duration) * 100 || 0}%` }}
+        ></div>
+      </div>
+      <span className="text-xs text-gray-600 w-20 text-center">{formatTime(currentTime)} / {formatTime(duration)}</span>
+    </div>
+  );
 };
 
 const CreatePost = ({ onPublished }) => {
@@ -98,7 +98,7 @@ const CreatePost = ({ onPublished }) => {
   const [mediaPreviewUrl, setMediaPreviewUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const mediaInputRef = useRef(null);
-  
+
   const [recording, setRecording] = useState(false);
   const [recorder, setRecorder] = useState(null);
   const chunksRef = useRef([]);
@@ -122,16 +122,16 @@ const CreatePost = ({ onPublished }) => {
 
     const selection = window.getSelection();
     if (selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        const textBeforeCursor = range.startContainer.textContent.substring(0, range.startOffset);
-        const mentionMatch = textBeforeCursor.match(/@(\w+)$/);
-        
-        if (mentionMatch) {
-            setMentionQuery(mentionMatch[1]);
-            setShowSuggestions(true);
-        } else {
-            setShowSuggestions(false);
-        }
+      const range = selection.getRangeAt(0);
+      const textBeforeCursor = range.startContainer.textContent.substring(0, range.startOffset);
+      const mentionMatch = textBeforeCursor.match(/@(\w+)$/);
+
+      if (mentionMatch) {
+        setMentionQuery(mentionMatch[1]);
+        setShowSuggestions(true);
+      } else {
+        setShowSuggestions(false);
+      }
     }
   };
 
@@ -164,7 +164,7 @@ const CreatePost = ({ onPublished }) => {
         .select("username")
         .eq("username", username)
         .maybeSingle();
-      
+
       if (data) {
         handleMentionSelect(username, true);
       } else {
@@ -249,15 +249,15 @@ const CreatePost = ({ onPublished }) => {
     let match;
     const mentions = [];
     while ((match = mentionRegex.exec(text)) !== null) {
-        mentions.push(match[1]);
+      mentions.push(match[1]);
     }
 
     if (mentions.length === 0) return;
 
     const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('username')
-        .in('username', mentions);
+      .from('profiles')
+      .select('username')
+      .in('username', mentions);
 
     if (error || !profiles) return;
 
@@ -265,13 +265,13 @@ const CreatePost = ({ onPublished }) => {
     let newHtml = div.innerHTML;
 
     validUsernames.forEach(username => {
-        const regex = new RegExp(`@${username}(?!</span>)`, 'g');
-        newHtml = newHtml.replace(regex, `<span class="mention" contenteditable="false">@${username}</span>`);
+      const regex = new RegExp(`@${username}(?!</span>)`, 'g');
+      newHtml = newHtml.replace(regex, `<span class="mention" contenteditable="false">@${username}</span>`);
     });
 
     if (newHtml !== div.innerHTML) {
-        div.innerHTML = newHtml;
-        setPostText(div.innerText);
+      div.innerHTML = newHtml;
+      setPostText(div.innerText);
     }
   };
 
@@ -328,7 +328,7 @@ const CreatePost = ({ onPublished }) => {
       } catch (e) {
         console.warn("AudioContext init échouée", e);
       }
-      
+
       let resolveRecording;
       const recordingDone = new Promise((resolve) => (resolveRecording = resolve));
       recorderPromiseRef.current = recordingDone;
@@ -382,8 +382,8 @@ const CreatePost = ({ onPublished }) => {
       // Petit délai pour fiabiliser sur mobile (initialisation des pistes)
       await new Promise((r) => setTimeout(r, 300));
 
-      // Démarre sans timeslice pour éviter les chunks vides sur iOS/Android
-      mediaRecorder.start();
+      // ✅ IMPORTANT : timeslice=1000 pour forcer génération chunks sur mobile
+      mediaRecorder.start(1000);
 
       setRecording(true);
       setRecorder(mediaRecorder);
@@ -411,7 +411,7 @@ const CreatePost = ({ onPublished }) => {
       recorder.requestData?.();
       setTimeout(() => {
         if (recorder && recorder.state !== "inactive") {
-            recorder.stop();
+          recorder.stop();
         }
       }, 300);
     }
@@ -434,12 +434,12 @@ const CreatePost = ({ onPublished }) => {
       mediaInputRef.current.value = '';
     }
   };
-  
-    const handleRemoveAudio = () => {
-        setAudioBlob(null);
-        setAudioDuration(0);
-        recorderPromiseRef.current = null;
-    };
+
+  const handleRemoveAudio = () => {
+    setAudioBlob(null);
+    setAudioDuration(0);
+    recorderPromiseRef.current = null;
+  };
 
   const uploadToBunny = async (file, folder) => {
     const formData = new FormData();
@@ -486,7 +486,7 @@ const CreatePost = ({ onPublished }) => {
       toast({ title: 'Erreur', description: 'Vous devez être connecté pour publier.', variant: 'destructive' });
       return;
     }
-    
+
     if (recording) {
       toast({ title: "Patientez", description: "L’audio est encore en cours de traitement...", variant: "default" });
       return;
@@ -501,83 +501,83 @@ const CreatePost = ({ onPublished }) => {
       }
 
       if (finalAudioBlob) {
-          if (!finalAudioBlob || finalAudioBlob.size < 2000) {
-              toast({ title: 'Erreur audio', description: "L’audio semble vide ou trop court. Réessayez.", variant: 'destructive' });
-              setLoading(false);
-              return;
-          }
+        if (!finalAudioBlob || finalAudioBlob.size < 2000) {
+          toast({ title: 'Erreur audio', description: "L’audio semble vide ou trop court. Réessayez.", variant: 'destructive' });
+          setLoading(false);
+          return;
+        }
 
-          const { ext } = mimeRef.current;
-          const audioFile = new File([finalAudioBlob], `audio-${Date.now()}.${ext}`, { type: finalAudioBlob.type });
-          const { publicUrl: audioUrl } = await uploadAudioFile(audioFile, 'comments_audio');
+        const { ext } = mimeRef.current;
+        const audioFile = new File([finalAudioBlob], `audio-${Date.now()}.${ext}`, { type: finalAudioBlob.type });
+        const { publicUrl: audioUrl } = await uploadAudioFile(audioFile, 'comments_audio');
 
-          const normalizedDuration = Math.max(1, Math.round(audioDuration || recordingTime || 1));
-          const { data: insertedComment, error: insertError } = await supabase
-            .from("comments")
-            .insert({
-              type: "audio",
-              audio_url: audioUrl,
-              user_id: user?.id,
-              content_type: "echange",
-              content: currentPostText || "",
-              created_at: new Date(),
-              audio_duration: normalizedDuration,
-            })
-            .select()
-            .single();
-          if (insertError) throw insertError;
+        const normalizedDuration = Math.max(1, Math.round(audioDuration || recordingTime || 1));
+        const { data: insertedComment, error: insertError } = await supabase
+          .from("comments")
+          .insert({
+            type: "audio",
+            audio_url: audioUrl,
+            user_id: user?.id,
+            content_type: "echange",
+            content: currentPostText || "",
+            created_at: new Date(),
+            audio_duration: normalizedDuration,
+          })
+          .select()
+          .single();
+        if (insertError) throw insertError;
 
-          if (mentionProfiles.length) {
-            try {
-              await notifyMentions({
-                mentionedUserIds: mentionProfiles.map((m) => m.id),
-                authorName: profile?.username || user?.email || 'Un membre OneKamer',
-                excerpt: currentPostText,
-                postId: insertedComment?.id,
-              });
-            } catch (notificationError) {
-              console.error('Erreur notification OneSignal (commentaire audio):', notificationError);
-            }
+        if (mentionProfiles.length) {
+          try {
+            await notifyMentions({
+              mentionedUserIds: mentionProfiles.map((m) => m.id),
+              authorName: profile?.username || user?.email || 'Un membre OneKamer',
+              excerpt: currentPostText,
+              postId: insertedComment?.id,
+            });
+          } catch (notificationError) {
+            console.error('Erreur notification OneSignal (commentaire audio):', notificationError);
           }
-          try { onPublished && onPublished({ kind: 'audio_post', item: insertedComment }); } catch (_) {}
-      } else { 
-          let postData = {
-            user_id: user.id,
-            content: currentPostText,
-            likes_count: 0,
-            comments_count: 0,
-          };
-          
-          if (mediaFile) {
-            const mediaUrl = await uploadToBunny(mediaFile, "posts");
-            const mediaType = mediaFile.type.startsWith('image') ? 'image' : 'video';
-            if (mediaType === 'image') {
-              postData.image_url = mediaUrl;
-            } else {
-              postData.video_url = mediaUrl;
-            }
-          }
-          
-          const { data: insertedPost, error: insertError } = await supabase
-            .from('posts')
-            .insert([postData])
-            .select()
-            .single();
-          if (insertError) throw insertError;
+        }
+        try { onPublished && onPublished({ kind: 'audio_post', item: insertedComment }); } catch (_) { }
+      } else {
+        let postData = {
+          user_id: user.id,
+          content: currentPostText,
+          likes_count: 0,
+          comments_count: 0,
+        };
 
-          if (insertedPost && mentionProfiles.length) {
-            try {
-              await notifyMentions({
-                mentionedUserIds: mentionProfiles.map((m) => m.id),
-                authorName: profile?.username || user?.email || 'Un membre OneKamer',
-                excerpt: currentPostText,
-                postId: insertedPost.id,
-              });
-            } catch (notificationError) {
-              console.error('Erreur notification OneSignal (mentions):', notificationError);
-            }
+        if (mediaFile) {
+          const mediaUrl = await uploadToBunny(mediaFile, "posts");
+          const mediaType = mediaFile.type.startsWith('image') ? 'image' : 'video';
+          if (mediaType === 'image') {
+            postData.image_url = mediaUrl;
+          } else {
+            postData.video_url = mediaUrl;
           }
-          try { onPublished && onPublished({ kind: 'post', item: insertedPost }); } catch (_) {}
+        }
+
+        const { data: insertedPost, error: insertError } = await supabase
+          .from('posts')
+          .insert([postData])
+          .select()
+          .single();
+        if (insertError) throw insertError;
+
+        if (insertedPost && mentionProfiles.length) {
+          try {
+            await notifyMentions({
+              mentionedUserIds: mentionProfiles.map((m) => m.id),
+              authorName: profile?.username || user?.email || 'Un membre OneKamer',
+              excerpt: currentPostText,
+              postId: insertedPost.id,
+            });
+          } catch (notificationError) {
+            console.error('Erreur notification OneSignal (mentions):', notificationError);
+          }
+        }
+        try { onPublished && onPublished({ kind: 'post', item: insertedPost }); } catch (_) { }
       }
 
       toast({
@@ -586,10 +586,10 @@ const CreatePost = ({ onPublished }) => {
       });
 
       setPostText('');
-      if(editableDivRef.current) editableDivRef.current.innerHTML = '';
+      if (editableDivRef.current) editableDivRef.current.innerHTML = '';
       handleRemoveMedia();
       handleRemoveAudio();
-      try { onPublished && onPublished({ kind: 'refresh' }); } catch (_) {}
+      try { onPublished && onPublished({ kind: 'refresh' }); } catch (_) { }
     } catch (error) {
       console.error('Erreur de publication :', error.message);
       toast({
@@ -601,7 +601,7 @@ const CreatePost = ({ onPublished }) => {
       setLoading(false);
     }
   };
-  
+
   const MentionSuggestions = () => (
     showSuggestions && suggestions.length > 0 && (
       <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-48 overflow-y-auto">
@@ -633,11 +633,10 @@ const CreatePost = ({ onPublished }) => {
             onKeyDown={handleKeyDown}
             onBlur={highlightExistingMentions}
             className="editable"
-            data-placeholder={`${
-                profile?.username
+            data-placeholder={`${profile?.username
                 ? `Quoi de neuf, ${profile.username} ? Mentionnez un membre avec @`
                 : 'Quoi de neuf ? Mentionnez un membre avec @'
-            }`}
+              }`}
           />
           <MentionSuggestions />
         </div>
@@ -667,77 +666,77 @@ const CreatePost = ({ onPublished }) => {
             </Button>
           </div>
         )}
-        
-        {audioBlob && !recording && (
-             <div className="relative p-2 bg-gray-100 rounded-lg mb-3">
-                <AudioPlayer src={URL.createObjectURL(audioBlob)} onCanPlay={(d) => setAudioDuration(d)} />
-                <Button size="icon" variant="destructive" onClick={handleRemoveAudio} className="absolute -top-1 -right-1 h-5 w-5 rounded-full">
-                    <X className="h-3 w-3" />
-                </Button>
-            </div>
-        )}
-        
-        <div className="flex justify-between items-center mt-2">
-            <div className="flex items-center gap-2">
-               {!recording && !audioBlob && (
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => mediaInputRef.current?.click()}
-                    disabled={loading}
-                >
-                    📎 Ajouter média
-                </Button>
-               )}
-                <input
-                    id="mediaInput"
-                    ref={mediaInputRef}
-                    type="file"
-                    accept="image/*,video/*"
-                    className="hidden"
-                    onChange={handleFileChange}
-                    disabled={recording || !!audioBlob}
-                />
-                
-                {!mediaFile && (
-                  !recording ? (
-                    <Button
-                      onClick={startRecording}
-                      disabled={loading || !!audioBlob}
-                      size="sm"
-                      variant="ghost"
-                    >
-                      <Mic className="h-4 w-4 mr-2" /> Démarrer
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={stopRecording}
-                      variant="destructive"
-                      size="sm"
-                    >
-                      <Square className="h-4 w-4 mr-2" /> Arrêter
-                    </Button>
-                  )
-                )}
-                {recording && (
-                  <div className="ml-2 flex items-center gap-2 text-red-600">
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                    <span className="font-mono text-sm">
-                      {String(Math.floor(recordingTime / 60)).padStart(1,"0")}:
-                      {String(recordingTime % 60).padStart(2,"0")}
-                    </span>
-                  </div>
-                )}
-            </div>
 
-            <Button
-              onClick={handlePublish}
-              disabled={loading || (!editableDivRef.current?.innerText.trim() && !mediaFile && !audioBlob && !recorderPromiseRef.current) || recording}
-              className="bg-gradient-to-r from-[#2BA84A] to-[#F5C300] text-white font-bold"
-            >
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Publier
+        {audioBlob && !recording && (
+          <div className="relative p-2 bg-gray-100 rounded-lg mb-3">
+            <AudioPlayer src={URL.createObjectURL(audioBlob)} onCanPlay={(d) => setAudioDuration(d)} />
+            <Button size="icon" variant="destructive" onClick={handleRemoveAudio} className="absolute -top-1 -right-1 h-5 w-5 rounded-full">
+              <X className="h-3 w-3" />
             </Button>
+          </div>
+        )}
+
+        <div className="flex justify-between items-center mt-2">
+          <div className="flex items-center gap-2">
+            {!recording && !audioBlob && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => mediaInputRef.current?.click()}
+                disabled={loading}
+              >
+                📎 Ajouter média
+              </Button>
+            )}
+            <input
+              id="mediaInput"
+              ref={mediaInputRef}
+              type="file"
+              accept="image/*,video/*"
+              className="hidden"
+              onChange={handleFileChange}
+              disabled={recording || !!audioBlob}
+            />
+
+            {!mediaFile && (
+              !recording ? (
+                <Button
+                  onClick={startRecording}
+                  disabled={loading || !!audioBlob}
+                  size="sm"
+                  variant="ghost"
+                >
+                  <Mic className="h-4 w-4 mr-2" /> Démarrer
+                </Button>
+              ) : (
+                <Button
+                  onClick={stopRecording}
+                  variant="destructive"
+                  size="sm"
+                >
+                  <Square className="h-4 w-4 mr-2" /> Arrêter
+                </Button>
+              )
+            )}
+            {recording && (
+              <div className="ml-2 flex items-center gap-2 text-red-600">
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="font-mono text-sm">
+                  {String(Math.floor(recordingTime / 60)).padStart(1, "0")}:
+                  {String(recordingTime % 60).padStart(2, "0")}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <Button
+            onClick={handlePublish}
+            disabled={loading || (!editableDivRef.current?.innerText.trim() && !mediaFile && !audioBlob && !recorderPromiseRef.current) || recording}
+            className="bg-gradient-to-r from-[#2BA84A] to-[#F5C300] text-white font-bold"
+          >
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Publier
+          </Button>
         </div>
 
       </CardContent>
