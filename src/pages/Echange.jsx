@@ -411,27 +411,22 @@ const CommentSection = ({ postId }) => {
     const pickSupportedMime = useCallback(() => {
   const ua = navigator.userAgent.toLowerCase();
 
-  // ✅ iOS / Safari ou PWA iPhone
-  if (ua.includes("iphone") || ua.includes("ipad") || ua.includes("safari")) {
+  // ✅ iOS / Safari ou PWA iPhone -> MP4 obligatoire
+  if (ua.includes("iphone") || ua.includes("ipad") || (ua.includes("safari") && !ua.includes("chrome"))) {
     return { type: "audio/mp4;codecs=mp4a.40.2", ext: "m4a" };
   }
 
-  // ✅ Android (Chrome / Edge / PWA)
-  if (ua.includes("android")) {
-    return { type: "audio/mp4;codecs=mp4a.40.2", ext: "m4a" };
-  }
-
-  // ✅ Desktop (Chrome / Edge)
+  // ✅ Android / Chrome / Desktop -> WebM (Opus) préféré
   if (window.MediaRecorder?.isTypeSupported("audio/webm;codecs=opus")) {
     return { type: "audio/webm;codecs=opus", ext: "webm" };
   }
 
-  // ✅ Desktop (Firefox)
+  // ✅ Fallback OGG
   if (window.MediaRecorder?.isTypeSupported("audio/ogg;codecs=opus")) {
     return { type: "audio/ogg;codecs=opus", ext: "ogg" };
   }
 
-  // 🔙 Fallback universel
+  // 🔙 Fallback ultime
   return { type: "audio/mp4;codecs=mp4a.40.2", ext: "m4a" };
 }, []);
 
@@ -514,8 +509,8 @@ const CommentSection = ({ postId }) => {
     // ⚡ Fix mobile : attendre un court délai avant démarrage
     await new Promise((r) => setTimeout(r, 300));
 
-    // ✅ Important : pas de timeslice ici (start sans paramètre)
-    recorder.start();
+    // ✅ Important : timeslice de 1000ms pour garantir la stabilité sur mobile
+    recorder.start(1000);
     console.log("⏺️ Enregistrement démarré avec format :", supportedMimeType);
 
     mediaRecorderRef.current = recorder;
