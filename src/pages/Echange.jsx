@@ -37,7 +37,7 @@ const parseMentions = (text) => {
   if (!text) return '';
   const mentionRegex = /@(\w+)/g;
   const parts = text.split(mentionRegex);
-  
+
   return parts.map((part, index) => {
     if (index % 2 === 1) { // It's a username
       return <span key={index} className="mention">@{part}</span>;
@@ -159,99 +159,99 @@ const DonationDialog = ({ post, user, profile, refreshBalance, children }) => {
 };
 
 const AudioPlayer = ({ src, initialDuration = 0 }) => {
-    const audioRef = useRef(null);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [duration, setDuration] = useState(initialDuration);
-    const [currentTime, setCurrentTime] = useState(0);
-    const [isLoading, setIsLoading] = useState(true);
+  const audioRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(initialDuration);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
-    const togglePlayPause = () => {
-        if (audioRef.current) {
-            if (isPlaying) {
-                audioRef.current.pause();
-            } else {
-                audioRef.current.play();
-            }
-            setIsPlaying(!isPlaying);
+  const togglePlayPause = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      const setAudioData = () => {
+        if (isFinite(audio.duration)) {
+          setDuration(audio.duration);
         }
-    };
+        setCurrentTime(audio.currentTime);
+        setIsLoading(false);
+      }
+      const setAudioTime = () => setCurrentTime(audio.currentTime);
 
-    useEffect(() => {
-        const audio = audioRef.current;
-        if (audio) {
-            const setAudioData = () => {
-                if (isFinite(audio.duration)) {
-                    setDuration(audio.duration);
-                }
-                setCurrentTime(audio.currentTime);
-                setIsLoading(false);
-            }
-            const setAudioTime = () => setCurrentTime(audio.currentTime);
+      audio.addEventListener('loadeddata', setAudioData);
+      audio.addEventListener('timeupdate', setAudioTime);
+      audio.addEventListener('ended', () => setIsPlaying(false));
+      audio.addEventListener('canplaythrough', () => setIsLoading(false));
 
-            audio.addEventListener('loadeddata', setAudioData);
-            audio.addEventListener('timeupdate', setAudioTime);
-            audio.addEventListener('ended', () => setIsPlaying(false));
-            audio.addEventListener('canplaythrough', () => setIsLoading(false));
-            
-            if (audio.readyState >= 2) {
-                setAudioData();
-            }
+      if (audio.readyState >= 2) {
+        setAudioData();
+      }
 
-            return () => {
-                audio.removeEventListener('loadeddata', setAudioData);
-                audio.removeEventListener('timeupdate', setAudioTime);
-                audio.removeEventListener('ended', () => setIsPlaying(false));
-                audio.removeEventListener('canplaythrough', () => setIsLoading(false));
-            }
-        }
-    }, [src]);
+      return () => {
+        audio.removeEventListener('loadeddata', setAudioData);
+        audio.removeEventListener('timeupdate', setAudioTime);
+        audio.removeEventListener('ended', () => setIsPlaying(false));
+        audio.removeEventListener('canplaythrough', () => setIsLoading(false));
+      }
+    }
+  }, [src]);
 
-    const formatTime = (time) => {
-        if (isNaN(time) || time === Infinity) return "0:00";
-        const minutes = Math.floor(time / 60);
-        const seconds = Math.floor(time % 60);
-        return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-    };
+  const formatTime = (time) => {
+    if (isNaN(time) || time === Infinity) return "0:00";
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
 
-    const displayDuration = duration > 0 ? duration : initialDuration;
+  const displayDuration = duration > 0 ? duration : initialDuration;
 
-    return (
-        <div className="flex items-center gap-2 bg-gray-200 rounded-full p-2 mt-2">
-            <audio ref={audioRef} src={src} preload="metadata"></audio>
-            <Button onClick={togglePlayPause} size="icon" className="rounded-full w-8 h-8" disabled={isLoading}>
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />)}
-            </Button>
-            <div className="w-full bg-gray-300 rounded-full h-1.5">
-                <div
-                    className="bg-blue-500 h-1.5 rounded-full"
-                    style={{ width: `${(currentTime / displayDuration) * 100 || 0}%` }}
-                ></div>
-            </div>
-            <span className="text-xs text-gray-600 w-20 text-center">{formatTime(currentTime)} / {formatTime(displayDuration)}</span>
-        </div>
-    );
+  return (
+    <div className="flex items-center gap-2 bg-gray-200 rounded-full p-2 mt-2">
+      <audio ref={audioRef} src={src} preload="metadata"></audio>
+      <Button onClick={togglePlayPause} size="icon" className="rounded-full w-8 h-8" disabled={isLoading}>
+        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />)}
+      </Button>
+      <div className="w-full bg-gray-300 rounded-full h-1.5">
+        <div
+          className="bg-blue-500 h-1.5 rounded-full"
+          style={{ width: `${(currentTime / displayDuration) * 100 || 0}%` }}
+        ></div>
+      </div>
+      <span className="text-xs text-gray-600 w-20 text-center">{formatTime(currentTime)} / {formatTime(displayDuration)}</span>
+    </div>
+  );
 };
 
 const CommentMedia = ({ url, type }) => {
-    if (!url) return null;
+  if (!url) return null;
 
-    if (type && type.startsWith('image')) {
-        return (
-            <img
-                src={url}
-                alt="Comment media"
-                className="rounded-lg max-h-40 mt-2"
-                onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = "https://onekamer-media-cdn.b-cdn.net/posts/default_post_image.png";
-                }}
-            />
-        );
-    }
-    if (type && type.startsWith('video')) {
-        return <video src={url} controls className="rounded-lg max-h-40 mt-2" />;
-    }
-    return null; // Audio is handled separately
+  if (type && type.startsWith('image')) {
+    return (
+      <img
+        src={url}
+        alt="Comment media"
+        className="rounded-lg max-h-40 mt-2"
+        onError={(e) => {
+          e.currentTarget.onerror = null;
+          e.currentTarget.src = "https://onekamer-media-cdn.b-cdn.net/posts/default_post_image.png";
+        }}
+      />
+    );
+  }
+  if (type && type.startsWith('video')) {
+    return <video src={url} controls className="rounded-lg max-h-40 mt-2" />;
+  }
+  return null; // Audio is handled separately
 };
 
 const CommentAvatar = ({ avatarPath, username }) => {
@@ -359,7 +359,7 @@ const CommentSection = ({ postId }) => {
 
   useEffect(() => {
     fetchComments();
-  
+
     const channel = supabase
       .channel(`comments-post-${postId}`)
       .on(
@@ -378,11 +378,11 @@ const CommentSection = ({ postId }) => {
             .single();
 
           if (!profileError) {
-              const resolved = normalizeAudioEntry({ ...payload.new, author: profileData });
-              setComments((prev) => [...prev, resolved]);
+            const resolved = normalizeAudioEntry({ ...payload.new, author: profileData });
+            setComments((prev) => [...prev, resolved]);
           } else {
-              const resolved = normalizeAudioEntry({ ...payload.new, author: { username: 'Anonyme', avatar_url: null } });
-              setComments((prev) => [...prev, resolved]);
+            const resolved = normalizeAudioEntry({ ...payload.new, author: { username: 'Anonyme', avatar_url: null } });
+            setComments((prev) => [...prev, resolved]);
           }
         }
       )
@@ -392,198 +392,198 @@ const CommentSection = ({ postId }) => {
       supabase.removeChannel(channel);
     };
   }, [postId, fetchComments]);
-  
+
   const handleRemoveMedia = () => {
     setMediaFile(null);
     setMediaPreviewUrl(null);
     if (mediaInputRef.current) mediaInputRef.current.value = "";
   };
-  
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
-    if(file){
+    if (file) {
       setMediaFile(file);
       setMediaPreviewUrl(URL.createObjectURL(file));
       setAudioBlob(null);
     }
   }
-  
-    const pickSupportedMime = useCallback(() => {
-  const ua = navigator.userAgent.toLowerCase();
 
-  // ✅ iOS / Safari ou PWA iPhone -> MP4 obligatoire
-  if (ua.includes("iphone") || ua.includes("ipad") || (ua.includes("safari") && !ua.includes("chrome"))) {
+  const pickSupportedMime = useCallback(() => {
+    const ua = navigator.userAgent.toLowerCase();
+
+    // ✅ iOS / Safari ou PWA iPhone -> MP4 obligatoire
+    if (ua.includes("iphone") || ua.includes("ipad") || (ua.includes("safari") && !ua.includes("chrome"))) {
+      return { type: "audio/mp4;codecs=mp4a.40.2", ext: "m4a" };
+    }
+
+    // ✅ Android / Chrome / Desktop -> WebM (Opus) préféré
+    if (window.MediaRecorder?.isTypeSupported("audio/webm;codecs=opus")) {
+      return { type: "audio/webm;codecs=opus", ext: "webm" };
+    }
+
+    // ✅ Fallback OGG
+    if (window.MediaRecorder?.isTypeSupported("audio/ogg;codecs=opus")) {
+      return { type: "audio/ogg;codecs=opus", ext: "ogg" };
+    }
+
+    // 🔙 Fallback ultime
     return { type: "audio/mp4;codecs=mp4a.40.2", ext: "m4a" };
+  }, []);
+
+  const startRecording = async () => {
+    try {
+      console.log("🎙️ Initialisation de l'enregistrement...");
+      setAudioBlob(null);
+      setRecordingTime(0);
+      lastRecordingTimeRef.current = 0;
+      recordedDurationRef.current = 0;
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log("✅ Micro autorisé :", stream.getAudioTracks().length, "piste(s)");
+
+      const chosenMime = pickSupportedMime();
+      mimeRef.current = chosenMime;
+
+      let resolveRecording;
+      const recordingDone = new Promise(resolve => (resolveRecording = resolve));
+      recorderPromiseRef.current = recordingDone;
+
+      const supportedMimeType = MediaRecorder.isTypeSupported(chosenMime.type)
+        ? chosenMime.type
+        : "audio/mp4";
+
+      console.log("🎚️ Type MIME utilisé :", supportedMimeType);
+
+      const recorder = new MediaRecorder(stream, { mimeType: supportedMimeType });
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        } else {
+          console.warn("⚠️ Chunk vide détecté !");
+        }
+      };
+
+      recorder.onerror = (event) => {
+        console.error("❌ Erreur MediaRecorder :", event.error || event);
+        toast({
+          title: "Erreur d'enregistrement",
+          description: "Une erreur est survenue pendant la capture audio.",
+          variant: "destructive",
+        });
+        resolveRecording?.(null);
+        recorderPromiseRef.current = null;
+      };
+
+      recorder.onstop = async () => {
+        console.log("🛑 Enregistrement terminé, création du blob...");
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+        stream.getTracks().forEach((t) => t.stop());
+
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: supportedMimeType.split(";")[0],
+        });
+        console.log("💾 Taille finale du blob :", audioBlob.size, "octets");
+
+        const fallbackDuration = Math.max(1, lastRecordingTimeRef.current || recordingTime);
+        const measuredDuration = await getBlobDuration(audioBlob, fallbackDuration);
+        const normalizedDuration = Math.max(1, Math.round(measuredDuration || fallbackDuration));
+        console.log("⏱️ Durée mesurée :", normalizedDuration, "sec");
+
+        setRecordingTime(normalizedDuration);
+        recordedDurationRef.current = normalizedDuration;
+        lastRecordingTimeRef.current = normalizedDuration;
+        setAudioBlob(audioBlob);
+        setMediaFile(null);
+        setMediaPreviewUrl(null);
+        setIsRecording(false);
+        mediaRecorderRef.current = null;
+        resolveRecording(audioBlob);
+        recorderPromiseRef.current = Promise.resolve(audioBlob);
+      };
+
+      // ⚡ Fix mobile : attendre un court délai avant démarrage
+      await new Promise((r) => setTimeout(r, 300));
+
+      // ✅ Important : pas de timeslice pour éviter les problèmes de métadonnées (loading infini)
+      recorder.start();
+      console.log("⏺️ Enregistrement démarré avec format :", supportedMimeType);
+
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime((prev) => {
+          const next = prev + 1;
+          lastRecordingTimeRef.current = next;
+          return next;
+        });
+      }, 1000);
+
+      // ⏹️ Auto-stop après 120 secondes
+      setTimeout(() => {
+        if (recorder.state !== "inactive") {
+          console.log("⏹️ Arrêt automatique après 120s.");
+          recorder.stop();
+        }
+      }, 120000);
+    } catch (error) {
+      console.error("❌ Erreur d'accès micro :", error);
+      toast({
+        title: "Erreur microphone",
+        description: "Veuillez autoriser le micro dans votre navigateur.",
+        variant: "destructive",
+      });
+      recorderPromiseRef.current = null;
+      recordedDurationRef.current = 0;
+    }
+  };
+
+  const stopRecording = () => {
+    console.log("🧭 Arrêt manuel de l'enregistrement...");
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      try {
+        // Demande le dernier chunk avant de stopper
+        mediaRecorderRef.current.requestData?.();
+
+        setTimeout(() => {
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+            console.log("⏹️ Enregistrement stoppé par l'utilisateur.");
+            mediaRecorderRef.current.stop();
+          }
+        }, 500); // petit délai pour laisser le dernier fragment audio arriver
+      } catch (error) {
+        console.error("❌ Erreur à l'arrêt de l'enregistrement :", error);
+      } finally {
+        // Nettoyage du timer de durée
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+    } else {
+      console.warn("⚠️ Aucun enregistrement actif à arrêter.");
+    }
+  };
+
+
+  const formatRecordingTime = (time) => {
+    const minutes = Math.floor(time / 60);
+    const seconds = time % 60;
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   }
 
-  // ✅ Android / Chrome / Desktop -> WebM (Opus) préféré
-  if (window.MediaRecorder?.isTypeSupported("audio/webm;codecs=opus")) {
-    return { type: "audio/webm;codecs=opus", ext: "webm" };
-  }
-
-  // ✅ Fallback OGG
-  if (window.MediaRecorder?.isTypeSupported("audio/ogg;codecs=opus")) {
-    return { type: "audio/ogg;codecs=opus", ext: "ogg" };
-  }
-
-  // 🔙 Fallback ultime
-  return { type: "audio/mp4;codecs=mp4a.40.2", ext: "m4a" };
-}, []);
-
-    const startRecording = async () => {
-  try {
-    console.log("🎙️ Initialisation de l'enregistrement...");
+  const handleRemoveAudio = () => {
     setAudioBlob(null);
     setRecordingTime(0);
     lastRecordingTimeRef.current = 0;
     recordedDurationRef.current = 0;
-
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    console.log("✅ Micro autorisé :", stream.getAudioTracks().length, "piste(s)");
-
-    const chosenMime = pickSupportedMime();
-    mimeRef.current = chosenMime;
-
-    let resolveRecording;
-    const recordingDone = new Promise(resolve => (resolveRecording = resolve));
-    recorderPromiseRef.current = recordingDone;
-
-    const supportedMimeType = MediaRecorder.isTypeSupported(chosenMime.type)
-      ? chosenMime.type
-      : "audio/mp4";
-
-    console.log("🎚️ Type MIME utilisé :", supportedMimeType);
-
-    const recorder = new MediaRecorder(stream, { mimeType: supportedMimeType });
-    audioChunksRef.current = [];
-
-    recorder.ondataavailable = (event) => {
-      if (event.data && event.data.size > 0) {
-        audioChunksRef.current.push(event.data);
-      } else {
-        console.warn("⚠️ Chunk vide détecté !");
-      }
-    };
-
-    recorder.onerror = (event) => {
-      console.error("❌ Erreur MediaRecorder :", event.error || event);
-      toast({
-        title: "Erreur d'enregistrement",
-        description: "Une erreur est survenue pendant la capture audio.",
-        variant: "destructive",
-      });
-      resolveRecording?.(null);
-      recorderPromiseRef.current = null;
-    };
-
-    recorder.onstop = async () => {
-      console.log("🛑 Enregistrement terminé, création du blob...");
-      clearInterval(recordingIntervalRef.current);
-      recordingIntervalRef.current = null;
-      stream.getTracks().forEach((t) => t.stop());
-
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      const audioBlob = new Blob(audioChunksRef.current, {
-        type: supportedMimeType.split(";")[0],
-      });
-      console.log("💾 Taille finale du blob :", audioBlob.size, "octets");
-
-      const fallbackDuration = Math.max(1, lastRecordingTimeRef.current || recordingTime);
-      const measuredDuration = await getBlobDuration(audioBlob, fallbackDuration);
-      const normalizedDuration = Math.max(1, Math.round(measuredDuration || fallbackDuration));
-      console.log("⏱️ Durée mesurée :", normalizedDuration, "sec");
-
-      setRecordingTime(normalizedDuration);
-      recordedDurationRef.current = normalizedDuration;
-      lastRecordingTimeRef.current = normalizedDuration;
-      setAudioBlob(audioBlob);
-      setMediaFile(null);
-      setMediaPreviewUrl(null);
-      setIsRecording(false);
-      mediaRecorderRef.current = null;
-      resolveRecording(audioBlob);
-      recorderPromiseRef.current = Promise.resolve(audioBlob);
-    };
-
-    // ⚡ Fix mobile : attendre un court délai avant démarrage
-    await new Promise((r) => setTimeout(r, 300));
-
-    // ✅ Important : timeslice de 1000ms pour garantir la stabilité sur mobile
-    recorder.start(1000);
-    console.log("⏺️ Enregistrement démarré avec format :", supportedMimeType);
-
-    mediaRecorderRef.current = recorder;
-    setIsRecording(true);
-    recordingIntervalRef.current = setInterval(() => {
-      setRecordingTime((prev) => {
-        const next = prev + 1;
-        lastRecordingTimeRef.current = next;
-        return next;
-      });
-    }, 1000);
-
-    // ⏹️ Auto-stop après 120 secondes
-    setTimeout(() => {
-      if (recorder.state !== "inactive") {
-        console.log("⏹️ Arrêt automatique après 120s.");
-        recorder.stop();
-      }
-    }, 120000);
-  } catch (error) {
-    console.error("❌ Erreur d'accès micro :", error);
-    toast({
-      title: "Erreur microphone",
-      description: "Veuillez autoriser le micro dans votre navigateur.",
-      variant: "destructive",
-    });
     recorderPromiseRef.current = null;
-    recordedDurationRef.current = 0;
-  }
-};
+    mimeRef.current = null;
+  };
 
-  const stopRecording = () => {
-  console.log("🧭 Arrêt manuel de l'enregistrement...");
-  
-  if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-    try {
-      // Demande le dernier chunk avant de stopper
-      mediaRecorderRef.current.requestData?.();
-
-      setTimeout(() => {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-          console.log("⏹️ Enregistrement stoppé par l'utilisateur.");
-          mediaRecorderRef.current.stop();
-        }
-      }, 500); // petit délai pour laisser le dernier fragment audio arriver
-    } catch (error) {
-      console.error("❌ Erreur à l'arrêt de l'enregistrement :", error);
-    } finally {
-      // Nettoyage du timer de durée
-      clearInterval(recordingIntervalRef.current);
-      recordingIntervalRef.current = null;
-    }
-  } else {
-    console.warn("⚠️ Aucun enregistrement actif à arrêter.");
-  }
-};
-
-    
-    const formatRecordingTime = (time) => {
-      const minutes = Math.floor(time / 60);
-      const seconds = time % 60;
-      return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-    }
-    
-    const handleRemoveAudio = () => {
-        setAudioBlob(null);
-        setRecordingTime(0);
-        lastRecordingTimeRef.current = 0;
-        recordedDurationRef.current = 0;
-        recorderPromiseRef.current = null;
-        mimeRef.current = null;
-    };
-  
   const uploadToBunny = async (file, folder) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -617,72 +617,72 @@ const CommentSection = ({ postId }) => {
     e.preventDefault();
     if (!newComment.trim() && !mediaFile && !audioBlob) return;
     if (!user) {
-        toast({ title: 'Erreur', description: 'Vous devez être connecté.', variant: 'destructive'});
-        return;
+      toast({ title: 'Erreur', description: 'Vous devez être connecté.', variant: 'destructive' });
+      return;
     }
 
     setIsPostingComment(true);
-    
+
     try {
-        let media_url = null;
-        let media_type = null;
-        let audio_url = null;
-        let audio_duration = null;
-        let type = 'text';
+      let media_url = null;
+      let media_type = null;
+      let audio_url = null;
+      let audio_duration = null;
+      let type = 'text';
 
-        let finalAudioBlob = audioBlob;
-        if (!finalAudioBlob && recorderPromiseRef.current) {
-            finalAudioBlob = await recorderPromiseRef.current;
+      let finalAudioBlob = audioBlob;
+      if (!finalAudioBlob && recorderPromiseRef.current) {
+        finalAudioBlob = await recorderPromiseRef.current;
+      }
+
+      if (mediaFile) {
+        media_url = await uploadToBunny(mediaFile, "comments");
+        media_type = mediaFile.type;
+        type = mediaFile.type.startsWith('image') ? 'image' : 'video';
+      } else if (finalAudioBlob) {
+        const { type: mimeType, ext } = mimeRef.current || { type: finalAudioBlob.type || 'audio/webm', ext: 'webm' };
+        const normalizedType = mimeType.split(";")[0];
+        if (!finalAudioBlob || finalAudioBlob.size < 2000) {
+          toast({ title: 'Erreur audio', description: "L’audio semble vide ou trop court. Réessayez.", variant: 'destructive' });
+          return;
         }
+        const audioFile = new File([finalAudioBlob], `audio-comment-${user.id}-${Date.now()}.${ext}`, { type: normalizedType || 'audio/webm' });
+        const { publicUrl } = await uploadAudioFile(audioFile, 'comments_audio');
+        audio_url = publicUrl;
+        const fallbackDuration = Math.max(1, recordedDurationRef.current || lastRecordingTimeRef.current || recordingTime || 1);
+        const measuredDuration = await getBlobDuration(finalAudioBlob, fallbackDuration);
+        const normalizedDuration = Math.max(1, Math.round(measuredDuration || fallbackDuration));
+        recordedDurationRef.current = normalizedDuration;
+        lastRecordingTimeRef.current = normalizedDuration;
+        setRecordingTime(normalizedDuration);
+        audio_duration = normalizedDuration;
+        recorderPromiseRef.current = null;
+        type = 'audio';
+      }
 
-        if (mediaFile) {
-            media_url = await uploadToBunny(mediaFile, "comments");
-            media_type = mediaFile.type;
-            type = mediaFile.type.startsWith('image') ? 'image' : 'video';
-        } else if (finalAudioBlob) {
-            const { type: mimeType, ext } = mimeRef.current || { type: finalAudioBlob.type || 'audio/webm', ext: 'webm' };
-            const normalizedType = mimeType.split(";")[0];
-            if (!finalAudioBlob || finalAudioBlob.size < 2000) {
-                toast({ title: 'Erreur audio', description: "L’audio semble vide ou trop court. Réessayez.", variant: 'destructive' });
-                return;
-            }
-            const audioFile = new File([finalAudioBlob], `audio-comment-${user.id}-${Date.now()}.${ext}`, { type: normalizedType || 'audio/webm' });
-            const { publicUrl } = await uploadAudioFile(audioFile, 'comments_audio');
-            audio_url = publicUrl;
-            const fallbackDuration = Math.max(1, recordedDurationRef.current || lastRecordingTimeRef.current || recordingTime || 1);
-            const measuredDuration = await getBlobDuration(finalAudioBlob, fallbackDuration);
-            const normalizedDuration = Math.max(1, Math.round(measuredDuration || fallbackDuration));
-            recordedDurationRef.current = normalizedDuration;
-            lastRecordingTimeRef.current = normalizedDuration;
-            setRecordingTime(normalizedDuration);
-            audio_duration = normalizedDuration;
-            recorderPromiseRef.current = null;
-            type = 'audio';
-        }
+      const { error: insertError } = await supabase.from('comments').insert([{
+        content_id: postId,
+        content_type: 'post',
+        user_id: user.id,
+        content: newComment,
+        media_url,
+        media_type,
+        audio_url,
+        audio_duration,
+        type,
+      }]);
 
-        const { error: insertError } = await supabase.from('comments').insert([{
-            content_id: postId,
-            content_type: 'post',
-            user_id: user.id,
-            content: newComment,
-            media_url,
-            media_type,
-            audio_url,
-            audio_duration,
-            type,
-        }]);
+      if (insertError) throw insertError;
 
-        if (insertError) throw insertError;
-        
-        setNewComment('');
-        handleRemoveMedia();
-        handleRemoveAudio();
+      setNewComment('');
+      handleRemoveMedia();
+      handleRemoveAudio();
 
     } catch (error) {
-        console.error('Error posting comment:', error);
-        toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
+      console.error('Error posting comment:', error);
+      toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
     } finally {
-        setIsPostingComment(false);
+      setIsPostingComment(false);
     }
   };
 
@@ -695,7 +695,7 @@ const CommentSection = ({ postId }) => {
       className="overflow-hidden"
     >
       <div className="pt-4 mt-4 border-t border-gray-200">
-        {loadingComments ? <Loader2 className="animate-spin" /> : 
+        {loadingComments ? <Loader2 className="animate-spin" /> :
           comments.length > 0 ? (
             <div className="space-y-3 mb-4">
               {comments.map((comment) => (
@@ -705,7 +705,7 @@ const CommentSection = ({ postId }) => {
                   </div>
                   <div className="bg-gray-100 rounded-lg px-3 py-2 w-full">
                     <p className="text-sm font-semibold cursor-pointer" onClick={() => navigate(`/profil/${comment.author?.id}`)}>{comment.author?.username}</p>
-                    {comment.type === 'audio' ? <AudioPlayer src={comment.audio_url} initialDuration={comment.audio_duration} /> : <p className="text-sm text-gray-700">{parseMentions(comment.content)}</p> }
+                    {comment.type === 'audio' ? <AudioPlayer src={comment.audio_url} initialDuration={comment.audio_duration} /> : <p className="text-sm text-gray-700">{parseMentions(comment.content)}</p>}
                     {comment.media_url && <CommentMedia url={comment.media_url} type={comment.media_type} />}
                   </div>
                 </div>
@@ -715,64 +715,64 @@ const CommentSection = ({ postId }) => {
             <p className="text-sm text-gray-400 italic mb-4">Aucun commentaire pour le moment</p>
           )
         }
-        
+
         <form onSubmit={handleAddComment} className="flex flex-col gap-2">
-            <div className="flex gap-2 items-center">
-                {isRecording ? (
-                    <div className="flex items-center gap-2 w-full bg-gray-100 p-2 rounded-lg">
-                       <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                       <span className="text-sm text-red-500 font-mono">{formatRecordingTime(recordingTime)}</span>
-                    </div>
-                ) : (
-                    <Input
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        placeholder="Écrire un commentaire..."
-                        disabled={isPostingComment || !!audioBlob}
-                    />
-                )}
-                <Button type="submit" size="icon" disabled={isPostingComment || (!newComment.trim() && !mediaFile && !audioBlob)}>
-                    {isPostingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
-            </div>
-            
-            {(mediaPreviewUrl || audioBlob) && (
-                <div className="relative p-2 bg-gray-100 rounded-lg">
-                  {mediaPreviewUrl && mediaFile?.type.startsWith("image") ? (
-                    <img src={mediaPreviewUrl} alt="preview" className="w-24 h-24 rounded object-cover" />
-                  ) : mediaPreviewUrl ? (
-                    <video src={mediaPreviewUrl} controls className="w-full rounded object-cover" />
-                  ) : audioBlob ? (
-                    <AudioPlayer src={URL.createObjectURL(audioBlob)} />
-                  ) : null}
-                  <Button size="icon" variant="destructive" onClick={mediaPreviewUrl ? handleRemoveMedia : handleRemoveAudio} className="absolute -top-1 -right-1 h-5 w-5 rounded-full">
-                      <X className="h-3 w-3" />
-                  </Button>
-                </div>
+          <div className="flex gap-2 items-center">
+            {isRecording ? (
+              <div className="flex items-center gap-2 w-full bg-gray-100 p-2 rounded-lg">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                <span className="text-sm text-red-500 font-mono">{formatRecordingTime(recordingTime)}</span>
+              </div>
+            ) : (
+              <Input
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Écrire un commentaire..."
+                disabled={isPostingComment || !!audioBlob}
+              />
             )}
-            
-            <div className="flex">
-                {!isRecording && !audioBlob && (
-                  <Button size="sm" type="button" variant="ghost" onClick={() => mediaInputRef.current?.click()} disabled={isPostingComment}>
-                      <ImageIcon className="h-4 w-4 mr-2" />
-                      Image/Vidéo
-                  </Button>
-                )}
-                <input type="file" ref={mediaInputRef} accept="image/*,video/*" className="hidden" onChange={handleFileChange} disabled={isRecording || !!audioBlob}/>
-                
-                {!mediaFile && (
-                    isRecording ? (
-                        <Button size="sm" type="button" variant="destructive" onClick={stopRecording}>
-                            <Square className="h-4 w-4 mr-2" /> Stop
-                        </Button>
-                    ) : (
-                       !audioBlob &&
-                        <Button size="sm" type="button" variant="ghost" onClick={startRecording} disabled={isPostingComment}>
-                            <Mic className="h-4 w-4 mr-2" /> Audio
-                        </Button>
-                    )
-                )}
+            <Button type="submit" size="icon" disabled={isPostingComment || (!newComment.trim() && !mediaFile && !audioBlob)}>
+              {isPostingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
+          </div>
+
+          {(mediaPreviewUrl || audioBlob) && (
+            <div className="relative p-2 bg-gray-100 rounded-lg">
+              {mediaPreviewUrl && mediaFile?.type.startsWith("image") ? (
+                <img src={mediaPreviewUrl} alt="preview" className="w-24 h-24 rounded object-cover" />
+              ) : mediaPreviewUrl ? (
+                <video src={mediaPreviewUrl} controls className="w-full rounded object-cover" />
+              ) : audioBlob ? (
+                <AudioPlayer src={URL.createObjectURL(audioBlob)} />
+              ) : null}
+              <Button size="icon" variant="destructive" onClick={mediaPreviewUrl ? handleRemoveMedia : handleRemoveAudio} className="absolute -top-1 -right-1 h-5 w-5 rounded-full">
+                <X className="h-3 w-3" />
+              </Button>
             </div>
+          )}
+
+          <div className="flex">
+            {!isRecording && !audioBlob && (
+              <Button size="sm" type="button" variant="ghost" onClick={() => mediaInputRef.current?.click()} disabled={isPostingComment}>
+                <ImageIcon className="h-4 w-4 mr-2" />
+                Image/Vidéo
+              </Button>
+            )}
+            <input type="file" ref={mediaInputRef} accept="image/*,video/*" className="hidden" onChange={handleFileChange} disabled={isRecording || !!audioBlob} />
+
+            {!mediaFile && (
+              isRecording ? (
+                <Button size="sm" type="button" variant="destructive" onClick={stopRecording}>
+                  <Square className="h-4 w-4 mr-2" /> Stop
+                </Button>
+              ) : (
+                !audioBlob &&
+                <Button size="sm" type="button" variant="ghost" onClick={startRecording} disabled={isPostingComment}>
+                  <Mic className="h-4 w-4 mr-2" /> Audio
+                </Button>
+              )
+            )}
+          </div>
         </form>
       </div>
     </motion.div>
@@ -788,31 +788,31 @@ const PostCard = ({ post, user, profile, onLike, onDelete, showComments, onToggl
   const checkLiked = useCallback(async () => {
     if (!user) return;
     try {
-        const { data, error } = await supabase
-            .from('likes')
-            .select('id')
-            .eq('content_id', post.id)
-            .eq('user_id', user.id)
-            .eq('content_type', 'post')
-            .maybeSingle();
-        if (error) throw error;
-        setIsLiked(!!data);
-    } catch(error) {
-        console.error("Error checking like status:", error);
+      const { data, error } = await supabase
+        .from('likes')
+        .select('id')
+        .eq('content_id', post.id)
+        .eq('user_id', user.id)
+        .eq('content_type', 'post')
+        .maybeSingle();
+      if (error) throw error;
+      setIsLiked(!!data);
+    } catch (error) {
+      console.error("Error checking like status:", error);
     }
   }, [post.id, user]);
-  
+
   useEffect(() => {
     checkLiked();
   }, [post, checkLiked]);
 
   const handleLike = async () => {
     if (!user) {
-        toast({ title: 'Connectez-vous pour aimer ce post.', variant: 'destructive'});
-        return;
+      toast({ title: 'Connectez-vous pour aimer ce post.', variant: 'destructive' });
+      return;
     }
-    
-    setIsLiked(!isLiked); 
+
+    setIsLiked(!isLiked);
     await onLike(post.id, isLiked);
   };
 
@@ -826,7 +826,7 @@ const PostCard = ({ post, user, profile, onLike, onDelete, showComments, onToggl
     if (navigator.share) {
       try {
         await navigator.share(shareData);
-      } catch(err) {
+      } catch (err) {
         if (err.name !== 'AbortError') {
           toast({ title: "Erreur de partage", description: "Votre navigateur ne supporte pas le partage natif.", variant: "destructive" });
         }
@@ -847,7 +847,7 @@ const PostCard = ({ post, user, profile, onLike, onDelete, showComments, onToggl
             className="shrink-0 cursor-pointer"
             onClick={() => navigate(`/profil/${post.user_id}`)}
           >
-             <UserAvatar avatarUrl={post.profiles?.avatar_url} username={post.profiles?.username} className="w-10 h-10" />
+            <UserAvatar avatarUrl={post.profiles?.avatar_url} username={post.profiles?.username} className="w-10 h-10" />
           </div>
           <div className="flex-1">
             <div className="flex justify-between items-start">
@@ -867,13 +867,13 @@ const PostCard = ({ post, user, profile, onLike, onDelete, showComments, onToggl
         </div>
         <p className="mb-4 whitespace-pre-wrap">{parseMentions(post.content)}</p>
         {imageUrl && (
-          <img 
-            src={imageUrl} 
-            alt="Post media" 
-            className="rounded-lg w-full mb-4" 
+          <img
+            src={imageUrl}
+            alt="Post media"
+            className="rounded-lg w-full mb-4"
             onError={(e) => {
               e.currentTarget.onerror = null;
-              e.currentTarget.src="https://onekamer-media-cdn.b-cdn.net/posts/default_post_image.png";
+              e.currentTarget.src = "https://onekamer-media-cdn.b-cdn.net/posts/default_post_image.png";
             }}
           />
         )}
@@ -960,7 +960,7 @@ const Echange = () => {
       [postId]: !prev[postId]
     }));
   };
-  
+
   const fetchFeed = useCallback(async () => {
     setLoadingPosts(true);
 
@@ -970,8 +970,8 @@ const Echange = () => {
       .order('created_at', { ascending: false });
 
     if (postsError) {
-        console.error('Error fetching posts:', postsError);
-        toast({ title: 'Erreur', description: "Impossible de charger les posts.", variant: 'destructive' });
+      console.error('Error fetching posts:', postsError);
+      toast({ title: 'Erreur', description: "Impossible de charger les posts.", variant: 'destructive' });
     }
 
     const { data: audioData, error: audioError } = await supabase
@@ -994,10 +994,10 @@ const Echange = () => {
     setFeedItems(combinedFeed);
     setLoadingPosts(false);
   }, []);
-  
+
   useEffect(() => {
     fetchFeed();
-    
+
     const channel = supabase
       .channel('public-echange-feed-unified')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, (payload) => {
@@ -1007,10 +1007,10 @@ const Echange = () => {
         fetchFeed();
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, (payload) => {
-          setFeedItems(current => current.filter(p => p.feed_type === 'post' && p.id !== payload.old.id));
+        setFeedItems(current => current.filter(p => p.feed_type === 'post' && p.id !== payload.old.id));
       })
-       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'comments' }, (payload) => {
-          setFeedItems(current => current.filter(p => p.feed_type === 'audio_post' && p.id !== payload.old.id));
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'comments' }, (payload) => {
+        setFeedItems(current => current.filter(p => p.feed_type === 'audio_post' && p.id !== payload.old.id));
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, (payload) => {
         fetchFeed();
@@ -1024,17 +1024,17 @@ const Echange = () => {
 
   const handleLike = async (postId, isCurrentlyLiked) => {
     if (!user) return;
-    
+
     if (isCurrentlyLiked) {
       await supabase.from('likes').delete().match({ content_id: postId, user_id: user.id, content_type: 'post' });
     } else {
       await supabase.from('likes').insert({ content_id: postId, user_id: user.id, content_type: 'post' });
     }
   };
-  
+
   const handleDeletePost = async (postId, imageUrl, videoUrl) => {
     const { error } = await supabase.from('posts').delete().eq('id', postId);
-    if(error) toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
+    if (error) toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
   };
 
   const handleDeleteAudioPost = async (commentId) => {
@@ -1066,15 +1066,15 @@ const Echange = () => {
             <TabsTrigger value="trending">Tendances</TabsTrigger>
           </TabsList>
           <TabsContent value="recent" className="space-y-4 mt-4">
-            {loadingPosts ? <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-[#2BA84A]" /></div> : 
+            {loadingPosts ? <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-[#2BA84A]" /></div> :
               feedItems.map((item, index) => (
                 <motion.div key={`${item.feed_type}-${item.id}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}>
                   {item.feed_type === 'post' ? (
-                    <PostCard 
-                      post={item} 
+                    <PostCard
+                      post={item}
                       user={user}
                       profile={profile}
-                      onLike={handleLike} 
+                      onLike={handleLike}
                       onDelete={handleDeletePost}
                       showComments={!!openComments[item.id]}
                       onToggleComments={() => handleToggleComments(item.id)}
@@ -1092,18 +1092,18 @@ const Echange = () => {
               [...feedItems].sort((a, b) => ((b.likes_count || 0) + (b.comments_count || 0)) - ((a.likes_count || 0) + (a.comments_count || 0))).map((item, index) => (
                 <motion.div key={`${item.feed_type}-${item.id}-trending`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}>
                   {item.feed_type === 'post' ? (
-                    <PostCard 
-                      post={item} 
+                    <PostCard
+                      post={item}
                       user={user}
                       profile={profile}
-                      onLike={handleLike} 
+                      onLike={handleLike}
                       onDelete={handleDeletePost}
                       showComments={!!openComments[item.id]}
                       onToggleComments={() => handleToggleComments(item.id)}
                       refreshBalance={refreshBalance}
                     />
                   ) : (
-                     <AudioPostCard post={item} user={user} onDelete={handleDeleteAudioPost} />
+                    <AudioPostCard post={item} user={user} onDelete={handleDeleteAudioPost} />
                   )}
                 </motion.div>
               ))
