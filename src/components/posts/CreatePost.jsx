@@ -408,12 +408,7 @@ const CreatePost = ({ onPublished }) => {
 
   const stopRecording = () => {
     if (recorder && recorder.state !== "inactive") {
-      recorder.requestData?.();
-      setTimeout(() => {
-        if (recorder && recorder.state !== "inactive") {
-          recorder.stop();
-        }
-      }, 300);
+      recorder.stop();
     }
   };
 
