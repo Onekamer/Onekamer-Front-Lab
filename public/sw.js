@@ -16,6 +16,12 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // ✅ NE PAS intercepter les blob URLs (MediaRecorder, createObjectURL, etc.)
+  // Cela évite que le SW bloque la lecture des fichiers audio/vidéo/images créés en mémoire
+  if (event.request.url.startsWith('blob:')) {
+    return; // Laisse passer directement sans interception
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
