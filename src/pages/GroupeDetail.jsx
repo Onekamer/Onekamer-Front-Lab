@@ -407,7 +407,7 @@ const GroupeDetail = () => {
         resolveRecording(blob);
       };
       await new Promise((r) => setTimeout(r, 300));
-      recorder.start();
+      recorder.start(200);
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
       recordingIntervalRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000);

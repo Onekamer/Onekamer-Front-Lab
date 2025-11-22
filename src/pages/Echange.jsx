@@ -514,8 +514,8 @@ const CommentSection = ({ postId }) => {
       // ⚡ Fix mobile : attendre un court délai avant démarrage
       await new Promise((r) => setTimeout(r, 300));
 
-      // ✅ Important : pas de timeslice pour éviter les problèmes de métadonnées (loading infini)
-      recorder.start();
+      // ✅ Utilisation de timeslice(200) pour garantir la capture continue des chunks
+      recorder.start(200);
       console.log("⏺️ Enregistrement démarré avec format :", supportedMimeType);
 
       mediaRecorderRef.current = recorder;
