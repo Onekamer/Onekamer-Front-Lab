@@ -39,6 +39,8 @@ const OKCoins = () => {
   const [isSearchingReceiver, setIsSearchingReceiver] = useState(false);
   const debounceTimeout = useRef(null);
 
+  const serverLabUrl = import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com';
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     const [packsRes, levelsRes, donorsRes] = await Promise.all([
@@ -204,13 +206,48 @@ const OKCoins = () => {
     }
     
     setIsSubmittingWithdrawal(true);
-    // TODO: Implement withdrawal logic (e.g., API call to backend)
-    setTimeout(() => {
-        toast({ title: "Demande reçue", description: `Votre demande de retrait de ${amount} pièces est en cours de traitement. Vous serez notifié.` });
-        setShowWithdrawalDialog(false);
-        setWithdrawalAmount('');
-        setIsSubmittingWithdrawal(false);
-    }, 2000);
+    try {
+      const response = await fetch(`${serverLabUrl}/notify-withdrawal`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          username: profile?.username || '',
+          email: profile?.email || '',
+          amount,
+        }),
+      });
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (_e) {
+        // Réponse vide ou non JSON : on ignore, on utilisera juste le status HTTP
+      }
+
+      if (!response.ok) {
+        const errorMessage = data?.error || "Erreur lors de l'envoi de la demande de retrait. Veuillez réessayer.";
+        throw new Error(errorMessage);
+      }
+
+      toast({
+        title: "Demande reçue",
+        description: `Votre demande de retrait de ${amount.toLocaleString('fr-FR')} pièces est en cours de traitement. Vous serez notifié.`,
+      });
+      setShowWithdrawalDialog(false);
+      setWithdrawalAmount('');
+    } catch (error) {
+      console.error('Erreur lors de la demande de retrait :', error);
+      toast({
+        title: "Erreur de retrait",
+        description: error.message || "Une erreur est survenue lors de la demande de retrait.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingWithdrawal(false);
+    }
   };
 
 
@@ -272,7 +309,7 @@ const OKCoins = () => {
                 <AccordionContent className="pl-8 space-y-2">
                   <p>1. <strong>Rechargez</strong> votre solde en OK Coins (pièces virtuelles) depuis votre compte.</p>
                   <p>2. <strong>Envoyez</strong> un don à un membre, un créateur ou une publication.</p>
-                  <p>3. Les bénéficiaires reçoivent des points et peuvent ensuite <strong>convertir</strong> leurs pièces en récompenses ou avantages.</p>
+                  <p>3. Les bénéficiaires reçoivent des pièces et peuvent par la suite demander un retrait directement sur leur compte bancaire via l'application ou les utiliser pour payer directement avec lorsqu'il s'agit d'évènement payant organisé par OneKamer.</p>
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="item-3">
