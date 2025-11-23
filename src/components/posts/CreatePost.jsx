@@ -350,7 +350,10 @@ const CreatePost = ({ onPublished }) => {
 
       chunksRef.current = [];
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+        if (e.data && e.data.size > 0) {
+          chunksRef.current.push(e.data);
+          console.log(`📼 Chunk #${chunksRef.current.length} reçu:`, e.data.size, "octets");
+        }
       };
 
       mediaRecorder.onerror = (e) => {
@@ -359,6 +362,7 @@ const CreatePost = ({ onPublished }) => {
       };
 
       mediaRecorder.onstop = async () => {
+        if (mediaRecorder.manualPollingInterval) clearInterval(mediaRecorder.manualPollingInterval);
         clearInterval(timerRef.current);
         stream.getTracks().forEach((t) => t.stop());
 
@@ -383,11 +387,18 @@ const CreatePost = ({ onPublished }) => {
       await new Promise((r) => setTimeout(r, 300));
 
       // ✅ IMPORTANT : timeslice=1000 pour forcer génération chunks sur mobile
-      mediaRecorder.start(1000);
+      mediaRecorder.start();
 
       setRecording(true);
       setRecorder(mediaRecorder);
       setRecordingTime(0);
+
+      // 🔄 Polling manuel pour mobile (remplace timeslice)
+      mediaRecorder.manualPollingInterval = setInterval(() => {
+        if (mediaRecorder.state === "recording") {
+          mediaRecorder.requestData();
+        }
+      }, 1000);
       clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
         setRecordingTime((s) => s + 1);
@@ -408,6 +419,7 @@ const CreatePost = ({ onPublished }) => {
 
   const stopRecording = () => {
     if (recorder && recorder.state !== "inactive") {
+      if (recorder.manualPollingInterval) clearInterval(recorder.manualPollingInterval);
       recorder.stop();
     }
   };
