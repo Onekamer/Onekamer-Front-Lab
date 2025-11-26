@@ -10,7 +10,7 @@ import { supabase } from '@/lib/customSupabaseClient';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import MediaDisplay from '@/components/MediaDisplay';
 import { useToast } from '@/components/ui/use-toast';
-import { notifyRencontreMessage } from '@/services/oneSignalNotifications';
+import { notifyRencontreMessage } from '@/services/supabaseNotifications';
 
 const ConversationDetail = () => {
   const { conversationId: matchId } = useParams();
@@ -128,7 +128,7 @@ const ConversationDetail = () => {
             message: trimmed,
           });
         } catch (notificationError) {
-          console.error('Erreur notification OneSignal (message rencontre):', notificationError);
+          console.error('Erreur notification (message rencontre):', notificationError);
         }
       }
     }

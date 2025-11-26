@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getInitials } from '@/lib/utils';
 import { uploadAudioFile } from '@/utils/audioStorage';
-import { notifyMentions } from '@/services/oneSignalNotifications';
+import { notifyMentions } from '@/services/supabaseNotifications';
 import { extractUniqueMentions } from '@/utils/mentions';
 
 const AudioPlayer = ({ src, onCanPlay }) => {
@@ -503,73 +503,47 @@ const CreatePost = ({ onPublished }) => {
       setLoading(true);
 
       let finalAudioBlob = audioBlob;
-      if (recorderPromiseRef.current && !finalAudioBlob) {
-        finalAudioBlob = await recorderPromiseRef.current;
-      }
 
-      if (finalAudioBlob) {
-        if (!finalAudioBlob || finalAudioBlob.size < 2000) {
-          toast({ title: 'Erreur audio', description: "L’audio semble vide ou trop court. Réessayez.", variant: 'destructive' });
-          setLoading(false);
-          return;
-        }
+const handleFileChange = (event) => {
+const file = event.target.files[0];
+if (file) {
+  setMediaFile(file);
+  setMediaPreviewUrl(URL.createObjectURL(file));
+  setAudioBlob(null);
+  setAudioDuration(0);
+}
+};
 
-        const { ext } = mimeRef.current;
-        const audioFile = new File([finalAudioBlob], `audio-${Date.now()}.${ext}`, { type: finalAudioBlob.type });
-        const { publicUrl: audioUrl } = await uploadAudioFile(audioFile, 'comments_audio');
+const handleRemoveMedia = () => {
+setMediaFile(null);
+setMediaPreviewUrl(null);
+if (mediaInputRef.current) {
+  mediaInputRef.current.value = '';
+}
+};
 
-        const normalizedDuration = Math.max(1, Math.round(audioDuration || recordingTime || 1));
-        const { data: insertedComment, error: insertError } = await supabase
-          .from("comments")
-          .insert({
-            type: "audio",
-            audio_url: audioUrl,
-            user_id: user?.id,
-            content_type: "echange",
-            content: currentPostText || "",
-            created_at: new Date(),
-            audio_duration: normalizedDuration,
-          })
-          .select()
-          .single();
-        if (insertError) throw insertError;
+const handleRemoveAudio = () => {
+setAudioBlob(null);
+setAudioDuration(0);
+recorderPromiseRef.current = null;
+};
 
-        if (mentionProfiles.length) {
-          try {
-            await notifyMentions({
-              mentionedUserIds: mentionProfiles.map((m) => m.id),
-              authorName: profile?.username || user?.email || 'Un membre OneKamer',
-              excerpt: currentPostText,
-              postId: insertedComment?.id,
-            });
-          } catch (notificationError) {
-            console.error('Erreur notification OneSignal (commentaire audio):', notificationError);
-          }
-        }
-        try { onPublished && onPublished({ kind: 'audio_post', item: insertedComment }); } catch (_) { }
-      } else {
-        let postData = {
-          user_id: user.id,
-          content: currentPostText,
-          likes_count: 0,
-          comments_count: 0,
-        };
+const uploadToBunny = async (file, folder) => {
+const formData = new FormData();
+formData.append("file", file);
+formData.append("folder", folder);
 
-        if (mediaFile) {
-          const mediaUrl = await uploadToBunny(mediaFile, "posts");
-          const mediaType = mediaFile.type.startsWith('image') ? 'image' : 'video';
-          if (mediaType === 'image') {
-            postData.image_url = mediaUrl;
-          } else {
-            postData.video_url = mediaUrl;
-          }
-        }
+const response = await fetch(`${import.meta.env.VITE_API_URL}/upload`, {
+  method: "POST",
+  body: formData,
+});
 
-        const { data: insertedPost, error: insertError } = await supabase
-          .from('posts')
-          .insert([postData])
-          .select()
-          .single();
+const data = await response.json();
+if (!data.success) {
+  throw new Error("Erreur d’upload BunnyCDN");
+}
+return data.url;
+};
         if (insertError) throw insertError;
 
         if (insertedPost && mentionProfiles.length) {

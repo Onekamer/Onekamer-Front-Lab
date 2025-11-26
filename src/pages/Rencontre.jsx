@@ -18,7 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
-import { notifyRencontreMatch } from '@/services/oneSignalNotifications';
+import { notifyRencontreMatch } from '@/services/supabaseNotifications';
 import { Slider } from "@/components/ui/slider"
 import RencontreProfil from './rencontre/RencontreProfil';
 import { canUserAccess } from '@/lib/accessControl';
@@ -396,7 +396,7 @@ useEffect(() => {
               });
             }
           } catch (notificationError) {
-            console.error('Erreur notification OneSignal (match rencontre):', notificationError);
+            console.error('Erreur notification (match rencontre):', notificationError);
           }
         }
       })

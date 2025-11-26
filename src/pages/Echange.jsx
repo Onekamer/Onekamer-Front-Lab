@@ -26,7 +26,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { getInitials } from '@/lib/utils';
 import { uploadAudioFile, ensurePublicAudioUrl } from '@/utils/audioStorage';
-import { notifyDonationReceived } from '@/services/oneSignalNotifications';
+import { notifyDonationReceived } from '@/services/supabaseNotifications';
 
 const normalizeAudioEntry = (entry) => {
   if (!entry || !entry.audio_url) return entry;
@@ -113,7 +113,7 @@ const DonationDialog = ({ post, user, profile, refreshBalance, children }) => {
             amount: donationAmount,
           });
         } catch (notificationError) {
-          console.error('Erreur notification OneSignal (don):', notificationError);
+          console.error('Erreur notification (don):', notificationError);
         }
       }
       await refreshBalance();

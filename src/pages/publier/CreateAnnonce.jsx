@@ -10,8 +10,8 @@ import React, { useState, useEffect, useCallback } from 'react';
     import { ArrowLeft, Image as ImageIcon, Tag, Euro, MapPin, Loader2, X, Globe, Phone, Mail } from 'lucide-react';
     import { toast } from '@/components/ui/use-toast';
     import { supabase } from '@/lib/customSupabaseClient';
-import { useAuth } from '@/contexts/SupabaseAuthContext';
-import { notifyNewAnnonce } from '@/services/oneSignalNotifications';
+    import { useAuth } from '@/contexts/SupabaseAuthContext';
+    import { notifyNewAnnonce } from '@/services/supabaseNotifications';
     import imageCompression from 'browser-image-compression';
 
     const CreateAnnonce = () => {
@@ -190,7 +190,7 @@ import { notifyNewAnnonce } from '@/services/oneSignalNotifications';
                 price: newAnnonce.prix,
               });
             } catch (notificationError) {
-              console.error('Erreur notification OneSignal (annonce):', notificationError);
+              console.error('Erreur notification (annonce):', notificationError);
             }
           }
           

@@ -12,7 +12,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Input } from "@/components/ui/input";
 import { Send } from 'lucide-react';
-import { notifyRencontreMessage } from '@/services/oneSignalNotifications';
+import { notifyRencontreMessage } from '@/services/supabaseNotifications';
 
 const MessagesPrives = () => {
   const { user } = useAuth();
@@ -106,7 +106,7 @@ const MessagesPrives = () => {
             message: content,
           });
         } catch (notificationError) {
-          console.error('Erreur notification OneSignal (message match):', notificationError);
+          console.error('Erreur notification (message match):', notificationError);
         }
       }
     }

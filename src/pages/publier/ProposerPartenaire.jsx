@@ -11,7 +11,7 @@ import { ArrowLeft, Building, Phone, MapPin, Tag, Globe, Image as ImageIcon, Loa
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
-import { notifyNewPartenaire } from '@/services/oneSignalNotifications';
+import { notifyNewPartenaire } from '@/services/supabaseNotifications';
 import imageCompression from 'browser-image-compression';
 import { GoogleMap, Marker, useJsApiLoader, Autocomplete } from '@react-google-maps/api';
 
@@ -159,7 +159,7 @@ const ProposerPartenaire = () => {
             authorName: profile?.username || user?.email || 'Un membre OneKamer',
           });
         } catch (notificationError) {
-          console.error('Erreur notification OneSignal (partenaire):', notificationError);
+          console.error('Erreur notification (partenaire):', notificationError);
         }
       }
       

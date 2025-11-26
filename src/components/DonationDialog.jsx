@@ -8,73 +8,47 @@
       DialogDescription,
       DialogFooter,
       DialogTrigger,
-    } from '@/components/ui/dialog';
-    import { Button } from '@/components/ui/button';
-    import { Input } from '@/components/ui/input';
-    import { Label } from '@/components/ui/label';
-    import { useAuth } from '@/contexts/SupabaseAuthContext';
-    import { supabase } from '@/lib/customSupabaseClient';
-    import { useToast } from '@/components/ui/use-toast';
-    import { Coins, Loader2 } from 'lucide-react';
-    import { motion } from 'framer-motion';
-    import { notifyDonationReceived } from '@/services/oneSignalNotifications';
 
-    const DonationDialog = ({ receiverId, receiverName, children }) => {
-      const { user, balance, refreshBalance, profile } = useAuth();
-      const { toast } = useToast();
-      const [amount, setAmount] = useState('');
-      const [message, setMessage] = useState('');
-      const [loading, setLoading] = useState(false);
-      const [isOpen, setIsOpen] = useState(false);
-      const [step, setStep] = useState(1);
+  const handleDonation = async () => {
+    if (!user) {
+      toast({ title: 'Connexion requise', variant: 'destructive' });
+      return;
+    }
 
-      const handleDonation = async () => {
-        if (!user) {
-          toast({ title: 'Connexion requise', variant: 'destructive' });
-          return;
-        }
+    const donationAmount = parseInt(amount);
+    if (isNaN(donationAmount) || donationAmount <= 0) {
+      toast({ title: 'Montant invalide', variant: 'destructive' });
+      return;
+    }
 
-        const donationAmount = parseInt(amount);
-        if (isNaN(donationAmount) || donationAmount <= 0) {
-          toast({ title: 'Montant invalide', variant: 'destructive' });
-          return;
-        }
+    if (balance.coins_balance < donationAmount) {
+      toast({ title: 'Solde insuffisant', description: `Vous n'avez que ${balance.coins_balance} pièces.`, variant: 'destructive' });
+      return;
+    }
 
-        if (balance.coins_balance < donationAmount) {
-          toast({ title: 'Solde insuffisant', description: `Vous n'avez que ${balance.coins_balance} pièces.`, variant: 'destructive' });
-          return;
-        }
+    setLoading(true);
+    try {
+      const { error } = await supabase.rpc('make_donation', {
+        sender: user.id,
+        receiver: receiverId,
+        amount: donationAmount,
+        msg: message || `Un petit don pour toi !`,
+      });
 
-        setLoading(true);
-        try {
-          const { error } = await supabase.rpc('make_donation', {
-            sender: user.id,
-            receiver: receiverId,
-            amount: donationAmount,
-            msg: message || `Un petit don pour toi !`,
-          });
+      if (error) throw error;
 
-          if (error) throw error;
-
-          toast({
-            title: 'Don effectué !',
-            description: `Vous avez envoyé ${donationAmount} pièces à ${receiverName}.`,
-          });
-          try {
-            await notifyDonationReceived({
-              receiverId,
-              senderName: profile?.username || user?.email || 'Un membre OneKamer',
-              amount: donationAmount,
-            });
-          } catch (notificationError) {
-            console.error('Erreur notification OneSignal (don dialogue):', notificationError);
-          }
-          refreshBalance();
-          setAmount('');
-          setMessage('');
-          setIsOpen(false);
-          setStep(1);
-
+      toast({
+        title: 'Don effectué !',
+        description: `Vous avez envoyé ${donationAmount} pièces à ${receiverName}.`,
+      });
+      try {
+        await notifyDonationReceived({
+          receiverId,
+          senderName: profile?.username || user?.email || 'Un membre OneKamer',
+          amount: donationAmount,
+        });
+      } catch (notificationError) {
+        console.error('Erreur notification (don dialogue):', notificationError);
         } catch (error) {
           toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
         } finally {

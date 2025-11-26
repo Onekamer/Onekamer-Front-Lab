@@ -25,9 +25,8 @@ import imageCompression from 'browser-image-compression';
 import MediaDisplay from '@/components/MediaDisplay';
 import FavoriteButton from '@/components/FavoriteButton';
 import { canUserAccess } from '@/lib/accessControl';
-import { notifyNewFaitDivers, notifyMentionInComment } from '@/services/oneSignalNotifications';
+import { notifyNewFaitDivers, notifyMentionInComment } from '@/services/supabaseNotifications';
 import { extractUniqueMentions } from '@/utils/mentions';
-
 
 const AddNewsForm = ({ categories, onArticleAdded }) => {
   const { user } = useAuth();
@@ -140,7 +139,7 @@ const AddNewsForm = ({ categories, onArticleAdded }) => {
           authorName: newArticle.author?.username || user?.email || 'Un membre OneKamer',
         });
       } catch (notificationError) {
-        console.error('Erreur notification OneSignal (fait divers):', notificationError);
+        console.error('Erreur notification (fait divers):', notificationError);
       }
       setFormData({
         title: '',
@@ -328,7 +327,7 @@ const CommentSection = ({ articleId }) => {
             articleId,
           });
         } catch (notificationError) {
-          console.error('Erreur notification OneSignal (mention commentaire):', notificationError);
+          console.error('Erreur notification (mention commentaire):', notificationError);
         }
       }
     } catch (error) {

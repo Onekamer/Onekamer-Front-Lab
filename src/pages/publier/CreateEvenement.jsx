@@ -11,7 +11,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
     import { toast } from '@/components/ui/use-toast';
     import { supabase } from '@/lib/customSupabaseClient';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
-import { notifyNewEvenement } from '@/services/oneSignalNotifications';
+import { notifyNewEvenement } from '@/services/supabaseNotifications';
     import imageCompression from 'browser-image-compression';
     import { GoogleMap, Marker, useJsApiLoader, Autocomplete } from '@react-google-maps/api';
     
@@ -168,7 +168,7 @@ import { notifyNewEvenement } from '@/services/oneSignalNotifications';
                 authorName: profile?.username || user?.email || 'Un membre OneKamer',
               });
             } catch (notificationError) {
-              console.error('Erreur notification OneSignal (événement):', notificationError);
+              console.error('Erreur notification (événement):', notificationError);
             }
           }
           
