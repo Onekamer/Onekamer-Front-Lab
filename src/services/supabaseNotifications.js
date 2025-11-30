@@ -62,6 +62,7 @@ export const notifyNewAnnonce = async ({ annonceId, title, authorName, price }) 
     title: '🛍️ Nouvelle annonce',
     message: `${authorName || 'Un membre'} vient de publier "${title}"${price ? ` à ${price}` : ''}.`,
     targetSegment: 'subscribed_users',
+    url: annonceId ? `/annonces?annonceId=${annonceId}` : '/annonces',
     data: {
       type: 'annonce',
       annonceId,
@@ -74,6 +75,7 @@ export const notifyNewEvenement = async ({ eventId, title, date, authorName }) =
     title: '🎉 Nouvel événement',
     message: `${authorName || 'Un membre'} organise ${title}${date ? ` le ${date}` : ''}.`,
     targetSegment: 'subscribed_users',
+    url: eventId ? `/evenements?eventId=${eventId}` : '/evenements',
     data: {
       type: 'evenement',
       eventId,
@@ -86,6 +88,7 @@ export const notifyNewPartenaire = async ({ partnerId, name, city, authorName })
     title: '🤝 Nouveau partenaire',
     message: `${authorName || 'Un membre'} recommande ${name}${city ? ` à ${city}` : ''}.`,
     targetSegment: 'subscribed_users',
+    url: partnerId ? `/partenaires?partnerId=${partnerId}` : '/partenaires',
     data: {
       type: 'partenaire',
       partnerId,
@@ -98,6 +101,7 @@ export const notifyNewFaitDivers = async ({ articleId, title, authorName }) => {
     title: '📰 Nouveau fait divers',
     message: `${authorName || 'Un membre'} a publié "${title}".`,
     targetSegment: 'subscribed_users',
+    url: articleId ? `/faits-divers?articleId=${articleId}` : '/faits-divers',
     data: {
       type: 'fait_divers',
       articleId,

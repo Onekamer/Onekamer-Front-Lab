@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+
 import { Helmet } from 'react-helmet';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +9,8 @@ import { Heart, MessageCircle, ArrowLeft, Send, Plus, Share2, Loader2, FileImage
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+
 import { supabase } from '@/lib/customSupabaseClient';
 import {
   Dialog,
@@ -462,6 +464,7 @@ const FaitsDivers = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [canCreate, setCanCreate] = useState(false);
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     if (user) {
@@ -507,6 +510,16 @@ const FaitsDivers = () => {
     fetchNews();
     fetchUserLikes();
   }, [fetchNews, fetchUserLikes]);
+
+  useEffect(() => {
+    if (!newsList || newsList.length === 0) return;
+    const articleId = searchParams.get('articleId');
+    if (!articleId) return;
+    const found = newsList.find((n) => String(n.id) === String(articleId));
+    if (found) {
+      setSelectedNews(found);
+    }
+  }, [newsList, searchParams]);
 
   const fetchCategories = useCallback(async () => {
     const { data, error } = await supabase.from('faits_divers_categories').select('*');

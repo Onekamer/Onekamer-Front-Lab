@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
     import { Button } from '@/components/ui/button';
     import { Calendar, MapPin, Clock, Banknote, Share2, ArrowLeft, Ticket, Plus, Loader2, Trash2 } from 'lucide-react';
     import { useToast } from '@/components/ui/use-toast';
-    import { useNavigate } from 'react-router-dom';
+    import { useNavigate, useSearchParams } from 'react-router-dom';
     import { supabase } from '@/lib/customSupabaseClient';
     import { useAuth } from '@/contexts/SupabaseAuthContext';
     import MediaDisplay from '@/components/MediaDisplay';
@@ -177,113 +177,144 @@ import React, { useState, useEffect, useCallback } from 'react';
     };
 
     const EvenementCard = ({ event, onSelect }) => {
-        const { toast } = useToast();
-        const handleShare = async (e) => {
-            e.stopPropagation();
-            if (navigator.share) {
-                try {
-                    await navigator.share({ title: event.title, text: event.description, url: window.location.href });
-                } catch (err) {
-                    if (err.name !== 'AbortError') {
-                        toast({ title: "Erreur de partage", description: err.message, variant: "destructive" });
-                    }
-                }
-            } else {
-                toast({ title: "Partage non disponible" });
+      const { toast } = useToast();
+
+      const handleShare = async (e) => {
+        e.stopPropagation();
+        if (navigator.share) {
+          try {
+            await navigator.share({
+              title: event.title,
+              text: event.description,
+              url: window.location.href,
+            });
+          } catch (err) {
+            if (err.name !== 'AbortError') {
+              toast({ title: "Erreur de partage", description: err.message, variant: "destructive" });
             }
-        };
-        const handleOpenMapsQuick = (e) => {
-          e.stopPropagation();
-
-          const { latitude, longitude, location } = event;
-
-          if (latitude && longitude) {
-            const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=driving`;
-            window.open(url, "_blank");
-            return;
           }
+        } else {
+          toast({ title: "Partage non disponible" });
+        }
+      };
 
-          if (location) {
-            const encoded = encodeURIComponent(location);
-            const url = `https://www.google.com/maps/search/?api=1&query=${encoded}`;
-            window.open(url, "_blank");
-            return;
-          }
+      const handleOpenMapsQuick = (e) => {
+        e.stopPropagation();
 
-          toast({
-            title: 'Lieu indisponible',
-            description: "Aucune information de localisation disponible pour cet événement.",
-            variant: 'destructive',
-          });
-        };
-        
-        return (
-            <Card onClick={() => onSelect(event)} className="cursor-pointer group overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300 h-full flex flex-col rounded-lg">
-                <div className="relative h-48 bg-gray-200">
-                    <MediaDisplay bucket="evenements" path={event.media_url} alt={event.title} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    <div className="relative p-2 h-full flex flex-col justify-between">
-                        <div className="flex items-center gap-2">
-                            <div className="bg-[#E0222A] text-white px-3 py-1 rounded-full text-xs font-semibold">{event.evenements_types?.nom || 'Catégorie'}</div>
-                            <div className="flex items-center gap-2">
-                                <FavoriteButton contentType="evenement" contentId={event.id} />
-                                <Button variant="ghost" size="icon" onClick={handleShare} className="text-white bg-black/20 hover:bg-black/40 rounded-full h-8 w-8">
-                                    <Share2 className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
-                        <div>
-                            <h3 className="text-white font-bold text-lg truncate">{event.title}</h3>
-                            <div className="flex items-center gap-2 text-sm text-gray-200"><MapPin className="h-4 w-4" />{event.location}</div>
-                        </div>
-                    </div>
+        const { latitude, longitude, location } = event;
+
+        if (latitude && longitude) {
+          const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=driving`;
+          window.open(url, "_blank");
+          return;
+        }
+
+        if (location) {
+          const encoded = encodeURIComponent(location);
+          const url = `https://www.google.com/maps/search/?api=1&query=${encoded}`;
+          window.open(url, "_blank");
+          return;
+        }
+
+        toast({
+          title: 'Lieu indisponible',
+          description: "Aucune information de localisation disponible pour cet événement.",
+          variant: 'destructive',
+        });
+      };
+
+      return (
+        <Card
+          onClick={() => onSelect(event)}
+          className="cursor-pointer group overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300 h-full flex flex-col rounded-lg"
+        >
+          <div className="relative h-48 bg-gray-200">
+            <MediaDisplay
+              bucket="evenements"
+              path={event.media_url}
+              alt={event.title}
+              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+            <div className="relative p-2 h-full flex flex-col justify-between">
+              <div className="flex items-center gap-2">
+                <div className="bg-[#E0222A] text-white px-3 py-1 rounded-full text-xs font-semibold">
+                  {event.evenements_types?.nom || 'Catégorie'}
                 </div>
-                <CardContent className="p-4 flex-grow flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600"><Calendar className="h-4 w-4 text-[#2BA84A]" /><span>{new Date(event.date).toLocaleDateString('fr-FR')} à {event.time}</span></div>
-                    </div>
-                    <div className="mt-3 flex items-center justify-between">
-                      <span className="text-2xl font-bold text-[#2BA84A]">{formatPrice(event.price, event.devises)}</span>
-                      <Button
-                        onClick={handleOpenMapsQuick}
-                        className="bg-[#2BA84A] hover:bg-[#24903f] text-white px-4 py-2 rounded-full flex items-center gap-2 text-sm"
-                      >
-                        <MapPin className="h-4 w-4" />
-                        <span>S'y rendre</span>
-                      </Button>
-                    </div>
-                </CardContent>
-            </Card>
-        );
+                <div className="flex items-center gap-2">
+                  <FavoriteButton contentType="evenement" contentId={event.id} />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleShare}
+                    className="text-white bg-black/20 hover:bg-black/40 rounded-full h-8 w-8"
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-white font-bold text-lg truncate">{event.title}</h3>
+                <div className="flex items-center gap-2 text-sm text-gray-200">
+                  <MapPin className="h-4 w-4" />
+                  {event.location}
+                </div>
+              </div>
+            </div>
+          </div>
+          <CardContent className="p-4 flex-grow flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Calendar className="h-4 w-4 text-[#2BA84A]" />
+                <span>{new Date(event.date).toLocaleDateString('fr-FR')} à {event.time}</span>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-2xl font-bold text-[#2BA84A]">{formatPrice(event.price, event.devises)}</span>
+              <Button
+                onClick={handleOpenMapsQuick}
+                className="bg-[#2BA84A] hover:bg-[#24903f] text-white px-4 py-2 rounded-full flex items-center gap-2 text-sm"
+              >
+                <MapPin className="h-4 w-4" />
+                <span>S'y rendre</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      );
     };
 
-   const Evenements = () => {
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
-  const { toast } = useToast();
-  const [canCreateEvent, setCanCreateEvent] = useState(false);
+    const Evenements = () => {
+      const [events, setEvents] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [selectedEvent, setSelectedEvent] = useState(null);
+      const navigate = useNavigate();
+      const [searchParams] = useSearchParams();
+      const { user, loading: authLoading } = useAuth();
+      const { toast } = useToast();
+      const [canCreateEvent, setCanCreateEvent] = useState(false);
 
-  // 🟢 Vérifie automatiquement les droits d'accès (Supabase)
-  useEffect(() => {
-    if (authLoading) return;
-    applyAutoAccessProtection(user, navigate, window.location.pathname);
-  }, [user, navigate, authLoading]);
+      // Vérifie automatiquement les droits d'accès (Supabase)
+      useEffect(() => {
+        if (authLoading) return;
+        applyAutoAccessProtection(user, navigate, window.location.pathname);
+      }, [user, navigate, authLoading]);
 
-  // 🟢 Vérifie si l'utilisateur peut créer un événement
-  useEffect(() => {
-    if (user) {
-      canUserAccess(user, "evenements", "create").then(setCanCreateEvent);
-    } else {
-      setCanCreateEvent(false);
-    }
-  }, [user]);
+      // Vérifie si l'utilisateur peut créer un événement
+      useEffect(() => {
+        if (user) {
+          canUserAccess(user, "evenements", "create").then(setCanCreateEvent);
+        } else {
+          setCanCreateEvent(false);
+        }
+      }, [user]);
 
       const fetchEvents = useCallback(async () => {
         setLoading(true);
-        const { data, error } = await supabase.from('view_evenements_accessible').select('*, evenements_types(nom), profiles(username), devises(symbole)').order('date', { ascending: true });
+        const { data, error } = await supabase
+          .from('view_evenements_accessible')
+          .select('*, evenements_types(nom), profiles(username), devises(symbole)')
+          .order('date', { ascending: true });
         if (error) {
           console.error("Error fetching events:", error);
           toast({ title: 'Erreur', description: "Impossible de charger les événements.", variant: 'destructive' });
@@ -292,17 +323,22 @@ import React, { useState, useEffect, useCallback } from 'react';
         }
         setLoading(false);
       }, [toast]);
-      
+
       useEffect(() => {
         fetchEvents();
-        
-        const channel = supabase.channel('public:evenements')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'evenements' }, fetchEvents)
-          .subscribe();
-          
-        return () => supabase.removeChannel(channel);
       }, [fetchEvents]);
-      
+
+      // Deep link : ouvre un événement précis via ?eventId=
+      useEffect(() => {
+        if (!events || events.length === 0) return;
+        const eventId = searchParams.get('eventId');
+        if (!eventId) return;
+        const found = events.find((evt) => String(evt.id) === String(eventId));
+        if (found) {
+          setSelectedEvent(found);
+        }
+      }, [events, searchParams]);
+
       const handleDelete = async (eventId, mediaUrl) => {
         if (!user) return;
         try {
@@ -317,7 +353,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 
       const handleCreateClick = async () => {
         if (!user) {
-          toast({title: "Connexion requise", description: "Veuillez vous connecter pour créer un événement.", variant: "destructive"});
+          toast({
+            title: "Connexion requise",
+            description: "Veuillez vous connecter pour créer un événement.",
+            variant: "destructive",
+          });
           return;
         }
         if (canCreateEvent) {
@@ -327,57 +367,76 @@ import React, { useState, useEffect, useCallback } from 'react';
           if (allowed) {
             navigate('/publier/evenement');
           } else {
-            toast({title: "Accès restreint", description: "Passez VIP pour créer un événement.", variant: "destructive"});
+            toast({
+              title: "Accès restreint",
+              description: "Passez VIP pour créer un événement.",
+              variant: "destructive",
+            });
             navigate('/forfaits');
           }
         }
       };
 
       return (
-  <>
-    <Helmet>
-      <title>Événements - OneKamer.co</title>
-      <meta name="description" content="Découvrez les événements de la communauté OneKamer.co" />
-    </Helmet>
+        <>
+          <Helmet>
+            <title>Événements - OneKamer.co</title>
+            <meta
+              name="description"
+              content="Découvrez les événements de la communauté OneKamer.co"
+            />
+          </Helmet>
 
-    <AnimatePresence>
-  {selectedEvent && (
-    <EvenementDetail 
-      event={selectedEvent} 
-      onBack={() => setSelectedEvent(null)} 
-    />
-  )}
-</AnimatePresence>
+          <AnimatePresence>
+            {selectedEvent && (
+              <EvenementDetail
+                event={selectedEvent}
+                onBack={() => setSelectedEvent(null)}
+                onDelete={handleDelete}
+              />
+            )}
+          </AnimatePresence>
 
           <div className="space-y-6">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
               <div className="flex justify-between items-center mb-4">
                 <h1 className="text-3xl font-bold text-[#2BA84A]">Événements</h1>
                 {canCreateEvent && (
-                  <Button onClick={handleCreateClick} className="bg-gradient-to-r from-[#2BA84A] to-[#F5C300] text-white">
+                  <Button
+                    onClick={handleCreateClick}
+                    className="bg-gradient-to-r from-[#2BA84A] to-[#F5C300] text-white"
+                  >
                     <Plus className="mr-2 h-4 w-4" /> Créer
                   </Button>
                 )}
               </div>
             </motion.div>
 
-            {loading ? <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-[#2BA84A]" /></div> :
-            events.length > 0 ? (
+            {loading ? (
+              <div className="flex justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-[#2BA84A]" />
+              </div>
+            ) : events.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {events.map((event, index) => (
-                  <motion.div key={event.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}>
+                  <motion.div
+                    key={event.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                  >
                     <EvenementCard event={event} onSelect={setSelectedEvent} />
                   </motion.div>
                 ))}
               </div>
             ) : (
-                 <div className="text-center py-12 text-gray-500">
-                    <p>Aucun événement pour le moment.</p>
-                </div>
+              <div className="text-center py-12 text-gray-500">
+                <p>Aucun événement pour le moment.</p>
+              </div>
             )}
-         </div>
-  </>
-);
-};
+          </div>
+        </>
+      );
+    };
 
-export default Evenements;
+    export default Evenements;

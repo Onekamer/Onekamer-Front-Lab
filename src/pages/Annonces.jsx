@@ -6,7 +6,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
     import { Input } from '@/components/ui/input';
     import { Search, Share2, MapPin, ArrowLeft, Phone, MessageSquare, Mail, Plus, Loader2, Trash2, Euro } from 'lucide-react';
     import { useToast } from '@/components/ui/use-toast';
-    import { useNavigate } from 'react-router-dom';
+    import { useNavigate, useSearchParams } from 'react-router-dom';
     import { supabase } from '@/lib/customSupabaseClient';
     import { useAuth } from '@/contexts/SupabaseAuthContext';
     import MediaDisplay from '@/components/MediaDisplay';
@@ -167,117 +167,127 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
                                 <Button variant="ghost" size="icon" onClick={handleShare} className="text-white bg-black/20 hover:bg-black/40 rounded-full h-8 w-8">
                                     <Share2 className="h-4 w-4" />
                                 </Button>
-                            </div>
                         </div>
-                        <div>
-                            <h3 className="text-white font-bold text-lg truncate">{annonce.titre}</h3>
-                            <div className="flex items-center gap-2 text-sm text-gray-200"><MapPin className="h-4 w-4" />{annonce.villes?.nom || 'Lieu non spécifié'}</div>
-                        </div>
+                    </div>
+                    <div>
+                        <h3 className="text-white font-bold text-lg truncate">{annonce.titre}</h3>
+                        <div className="flex items-center gap-2 text-sm text-gray-200"><MapPin className="h-4 w-4" />{annonce.villes?.nom || 'Lieu non spécifié'}</div>
                     </div>
                 </div>
-                <CardContent className="p-4 flex-grow flex flex-col justify-between">
-                    <span className="text-2xl font-bold text-[#2BA84A] mb-2">{formatPrice(annonce.prix, annonce.devises)}</span>
-                    <div className="grid grid-cols-2 gap-2 w-full">
-                      {annonce.telephone && (
+            </div>
+            <CardContent className="p-4 flex-grow flex flex-col justify-between">
+                <span className="text-2xl font-bold text-[#2BA84A] mb-2">{formatPrice(annonce.prix, annonce.devises)}</span>
+                <div className="grid grid-cols-2 gap-2 w-full">
+                    {annonce.telephone && (
                         <a href={`https://wa.me/${annonce.telephone.replace(/\D/g, '')}`} onClick={e => e.stopPropagation()} target="_blank" rel="noopener noreferrer">
-                          <Button variant="outline" size="sm" className="w-full bg-[#25D366]/10 border-[#25D366] text-[#25D366] hover:bg-[#25D366]/20">
-                              <MessageSquare className="h-4 w-4" />
-                          </Button>
+                            <Button variant="outline" size="sm" className="w-full bg-[#25D366]/10 border-[#25D366] text-[#25D366] hover:bg-[#25D366]/20">
+                                <MessageSquare className="h-4 w-4" />
+                            </Button>
                         </a>
-                      )}
-                      {annonce.email && (
+                    )}
+                    {annonce.email && (
                         <a href={`mailto:${annonce.email}`} onClick={e => e.stopPropagation()} target="_blank" rel="noopener noreferrer">
-                          <Button variant="outline" size="sm" className="w-full">
-                              <Mail className="h-4 w-4" />
-                          </Button>
+                            <Button variant="outline" size="sm" className="w-full">
+                                <Mail className="h-4 w-4" />
+                            </Button>
                         </a>
-                      )}
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    };
+                    )}
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
 
+const Annonces = () => {
+    const [annonces, setAnnonces] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedAnnonce, setSelectedAnnonce] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [suggestions, setSuggestions] = useState([]);
+    const [suggestLoading, setSuggestLoading] = useState(false);
+    const suggestDebounceRef = useRef(null);
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const { user, loading: authLoading } = useAuth();
+    const { toast } = useToast();
+    const [canCreateAd, setCanCreateAd] = useState(false);
 
-    const Annonces = () => {
-  const [annonces, setAnnonces] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedAnnonce, setSelectedAnnonce] = useState(null);
-  const [searchTerm, setSearchTerm] = useState(''); // ✅ Correction ici
-  const [suggestions, setSuggestions] = useState([]);
-  const [suggestLoading, setSuggestLoading] = useState(false);
-  const suggestDebounceRef = useRef(null);
-  const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
-  const { toast } = useToast();
-  const [canCreateAd, setCanCreateAd] = useState(false);
+    // Vérifie automatiquement les droits d'accès à la page "Annonces"
+    useEffect(() => {
+        if (authLoading) return;
+        applyAutoAccessProtection(user, navigate, window.location.pathname);
+    }, [user, navigate, authLoading]);
 
-  // 🟢 Vérifie automatiquement les droits d'accès à la page "Annonces"
-  useEffect(() => {
-    if (authLoading) return;
-    applyAutoAccessProtection(user, navigate, window.location.pathname);
-  }, [user, navigate, authLoading]);
+    // Vérifie si l'utilisateur peut créer une annonce
+    useEffect(() => {
+        if (user) {
+            canUserAccess(user, "annonces", "create").then(setCanCreateAd);
+        } else {
+            setCanCreateAd(false);
+        }
+    }, [user]);
 
-  // Vérifie si l'utilisateur peut créer une annonce
-  useEffect(() => {
-    if (user) {
-      canUserAccess(user, "annonces", "create").then(setCanCreateAd);
-    } else {
-      setCanCreateAd(false);
-    }
-  }, [user]);
-
-      const fetchAnnonces = useCallback(async () => {
+    const fetchAnnonces = useCallback(async () => {
         setLoading(true);
         const { data, error } = await supabase
-          .from('view_annonces_accessible')
-          .select('*, annonces_categories(nom), pays(nom), villes(nom), profiles(username, avatar_url), devises(symbole)')
-          .order('created_at', { ascending: false });
+            .from('view_annonces_accessible')
+            .select('*, annonces_categories(nom), pays(nom), villes(nom), profiles(username, avatar_url), devises(symbole)')
+            .order('created_at', { ascending: false });
 
         if (error) {
-          toast({ title: "Erreur de chargement", description: error.message, variant: "destructive" });
-          setAnnonces([]);
+            toast({ title: "Erreur de chargement", description: error.message, variant: "destructive" });
+            setAnnonces([]);
         } else {
-          setAnnonces(data);
+            setAnnonces(data);
         }
         setLoading(false);
-      }, [toast]);
+    }, [toast]);
 
-      useEffect(() => {
+    useEffect(() => {
         fetchAnnonces();
 
         const channel = supabase.channel('realtime:public:annonces')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'annonces' }, (payload) => {
-            fetchAnnonces();
-          })
-          .subscribe();
-        
-        return () => {
-          supabase.removeChannel(channel);
-        }
-      }, [fetchAnnonces]);
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'annonces' }, (payload) => {
+                fetchAnnonces();
+            })
+            .subscribe();
 
-      const handleDelete = async (annonceId, mediaPath) => {
+        return () => {
+            supabase.removeChannel(channel);
+        }
+    }, [fetchAnnonces]);
+
+    useEffect(() => {
+        if (!annonces || annonces.length === 0) return;
+        const annonceId = searchParams.get('annonceId');
+        if (!annonceId) return;
+        const found = annonces.find((ann) => String(ann.id) === String(annonceId));
+        if (found) {
+            setSelectedAnnonce(found);
+        }
+    }, [annonces, searchParams]);
+
+    const handleDelete = async (annonceId, mediaPath) => {
         if (!user) return;
         try {
-          if (mediaPath) {
-            const { error: storageError } = await supabase.storage.from('annonces').remove([mediaPath]);
-            if (storageError) console.warn("Storage deletion warning:", storageError.message);
-          }
+            if (mediaPath) {
+                const { error } = await supabase.storage.from('annonces').remove([mediaPath]);
+                if (error) console.warn("Storage deletion warning:", error.message);
+            }
 
-          const { error: dbError } = await supabase.from('annonces').delete().eq('id', annonceId);
-          if (dbError) throw dbError;
-          
-          toast({ title: 'Succès', description: 'Annonce supprimée.' });
+            const { error: dbError } = await supabase.from('annonces').delete().eq('id', annonceId);
+            if (dbError) throw dbError;
+
+            toast({ title: 'Succès', description: 'Annonce supprimée.' });
         } catch (error) {
-          toast({ title: "Erreur de suppression", description: error.message, variant: "destructive" });
+            toast({ title: "Erreur de suppression", description: error.message, variant: "destructive" });
         }
-      };
+    };
 
-      const handleCreateClick = async () => {
+    const handleCreateClick = async () => {
         if (!user) {
-          toast({title: "Connexion requise", description: "Veuillez vous connecter pour publier.", variant: "destructive"});
-          return;
+            toast({ title: "Connexion requise", description: "Veuillez vous connecter pour publier.", variant: "destructive" });
+            return;
         }
         if (canCreateAd) {
           navigate('/publier/annonce');

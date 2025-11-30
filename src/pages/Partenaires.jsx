@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Search, Star, Share2, MessageSquare, Mail, ArrowLeft, Lock, MapPin } from 'lucide-react';
 import { canUserAccess } from '@/lib/accessControl';
 import FavoriteButton from '@/components/FavoriteButton';
@@ -129,6 +129,7 @@ const Partenaires = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [canCreate, setCanCreate] = useState(false);
+  const [searchParams] = useSearchParams();
 
   // 🟢 Vérifie automatiquement les droits d'accès à la page "Partenaires"
   useEffect(() => {
@@ -166,6 +167,16 @@ const Partenaires = () => {
   useEffect(() => {
     fetchPartenaires();
   }, [fetchPartenaires]);
+
+  useEffect(() => {
+    if (!partenaires || partenaires.length === 0) return;
+    const partnerId = searchParams.get('partnerId');
+    if (!partnerId) return;
+    const found = partenaires.find((p) => String(p.id) === String(partnerId));
+    if (found) {
+      setSelectedPartenaire(found);
+    }
+  }, [partenaires, searchParams]);
 
   // Autocomplete en temps réel (Partenaires uniquement)
   useEffect(() => {
