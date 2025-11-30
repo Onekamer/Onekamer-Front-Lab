@@ -90,7 +90,7 @@ const Header = ({ deferredPrompt }) => {
 
           {/* Cloche de notifications LAB */}
           {user && (
-            <div className="relative">
+            <div className="relative flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon"
