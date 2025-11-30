@@ -1,17 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, Search, User, Download, Users, Heart } from 'lucide-react';
+import { Menu, Search, User, Download, Users, Heart, Bell } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import MediaDisplay from '@/components/MediaDisplay';
+import { useNotifications } from '@/hooks/useNotifications';
+import NotifDrawer from '@/components/notifications/NotifDrawer';
 
 const Header = ({ deferredPrompt }) => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const [showInstall, setShowInstall] = useState(false);
+  const {
+    items,
+    unreadCount,
+    loading,
+    hasMore,
+    fetchFirst,
+    fetchMore,
+    markRead,
+    markAllRead,
+    open,
+    setOpen,
+  } = useNotifications(user?.id);
 
   useEffect(() => {
     setShowInstall(!!deferredPrompt);
@@ -74,6 +88,29 @@ const Header = ({ deferredPrompt }) => {
             <Search className="h-5 w-5" />
           </Button>
 
+          {/* Cloche de notifications LAB */}
+          {user && (
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={async () => {
+                  setOpen(true);
+                  if (!items?.length) await fetchFirst();
+                }}
+                className="text-[#2BA84A]"
+                aria-label="Notifications"
+              >
+                <Bell className="h-5 w-5" />
+              </Button>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-[4px] rounded-full bg-red-500 text-white text-[10px] leading-[16px] text-center">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </div>
+          )}
+
           {showInstall && (
             <Button variant="ghost" size="icon" onClick={handleInstall} className="text-[#2BA84A]">
               <Download className="h-5 w-5" />
@@ -132,6 +169,20 @@ const Header = ({ deferredPrompt }) => {
           </DropdownMenu>
         </div>
       </div>
+      <NotifDrawer
+        open={open}
+        setOpen={setOpen}
+        items={items}
+        loading={loading}
+        hasMore={hasMore}
+        fetchMore={fetchMore}
+        markRead={markRead}
+        markAllRead={markAllRead}
+        onNavigate={(to) => {
+          setOpen(false);
+          navigate(to);
+        }}
+      />
     </header>
   );
 };
