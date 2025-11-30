@@ -495,7 +495,7 @@ const CreatePost = ({ onPublished }) => {
     }
 
     if (recording) {
-      toast({ title: "Patientez", description: "L’audio est encore en cours de traitement...", variant: "default" });
+      toast({ title: 'Patientez', description: "L’audio est encore en cours de traitement...", variant: 'default' });
       return;
     }
 
@@ -503,47 +503,75 @@ const CreatePost = ({ onPublished }) => {
       setLoading(true);
 
       let finalAudioBlob = audioBlob;
+      if (recorderPromiseRef.current && !finalAudioBlob) {
+        finalAudioBlob = await recorderPromiseRef.current;
+      }
 
-const handleFileChange = (event) => {
-const file = event.target.files[0];
-if (file) {
-  setMediaFile(file);
-  setMediaPreviewUrl(URL.createObjectURL(file));
-  setAudioBlob(null);
-  setAudioDuration(0);
-}
-};
+      if (finalAudioBlob) {
+        // Cas audio : on crée un commentaire audio lié à l'échange
+        if (!finalAudioBlob || finalAudioBlob.size < 2000) {
+          toast({ title: 'Erreur audio', description: "L’audio semble vide ou trop court. Réessayez.", variant: 'destructive' });
+          setLoading(false);
+          return;
+        }
 
-const handleRemoveMedia = () => {
-setMediaFile(null);
-setMediaPreviewUrl(null);
-if (mediaInputRef.current) {
-  mediaInputRef.current.value = '';
-}
-};
+        const { ext } = mimeRef.current;
+        const audioFile = new File([finalAudioBlob], `audio-${Date.now()}.${ext}`, { type: finalAudioBlob.type });
+        const { publicUrl: audioUrl } = await uploadAudioFile(audioFile, 'comments_audio');
 
-const handleRemoveAudio = () => {
-setAudioBlob(null);
-setAudioDuration(0);
-recorderPromiseRef.current = null;
-};
+        const normalizedDuration = Math.max(1, Math.round(audioDuration || recordingTime || 1));
+        const { data: insertedComment, error: insertError } = await supabase
+          .from('comments')
+          .insert({
+            type: 'audio',
+            audio_url: audioUrl,
+            user_id: user?.id,
+            content_type: 'echange',
+            content: currentPostText || '',
+            created_at: new Date(),
+            audio_duration: normalizedDuration,
+          })
+          .select()
+          .single();
+        if (insertError) throw insertError;
 
-const uploadToBunny = async (file, folder) => {
-const formData = new FormData();
-formData.append("file", file);
-formData.append("folder", folder);
+        if (mentionProfiles.length) {
+          try {
+            await notifyMentions({
+              mentionedUserIds: mentionProfiles.map((m) => m.id),
+              authorName: profile?.username || user?.email || 'Un membre OneKamer',
+              excerpt: currentPostText,
+              postId: insertedComment?.id,
+            });
+          } catch (notificationError) {
+            console.error('Erreur notification (commentaire audio):', notificationError);
+          }
+        }
+        try { onPublished && onPublished({ kind: 'audio_post', item: insertedComment }); } catch (_) { }
+      } else {
+        // Cas post texte / média classique
+        let postData = {
+          user_id: user.id,
+          content: currentPostText,
+          likes_count: 0,
+          comments_count: 0,
+        };
 
-const response = await fetch(`${import.meta.env.VITE_API_URL}/upload`, {
-  method: "POST",
-  body: formData,
-});
+        if (mediaFile) {
+          const mediaUrl = await uploadToBunny(mediaFile, 'posts');
+          const mediaType = mediaFile.type.startsWith('image') ? 'image' : 'video';
+          if (mediaType === 'image') {
+            postData.image_url = mediaUrl;
+          } else {
+            postData.video_url = mediaUrl;
+          }
+        }
 
-const data = await response.json();
-if (!data.success) {
-  throw new Error("Erreur d’upload BunnyCDN");
-}
-return data.url;
-};
+        const { data: insertedPost, error: insertError } = await supabase
+          .from('posts')
+          .insert([postData])
+          .select()
+          .single();
         if (insertError) throw insertError;
 
         if (insertedPost && mentionProfiles.length) {
@@ -555,7 +583,7 @@ return data.url;
               postId: insertedPost.id,
             });
           } catch (notificationError) {
-            console.error('Erreur notification OneSignal (mentions):', notificationError);
+            console.error('Erreur notification (mentions):', notificationError);
           }
         }
         try { onPublished && onPublished({ kind: 'post', item: insertedPost }); } catch (_) { }
