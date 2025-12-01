@@ -21,6 +21,8 @@ function routeForNotification(n) {
       return '/groupes'
     case 'rencontre':
       return '/rencontre/profil'
+    case 'donation':
+      return '/ok-coins'
     default:
       return '/'
   }

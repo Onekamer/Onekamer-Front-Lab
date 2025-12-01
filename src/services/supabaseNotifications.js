@@ -119,6 +119,7 @@ export const notifyDonationReceived = async ({ receiverId, senderName, amount })
     title: '💚 Nouveau don reçu',
     message: `${senderName || 'Un membre'} t’a envoyé ${amount} OKCoins !`,
     targetUserIds: targets,
+    url: '/ok-coins',
     data: {
       type: 'donation',
     },
