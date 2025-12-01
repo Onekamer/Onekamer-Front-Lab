@@ -104,6 +104,7 @@ const MessagesPrives = () => {
             recipientId: receiverProfile.user_id,
             senderName: myRencontreProfile?.name || user?.user_metadata?.full_name || user?.email || 'Un membre OneKamer',
             message: content,
+            matchId: selectedMatch,
           });
         } catch (notificationError) {
           console.error('Erreur notification (message match):', notificationError);

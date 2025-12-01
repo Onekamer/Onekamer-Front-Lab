@@ -135,14 +135,16 @@ export const notifyRencontreMatch = async ({ userIds = [], names = [], matchId }
     title: '💞 Nouveau match',
     message: label ? `${label}, vous avez matché !` : 'Vous avez un nouveau match 🎉',
     targetUserIds: targets,
+    url: matchId ? `/rencontre/messages/${matchId}` : '/rencontre/messages',
     data: {
       type: 'rencontre_match',
       matchId,
+      contentId: matchId,
     },
   });
 };
 
-export const notifyRencontreMessage = async ({ recipientId, senderName, message }) => {
+export const notifyRencontreMessage = async ({ recipientId, senderName, message, matchId }) => {
   const targets = normalizeUserIds([recipientId]);
   if (!targets.length) return false;
 
@@ -153,8 +155,11 @@ export const notifyRencontreMessage = async ({ recipientId, senderName, message 
     title: '💬 Nouveau message',
     message: `${senderName || 'Un membre'} t’a écrit${preview ? ` : "${preview}"` : ''}.`,
     targetUserIds: targets,
+    url: matchId ? `/rencontre/messages/${matchId}` : '/rencontre/messages',
     data: {
       type: 'rencontre_message',
+      matchId,
+      contentId: matchId,
     },
   });
 };
