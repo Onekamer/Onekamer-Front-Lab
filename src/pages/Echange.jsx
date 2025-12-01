@@ -8,7 +8,7 @@ import { Heart, MessageCircle, Share2, Send, Loader2, Trash2, Image as ImageIcon
 import { toast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/customSupabaseClient';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -944,6 +944,7 @@ const Echange = () => {
   const [feedItems, setFeedItems] = useState([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [openComments, setOpenComments] = useState({});
+  const [searchParams] = useSearchParams();
 
   const handleToggleComments = (postId) => {
     setOpenComments(prev => ({
@@ -1012,6 +1013,23 @@ const Echange = () => {
       supabase.removeChannel(channel);
     }
   }, [fetchFeed]);
+
+  // Deep link : ouvre automatiquement les commentaires d'un post via ?postId=
+  useEffect(() => {
+    if (!feedItems || feedItems.length === 0) return;
+    const postId = searchParams.get('postId');
+    if (!postId) return;
+
+    const found = feedItems.find(
+      (item) => item.feed_type === 'post' && String(item.id) === String(postId)
+    );
+    if (!found) return;
+
+    setOpenComments((prev) => ({
+      ...prev,
+      [found.id]: true,
+    }));
+  }, [feedItems, searchParams]);
 
   const handleLike = async (postId, isCurrentlyLiked) => {
     if (!user) return;

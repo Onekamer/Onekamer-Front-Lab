@@ -50,9 +50,11 @@ export const notifyMentions = async ({ mentionedUserIds = [], authorName, excerp
     title: '📣 Nouvelle mention',
     message: `${authorName || 'Un membre'} t’a mentionné${message ? ` : ${message}` : ''}`,
     targetUserIds: targets,
+    url: postId ? `/echange?postId=${postId}` : '/echange',
     data: {
       type: 'mention',
       postId,
+      contentId: postId,
     },
   });
 };
