@@ -312,21 +312,6 @@ const CommentSection = ({ postId }) => {
     });
   }, []);
 
-  const handlePublished = useCallback((payload) => {
-    if (!payload) return fetchFeed();
-    if (payload.kind === 'post') {
-      // normalize to include author for UI
-      const item = { ...payload.item, author: payload.item.profiles || payload.item.author };
-      setFeedItems((curr) => [{ ...normalizeAudioEntry(item), feed_type: 'post' }, ...curr]);
-      return;
-    }
-    if (payload.kind === 'audio_post') {
-      setFeedItems((curr) => [{ ...normalizeAudioEntry(payload.item), feed_type: 'audio_post' }, ...curr]);
-      return;
-    }
-    fetchFeed();
-  }, [fetchFeed]);
-
   const fetchComments = useCallback(async () => {
     setLoadingComments(true);
 
