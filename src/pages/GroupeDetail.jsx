@@ -487,11 +487,12 @@ const GroupeDetail = () => {
     let mentionTargets = [];
     if (mentionUsernames.length) {
       const found = [];
-      for (const username of mentionUsernames) {
+      for (const raw of mentionUsernames) {
+        const username = (raw || '').replace(/^@/, '');
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('id, username')
-          .ilike('username', username)
+          .ilike('username', `%${username}%`)
           .maybeSingle();
 
         if (!profileError && profileData) {
