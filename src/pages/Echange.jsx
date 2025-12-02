@@ -26,7 +26,8 @@ import {
 import { Label } from '@/components/ui/label';
 import { getInitials } from '@/lib/utils';
 import { uploadAudioFile, ensurePublicAudioUrl } from '@/utils/audioStorage';
-import { notifyDonationReceived } from '@/services/supabaseNotifications';
+import { notifyDonationReceived, notifyMentions } from '@/services/supabaseNotifications';
+import { extractUniqueMentions } from '@/utils/mentions';
 
 const normalizeAudioEntry = (entry) => {
   if (!entry || !entry.audio_url) return entry;
@@ -260,7 +261,7 @@ const CommentAvatar = ({ avatarPath, username }) => {
   );
 };
 
-const CommentSection = ({ postId }) => {
+const CommentSection = ({ postId, highlightCommentId }) => {
   const { user } = useAuth();
   const [comments, setComments] = useState([]);
   const [loadingComments, setLoadingComments] = useState(true);
@@ -281,6 +282,7 @@ const CommentSection = ({ postId }) => {
   const recordingIntervalRef = useRef(null);
   const lastRecordingTimeRef = useRef(0);
   const recordedDurationRef = useRef(0);
+  const commentRefs = useRef({});
 
   const getBlobDuration = useCallback((blob, fallback = 0) => {
     if (!blob) return Promise.resolve(fallback);
@@ -675,7 +677,13 @@ const CommentSection = ({ postId }) => {
           comments.length > 0 ? (
             <div className="space-y-3 mb-4">
               {comments.map((comment) => (
-                <div key={comment.id} className="flex gap-2 items-start">
+                <div
+                  key={comment.id}
+                  ref={(el) => {
+                    if (el) commentRefs.current[comment.id] = el;
+                  }}
+                  className="flex gap-2 items-start"
+                >
                   <div className="cursor-pointer" onClick={() => navigate(`/profil/${comment.author?.id}`)}>
                     <CommentAvatar avatarPath={comment.author?.avatar_url} username={comment.author?.username} />
                   </div>
@@ -880,7 +888,16 @@ const PostCard = ({ post, user, profile, onLike, onDelete, showComments, onToggl
           )}
         </div>
         <AnimatePresence>
-          {showComments && <CommentSection postId={post.id} />}
+          {showComments && (
+            <CommentSection
+              postId={post.id}
+              highlightCommentId={
+                searchParams.get('postId') && String(searchParams.get('postId')) === String(post.id)
+                  ? searchParams.get('commentId')
+                  : null
+              }
+            />
+          )}
         </AnimatePresence>
       </CardContent>
     </Card>

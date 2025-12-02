@@ -39,21 +39,25 @@ const postNotification = async (payload = {}) => {
   }
 };
 
-export const notifyMentions = async ({ mentionedUserIds = [], authorName, excerpt, postId }) => {
+export const notifyMentions = async ({ mentionedUserIds = [], authorName, excerpt, postId, commentId }) => {
   const targets = normalizeUserIds(mentionedUserIds);
   if (!targets.length) return false;
 
   const safeExcerpt = (excerpt || '').trim();
   const message = safeExcerpt.length > 120 ? `${safeExcerpt.slice(0, 117)}...` : safeExcerpt;
 
+  const baseUrl = postId ? `/echange?postId=${postId}` : '/echange';
+  const url = commentId ? `${baseUrl}&commentId=${commentId}` : baseUrl;
+
   return postNotification({
     title: '📣 Nouvelle mention',
     message: `${authorName || 'Un membre'} t’a mentionné${message ? ` : ${message}` : ''}`,
     targetUserIds: targets,
-    url: postId ? `/echange?postId=${postId}` : '/echange',
+    url,
     data: {
       type: 'mention',
       postId,
+      commentId,
       contentId: postId,
     },
   });
