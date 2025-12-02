@@ -63,6 +63,30 @@ export const notifyMentions = async ({ mentionedUserIds = [], authorName, excerp
   });
 };
 
+export const notifyGroupMentions = async ({ mentionedUserIds = [], authorName, excerpt, groupId, messageId }) => {
+  const targets = normalizeUserIds(mentionedUserIds);
+  if (!targets.length) return false;
+
+  const safeExcerpt = (excerpt || '').trim();
+  const message = safeExcerpt.length > 120 ? `${safeExcerpt.slice(0, 117)}...` : safeExcerpt;
+
+  const baseUrl = groupId ? `/groupes/${groupId}` : '/groupes';
+  const url = messageId ? `${baseUrl}?messageId=${messageId}` : baseUrl;
+
+  return postNotification({
+    title: '📣 Nouvelle mention dans un groupe',
+    message: `${authorName || 'Un membre'} t’a mentionné${message ? ` : ${message}` : ''}`,
+    targetUserIds: targets,
+    url,
+    data: {
+      type: 'group_mention',
+      groupId,
+      messageId,
+      contentId: messageId || groupId,
+    },
+  });
+};
+
 export const notifyNewAnnonce = async ({ annonceId, title, authorName, price }) => {
   return postNotification({
     title: '🛍️ Nouvelle annonce',
@@ -186,6 +210,7 @@ export const notifyMentionInComment = async ({ mentionedUserIds = [], authorName
 
 export default {
   notifyMentions,
+  notifyGroupMentions,
   notifyNewAnnonce,
   notifyNewEvenement,
   notifyNewPartenaire,

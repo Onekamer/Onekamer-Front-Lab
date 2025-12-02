@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Helmet } from 'react-helmet';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Send, Loader2, Heart, Mic, Square, X, Image as ImageIcon, Phone } from 'lucide-react';
@@ -19,6 +19,8 @@ import GroupMembers from '@/pages/groupes/GroupMembers';
 import GroupAdmin from '@/pages/groupes/GroupAdmin';
 import { uploadAudioFile } from '@/utils/audioStorage';
 import GroupAudioCall from '@/components/GroupAudioCall';
+import { extractUniqueMentions } from '@/utils/mentions';
+import { notifyGroupMentions } from '@/services/supabaseNotifications';
 
 const AudioPlayer = ({ src, initialDuration = 0 }) => {
   const audioRef = useRef(null);
@@ -191,6 +193,7 @@ const MessageItem = ({ msg, currentUserId, groupId, onActionComplete }) => {
 
 const GroupeDetail = () => {
   const { groupId } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, session, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -216,6 +219,7 @@ const GroupeDetail = () => {
   const mimeRef = useRef(null);
   const recordingIntervalRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const messageRefs = useRef({});
 
   const fetchGroupData = useCallback(async () => {
     if (!user || !session) {
@@ -321,6 +325,16 @@ const GroupeDetail = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Scroll automatique vers un message ciblé (mention) via ?messageId=
+  useEffect(() => {
+    const targetId = searchParams.get('messageId');
+    if (!targetId || !messages || messages.length === 0) return;
+    const el = messageRefs.current[targetId];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [searchParams, messages]);
 
   const pickSupportedMime = useCallback(() => {
     const ua = navigator.userAgent.toLowerCase();
@@ -466,15 +480,49 @@ const GroupeDetail = () => {
     }
 
     if (!newMessage.trim()) return;
-    const { error } = await supabase.from('messages_groupes').insert({
-      groupe_id: groupId,
-      sender_id: user.id,
-      contenu: newMessage,
-    });
+
+    // Mentions dans le message texte
+    const mentionUsernames = extractUniqueMentions(newMessage);
+    let mentionTargets = [];
+    if (mentionUsernames.length) {
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('username', mentionUsernames);
+
+      if (!profilesError && profilesData) {
+        mentionTargets = profilesData;
+      }
+    }
+
+    const { data: insertedMessage, error } = await supabase
+      .from('messages_groupes')
+      .insert({
+        groupe_id: groupId,
+        sender_id: user.id,
+        contenu: newMessage,
+      })
+      .select('id')
+      .single();
+
     if (error) {
       toast({ title: 'Erreur', description: 'Impossible d\'envoyer le message.', variant: 'destructive' });
     } else {
       setNewMessage('');
+
+      if (mentionTargets.length && insertedMessage?.id) {
+        try {
+          await notifyGroupMentions({
+            mentionedUserIds: mentionTargets.map((m) => m.id),
+            authorName: user?.email || 'Un membre OneKamer',
+            excerpt: newMessage,
+            groupId,
+            messageId: insertedMessage.id,
+          });
+        } catch (notificationError) {
+          console.error('Erreur notification (mention groupe):', notificationError);
+        }
+      }
     }
   };
 
@@ -673,7 +721,21 @@ const GroupeDetail = () => {
           <TabsContent value="messages" className="flex-grow flex flex-col overflow-hidden">
             <div className="flex-grow overflow-y-auto flex flex-col">
               <div className="p-4 space-y-2">
-                {messages.map(msg => <MessageItem key={msg.message_id} msg={msg} currentUserId={user.id} groupId={groupId} onActionComplete={fetchGroupData} />)}
+                {messages.map(msg => (
+                  <div
+                    key={msg.message_id}
+                    ref={(el) => {
+                      if (el) messageRefs.current[msg.message_id] = el;
+                    }}
+                  >
+                    <MessageItem
+                      msg={msg}
+                      currentUserId={user.id}
+                      groupId={groupId}
+                      onActionComplete={fetchGroupData}
+                    />
+                  </div>
+                ))}
                 <div ref={messagesEndRef}></div>
               </div>
               {isMember && (
