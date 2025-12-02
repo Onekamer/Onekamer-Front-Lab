@@ -483,6 +483,7 @@ const GroupeDetail = () => {
 
     // Mentions dans le message texte (recherche insensible à la casse)
     const mentionUsernames = extractUniqueMentions(newMessage);
+    console.log('[GroupMentions] usernames détectés :', mentionUsernames);
     let mentionTargets = [];
     if (mentionUsernames.length) {
       const found = [];
@@ -504,6 +505,7 @@ const GroupeDetail = () => {
           if (p?.id && !unique.has(p.id)) unique.set(p.id, p);
         });
         mentionTargets = Array.from(unique.values());
+        console.log('[GroupMentions] cibles résolues :', mentionTargets);
       }
     }
 
@@ -524,13 +526,19 @@ const GroupeDetail = () => {
 
       if (mentionTargets.length && insertedMessage?.id) {
         try {
-          await notifyGroupMentions({
+          console.log('[GroupMentions] envoi notification', {
+            mentionedIds: mentionTargets.map((m) => m.id),
+            groupId,
+            messageId: insertedMessage.id,
+          });
+          const ok = await notifyGroupMentions({
             mentionedUserIds: mentionTargets.map((m) => m.id),
             authorName: user?.email || 'Un membre OneKamer',
             excerpt: newMessage,
             groupId,
             messageId: insertedMessage.id,
           });
+          console.log('[GroupMentions] résultat notifyGroupMentions =', ok);
         } catch (notificationError) {
           console.error('Erreur notification (mention groupe):', notificationError);
         }
