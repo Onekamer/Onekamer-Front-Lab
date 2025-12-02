@@ -481,17 +481,29 @@ const GroupeDetail = () => {
 
     if (!newMessage.trim()) return;
 
-    // Mentions dans le message texte
+    // Mentions dans le message texte (recherche insensible à la casse)
     const mentionUsernames = extractUniqueMentions(newMessage);
     let mentionTargets = [];
     if (mentionUsernames.length) {
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, username')
-        .in('username', mentionUsernames);
+      const found = [];
+      for (const username of mentionUsernames) {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .ilike('username', username)
+          .maybeSingle();
 
-      if (!profilesError && profilesData) {
-        mentionTargets = profilesData;
+        if (!profileError && profileData) {
+          found.push(profileData);
+        }
+      }
+      if (found.length) {
+        // dédoublonner au cas où
+        const unique = new Map();
+        found.forEach((p) => {
+          if (p?.id && !unique.has(p.id)) unique.set(p.id, p);
+        });
+        mentionTargets = Array.from(unique.values());
       }
     }
 
