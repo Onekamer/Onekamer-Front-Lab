@@ -5,8 +5,10 @@ const resolveEndpoint = () => {
     console.warn("Aucune URL API configurée pour l'envoi des notifications push.");
     return null;
   }
-  // Pipeline notifications natif (supabase_light) côté serveur
-  return `${API_BASE_URL}/api/push/send`;
+  const endsWithApi = /\/api$/i.test(API_BASE_URL);
+  // Si l'URL contient déjà /api (cas LAB), ne pas le doubler
+  const path = endsWithApi ? '/push/send' : '/api/push/send';
+  return `${API_BASE_URL}${path}`;
 };
 
 const normalizeUserIds = (userIds = []) => {
