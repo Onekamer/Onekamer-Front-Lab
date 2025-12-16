@@ -24,11 +24,13 @@ import InfluenceurStats from '@/pages/InfluenceurStats';
 import Publier from '@/pages/Publier';
 import Rechercher from '@/pages/Rechercher';
 import Messages from '@/pages/Messages';
+import Scan from '@/pages/Scan';
 import { AuthProvider, useAuth } from '@/contexts/SupabaseAuthContext';
 import ModifierProfil from '@/pages/compte/ModifierProfil';
 import Notifications from '@/pages/compte/Notifications';
 import Confidentialite from '@/pages/compte/Confidentialite';
 import Favoris from '@/pages/compte/Favoris';
+import MonQRCode from '@/pages/compte/MonQRCode';
 import CreateAnnonce from '@/pages/publier/CreateAnnonce';
 import CreateEvenement from '@/pages/publier/CreateEvenement';
 import ProposerPartenaire from '@/pages/publier/ProposerPartenaire';
@@ -124,6 +126,8 @@ const AppContent = () => {
           <Route path="/compte/notifications" element={<Notifications />} />
           <Route path="/compte/confidentialite" element={<Confidentialite />} />
           <Route path="/compte/favoris" element={<Favoris />} />
+          <Route path="/compte/mon-qrcode" element={<MonQRCode />} />
+          <Route path="/scan" element={<Scan />} />
           <Route path="/publier" element={<Publier />} />
           <Route path="/publier/annonce" element={<CreateAnnonce />} />
           <Route path="/publier/evenement" element={<CreateEvenement />} />
