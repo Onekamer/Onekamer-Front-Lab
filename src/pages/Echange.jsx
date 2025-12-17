@@ -768,7 +768,7 @@ const PostCard = ({ post, user, profile, onLike, onDelete, showComments, onToggl
   const navigate = useNavigate();
   const [isLiked, setIsLiked] = useState(false);
   const isMyPost = user?.id === post.user_id;
-  const isAdmin = profile?.is_admin === true || profile?.is_admin === 1;
+  const isAdmin = profile?.is_admin === true || profile?.is_admin === 1 || profile?.is_admin === 'true';
 
   const checkLiked = useCallback(async () => {
     if (!user) return;
@@ -908,7 +908,7 @@ const PostCard = ({ post, user, profile, onLike, onDelete, showComments, onToggl
 const AudioPostCard = ({ post, user, profile, onDelete }) => {
   const navigate = useNavigate();
   const isMyPost = user?.id === post.user_id;
-  const isAdmin = profile?.is_admin === true || profile?.is_admin === 1;
+  const isAdmin = profile?.is_admin === true || profile?.is_admin === 1 || profile?.is_admin === 'true';
 
   return (
     <Card>
@@ -958,6 +958,10 @@ const Echange = () => {
       [postId]: !prev[postId]
     }));
   };
+
+  useEffect(() => {
+    console.log('[Echange] profile.is_admin =', profile?.is_admin);
+  }, [profile]);
 
   const fetchFeed = useCallback(async () => {
     setLoadingPosts(true);
@@ -1049,7 +1053,7 @@ const Echange = () => {
 
   const handleDeletePost = async (postId, imageUrl, videoUrl) => {
     try {
-      const isAdmin = profile?.is_admin === true || profile?.is_admin === 1;
+      const isAdmin = profile?.is_admin === true || profile?.is_admin === 1 || profile?.is_admin === 'true';
       const isMyPost = user?.id && feedItems.find((p) => p.feed_type === 'post' && p.id === postId)?.user_id === user.id;
 
       if (isAdmin && !isMyPost) {
@@ -1075,7 +1079,7 @@ const Echange = () => {
 
   const handleDeleteAudioPost = async (commentId) => {
     try {
-      const isAdmin = profile?.is_admin === true || profile?.is_admin === 1;
+      const isAdmin = profile?.is_admin === true || profile?.is_admin === 1 || profile?.is_admin === 'true';
       const isMyPost = user?.id && feedItems.find((p) => p.feed_type === 'audio_post' && p.id === commentId)?.user_id === user.id;
 
       if (isAdmin && !isMyPost) {
