@@ -764,11 +764,15 @@ const CommentSection = ({ postId, highlightCommentId }) => {
 };
 
 
-const PostCard = ({ post, user, profile, onLike, onDelete, showComments, onToggleComments, refreshBalance }) => {
+const PostCard = ({ post, user, profile, onLike, onDelete, onWarn, showComments, onToggleComments, refreshBalance }) => {
   const navigate = useNavigate();
   const [isLiked, setIsLiked] = useState(false);
   const isMyPost = user?.id === post.user_id;
   const isAdmin = profile?.is_admin === true || profile?.is_admin === 1 || profile?.is_admin === 'true';
+  const [warnOpen, setWarnOpen] = useState(false);
+  const [warnReason, setWarnReason] = useState('Contenu inapproprié');
+  const [warnMessage, setWarnMessage] = useState('');
+  const [warnSending, setWarnSending] = useState(false);
 
   const checkLiked = useCallback(async () => {
     if (!user) return;
@@ -842,11 +846,88 @@ const PostCard = ({ post, user, profile, onLike, onDelete, showComments, onToggl
                 </div>
                 <div className="text-sm text-[#6B6B6B]">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: fr })}</div>
               </div>
-              {(isMyPost || isAdmin) && (
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => onDelete(post.id, post.image_url, post.video_url)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
+              <div className="flex items-center gap-1">
+                {isAdmin && user?.id !== post.user_id && (
+                  <Dialog open={warnOpen} onOpenChange={setWarnOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-[#2BA84A]" type="button">
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Avertir l'auteur</DialogTitle>
+                        <DialogDescription>
+                          Envoyer une notification + un email à l'auteur (expéditeur: L'équipe OneKamer).
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      <div className="grid gap-3 py-2 text-sm">
+                        <div className="grid gap-1">
+                          <Label>Motif</Label>
+                          <select
+                            className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-500/40"
+                            value={warnReason}
+                            onChange={(e) => setWarnReason(e.target.value)}
+                          >
+                            <option value="Contenu inapproprié">Contenu inapproprié</option>
+                            <option value="Spam">Spam</option>
+                            <option value="Harcèlement">Harcèlement</option>
+                            <option value="Hors sujet">Hors sujet</option>
+                            <option value="Autre">Autre</option>
+                          </select>
+                        </div>
+
+                        <div className="grid gap-1">
+                          <Label>Message</Label>
+                          <textarea
+                            className="w-full border rounded px-3 py-2 text-sm min-h-[120px] focus:outline-none focus:ring focus:ring-green-500/40"
+                            value={warnMessage}
+                            onChange={(e) => setWarnMessage(e.target.value)}
+                            placeholder="Expliquez la raison / l'avertissement..."
+                          />
+                        </div>
+                      </div>
+
+                      <DialogFooter>
+                        <Button
+                          type="button"
+                          disabled={warnSending}
+                          onClick={async () => {
+                            if (!warnMessage || !warnReason) {
+                              toast({ title: 'Champs incomplets', description: 'Motif et message requis.', variant: 'destructive' });
+                              return;
+                            }
+                            setWarnSending(true);
+                            try {
+                              await onWarn({
+                                targetUserId: post.user_id,
+                                contentType: 'post',
+                                contentId: post.id,
+                                reason: warnReason,
+                                message: warnMessage,
+                              });
+                              setWarnMessage('');
+                              setWarnReason('Contenu inapproprié');
+                              setWarnOpen(false);
+                            } finally {
+                              setWarnSending(false);
+                            }
+                          }}
+                        >
+                          Envoyer
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
+
+                {(isMyPost || isAdmin) && (
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => onDelete(post.id, post.image_url, post.video_url)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -905,10 +986,14 @@ const PostCard = ({ post, user, profile, onLike, onDelete, showComments, onToggl
   )
 }
 
-const AudioPostCard = ({ post, user, profile, onDelete }) => {
+const AudioPostCard = ({ post, user, profile, onDelete, onWarn }) => {
   const navigate = useNavigate();
   const isMyPost = user?.id === post.user_id;
   const isAdmin = profile?.is_admin === true || profile?.is_admin === 1 || profile?.is_admin === 'true';
+  const [warnOpen, setWarnOpen] = useState(false);
+  const [warnReason, setWarnReason] = useState('Contenu inapproprié');
+  const [warnMessage, setWarnMessage] = useState('');
+  const [warnSending, setWarnSending] = useState(false);
 
   return (
     <Card>
@@ -928,11 +1013,88 @@ const AudioPostCard = ({ post, user, profile, onDelete }) => {
                 </div>
                 <div className="text-sm text-[#6B6B6B]">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: fr })}</div>
               </div>
-              {(isMyPost || isAdmin) && (
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => onDelete(post.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
+              <div className="flex items-center gap-1">
+                {isAdmin && user?.id !== post.user_id && (
+                  <Dialog open={warnOpen} onOpenChange={setWarnOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-[#2BA84A]" type="button">
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Avertir l'auteur</DialogTitle>
+                        <DialogDescription>
+                          Envoyer une notification + un email à l'auteur (expéditeur: L'équipe OneKamer).
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      <div className="grid gap-3 py-2 text-sm">
+                        <div className="grid gap-1">
+                          <Label>Motif</Label>
+                          <select
+                            className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-500/40"
+                            value={warnReason}
+                            onChange={(e) => setWarnReason(e.target.value)}
+                          >
+                            <option value="Contenu inapproprié">Contenu inapproprié</option>
+                            <option value="Spam">Spam</option>
+                            <option value="Harcèlement">Harcèlement</option>
+                            <option value="Hors sujet">Hors sujet</option>
+                            <option value="Autre">Autre</option>
+                          </select>
+                        </div>
+
+                        <div className="grid gap-1">
+                          <Label>Message</Label>
+                          <textarea
+                            className="w-full border rounded px-3 py-2 text-sm min-h-[120px] focus:outline-none focus:ring focus:ring-green-500/40"
+                            value={warnMessage}
+                            onChange={(e) => setWarnMessage(e.target.value)}
+                            placeholder="Expliquez la raison / l'avertissement..."
+                          />
+                        </div>
+                      </div>
+
+                      <DialogFooter>
+                        <Button
+                          type="button"
+                          disabled={warnSending}
+                          onClick={async () => {
+                            if (!warnMessage || !warnReason) {
+                              toast({ title: 'Champs incomplets', description: 'Motif et message requis.', variant: 'destructive' });
+                              return;
+                            }
+                            setWarnSending(true);
+                            try {
+                              await onWarn({
+                                targetUserId: post.user_id,
+                                contentType: 'audio_post',
+                                contentId: post.id,
+                                reason: warnReason,
+                                message: warnMessage,
+                              });
+                              setWarnMessage('');
+                              setWarnReason('Contenu inapproprié');
+                              setWarnOpen(false);
+                            } finally {
+                              setWarnSending(false);
+                            }
+                          }}
+                        >
+                          Envoyer
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
+
+                {(isMyPost || isAdmin) && (
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => onDelete(post.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
             {post.content && post.content !== "Message vocal" && <p className="mt-2 text-sm text-gray-700">{parseMentions(post.content)}</p>}
             <AudioPlayer src={post.audio_url} initialDuration={post.audio_duration} />
@@ -951,6 +1113,33 @@ const Echange = () => {
   const [searchParams] = useSearchParams();
 
   const API_PREFIX = import.meta.env.VITE_API_URL || '/api';
+
+  const handleWarnUser = async ({ targetUserId, contentType, contentId, reason, message }) => {
+    try {
+      const token = session?.access_token;
+      if (!token) throw new Error('Session expirée');
+      const res = await fetch(`${API_PREFIX}/admin/moderation/warn`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          targetUserId,
+          contentType,
+          contentId,
+          reason,
+          message,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur serveur');
+      toast({ title: 'Envoyé', description: 'Avertissement envoyé (notification + email).' });
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || 'Erreur interne', variant: 'destructive' });
+      throw e;
+    }
+  };
 
   const handleToggleComments = (postId) => {
     setOpenComments(prev => ({
@@ -1131,18 +1320,19 @@ const Echange = () => {
               feedItems.map((item, index) => (
                 <motion.div key={`${item.feed_type}-${item.id}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}>
                   {item.feed_type === 'post' ? (
-                    <PostCard
-                      post={item}
+                    <PostCard 
+                      post={item} 
                       user={user}
                       profile={profile}
-                      onLike={handleLike}
+                      onLike={handleLike} 
                       onDelete={handleDeletePost}
+                      onWarn={handleWarnUser}
                       showComments={!!openComments[item.id]}
                       onToggleComments={() => handleToggleComments(item.id)}
                       refreshBalance={refreshBalance}
                     />
                   ) : (
-                    <AudioPostCard post={item} user={user} profile={profile} onDelete={handleDeleteAudioPost} />
+                    <AudioPostCard post={item} user={user} profile={profile} onDelete={handleDeleteAudioPost} onWarn={handleWarnUser} />
                   )}
                 </motion.div>
               ))
@@ -1159,12 +1349,13 @@ const Echange = () => {
                       profile={profile}
                       onLike={handleLike}
                       onDelete={handleDeletePost}
+                      onWarn={handleWarnUser}
                       showComments={!!openComments[item.id]}
                       onToggleComments={() => handleToggleComments(item.id)}
                       refreshBalance={refreshBalance}
                     />
                   ) : (
-                    <AudioPostCard post={item} user={user} profile={profile} onDelete={handleDeleteAudioPost} />
+                    <AudioPostCard post={item} user={user} profile={profile} onDelete={handleDeleteAudioPost} onWarn={handleWarnUser} />
                   )}
                 </motion.div>
               ))
