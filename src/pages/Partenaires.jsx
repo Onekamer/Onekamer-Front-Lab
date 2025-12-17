@@ -126,10 +126,14 @@ const Partenaires = () => {
   const suggestDebounceRef = useRef(null);
   const [selectedPartenaire, setSelectedPartenaire] = useState(null);
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [canCreate, setCanCreate] = useState(false);
   const [searchParams] = useSearchParams();
+  const [marketPartner, setMarketPartner] = useState(null);
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [marketOnboarding, setMarketOnboarding] = useState(false);
+  const serverLabUrl = import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com';
 
   // 🟢 Vérifie automatiquement les droits d'accès à la page "Partenaires"
   useEffect(() => {
@@ -145,6 +149,36 @@ const Partenaires = () => {
       setCanCreate(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    const loadMarketPartner = async () => {
+      if (!user?.id) {
+        setMarketPartner(null);
+        return;
+      }
+      setMarketLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('partners_market')
+          .select('id, display_name, status, payout_status, stripe_connect_account_id')
+          .eq('owner_user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (error) {
+          setMarketPartner(null);
+        } else {
+          setMarketPartner(Array.isArray(data) && data.length > 0 ? data[0] : null);
+        }
+      } finally {
+        setMarketLoading(false);
+      }
+    };
+
+    if (!authLoading) {
+      loadMarketPartner();
+    }
+  }, [user, authLoading]);
 
   const fetchPartenaires = useCallback(async () => {
     setLoading(true);
@@ -283,6 +317,88 @@ const Partenaires = () => {
             {canCreate ? 'Proposer' : 'Verrouillé'}
           </Button>
         </div>
+
+        {user && (
+          <Card>
+            <CardHeader className="p-4">
+              <CardTitle className="text-base">Espace partenaire (Marketplace)</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 space-y-3 text-sm">
+              {marketLoading ? (
+                <div className="text-gray-600">Chargement…</div>
+              ) : !marketPartner ? (
+                <div className="text-gray-600">
+                  Aucun espace partenaire marketplace lié à ton compte pour le moment.
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-1">
+                    <div className="font-semibold text-gray-800">{marketPartner.display_name || 'Mon partenaire'}</div>
+                    <div className="text-gray-600">Statut: {marketPartner.status || '—'}</div>
+                    <div className="text-gray-600">Paiements: {marketPartner.payout_status || '—'}</div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button
+                      type="button"
+                      disabled={marketOnboarding || !session?.access_token}
+                      onClick={async () => {
+                        if (!session?.access_token) {
+                          toast({
+                            title: 'Connexion requise',
+                            description: "Impossible de récupérer la session. Réessaie après reconnexion.",
+                            variant: 'destructive',
+                          });
+                          return;
+                        }
+
+                        setMarketOnboarding(true);
+                        try {
+                          const res = await fetch(`${serverLabUrl}/api/partner/connect/onboarding-link`, {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              Authorization: `Bearer ${session.access_token}`,
+                            },
+                            body: JSON.stringify({ partnerId: marketPartner.id }),
+                          });
+
+                          const data = await res.json();
+                          if (!res.ok) {
+                            throw new Error(data?.error || "Impossible de générer le lien d'onboarding");
+                          }
+
+                          if (data?.url) {
+                            window.location.href = data.url;
+                          } else {
+                            throw new Error("Lien d'onboarding manquant");
+                          }
+                        } catch (e) {
+                          toast({
+                            title: 'Erreur',
+                            description: e?.message || "Impossible de démarrer l'onboarding Stripe",
+                            variant: 'destructive',
+                          });
+                        } finally {
+                          setMarketOnboarding(false);
+                        }
+                      }}
+                      className="sm:w-fit"
+                    >
+                      {marketOnboarding ? 'Redirection…' : 'Activer les paiements'}
+                    </Button>
+                    {marketPartner.stripe_connect_account_id ? (
+                      <div className="text-xs text-gray-500 self-center">
+                        Compte Stripe: {marketPartner.stripe_connect_account_id}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-500 self-center">Compte Stripe: non lié</div>
+                    )}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
