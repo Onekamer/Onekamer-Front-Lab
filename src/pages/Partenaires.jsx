@@ -134,6 +134,7 @@ const Partenaires = () => {
   const [marketPartner, setMarketPartner] = useState(null);
   const [marketLoading, setMarketLoading] = useState(false);
   const [marketOnboarding, setMarketOnboarding] = useState(false);
+  const [marketCheckoutLoading, setMarketCheckoutLoading] = useState(false);
   const serverLabUrl = import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com';
 
   // 🟢 Vérifie automatiquement les droits d'accès à la page "Partenaires"
@@ -320,6 +321,87 @@ const Partenaires = () => {
     });
   };
 
+  const handleTestMarketplacePayment = async () => {
+    if (!marketPartner?.id) return;
+    if (!session?.access_token) {
+      toast({
+        title: 'Connexion requise',
+        description: "Impossible de récupérer la session. Réessaie après reconnexion.",
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (marketCheckoutLoading) return;
+
+    setMarketCheckoutLoading(true);
+    try {
+      const itemsRes = await fetch(`${serverLabUrl}/api/market/partners/${marketPartner.id}/items`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      const itemsData = await itemsRes.json().catch(() => ({}));
+      if (!itemsRes.ok) throw new Error(itemsData?.error || 'Erreur lecture items');
+
+      const items = Array.isArray(itemsData?.items) ? itemsData.items : [];
+      const first = items.find((it) => it?.id) || null;
+      if (!first) {
+        toast({
+          title: 'Aucun produit',
+          description: "Aucun item publié n'est disponible pour ce partenaire.",
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const createRes = await fetch(`${serverLabUrl}/api/market/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          partnerId: marketPartner.id,
+          items: [{ itemId: first.id, quantity: 1 }],
+          delivery_mode: 'pickup',
+        }),
+      });
+      const createData = await createRes.json().catch(() => ({}));
+      if (!createRes.ok) throw new Error(createData?.error || 'Erreur création commande');
+
+      const orderId = createData?.orderId;
+      if (!orderId) throw new Error('orderId manquant');
+
+      const checkoutRes = await fetch(`${serverLabUrl}/api/market/orders/${orderId}/checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({}),
+      });
+      const checkoutData = await checkoutRes.json().catch(() => ({}));
+      if (!checkoutRes.ok) throw new Error(checkoutData?.error || 'Erreur création checkout');
+
+      if (checkoutData?.url) {
+        window.location.href = checkoutData.url;
+      } else {
+        throw new Error('URL Stripe manquante');
+      }
+    } catch (e) {
+      toast({
+        title: 'Erreur',
+        description: e?.message || "Impossible de démarrer le paiement marketplace",
+        variant: 'destructive',
+      });
+    } finally {
+      setMarketCheckoutLoading(false);
+    }
+  };
+
   return (
   <>
     <Helmet>
@@ -419,6 +501,15 @@ const Partenaires = () => {
                       className="sm:w-fit"
                     >
                       {marketOnboarding ? 'Redirection…' : 'Activer les paiements'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={marketCheckoutLoading || !session?.access_token}
+                      onClick={handleTestMarketplacePayment}
+                      className="sm:w-fit"
+                    >
+                      {marketCheckoutLoading ? 'Redirection…' : 'Tester un paiement'}
                     </Button>
                     {marketPartner.stripe_connect_account_id ? (
                       <div className="text-xs text-gray-500 self-center">
