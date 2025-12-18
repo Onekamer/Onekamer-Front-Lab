@@ -124,6 +124,7 @@ const Partenaires = () => {
   const [suggestions, setSuggestions] = useState([]);
   const [suggestLoading, setSuggestLoading] = useState(false);
   const suggestDebounceRef = useRef(null);
+  const marketSyncRef = useRef(false);
   const [selectedPartenaire, setSelectedPartenaire] = useState(null);
   const { toast } = useToast();
   const { user, session, loading: authLoading } = useAuth();
@@ -150,35 +151,68 @@ const Partenaires = () => {
     }
   }, [user]);
 
-  useEffect(() => {
-    const loadMarketPartner = async () => {
-      if (!user?.id) {
-        setMarketPartner(null);
-        return;
-      }
-      setMarketLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('partners_market')
-          .select('id, display_name, status, payout_status, stripe_connect_account_id')
-          .eq('owner_user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1);
+  const loadMarketPartner = useCallback(async () => {
+    if (!user?.id) {
+      setMarketPartner(null);
+      return;
+    }
+    setMarketLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('partners_market')
+        .select('id, display_name, status, payout_status, stripe_connect_account_id')
+        .eq('owner_user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
 
-        if (error) {
-          setMarketPartner(null);
-        } else {
-          setMarketPartner(Array.isArray(data) && data.length > 0 ? data[0] : null);
+      if (error) {
+        setMarketPartner(null);
+      } else {
+        setMarketPartner(Array.isArray(data) && data.length > 0 ? data[0] : null);
+      }
+    } finally {
+      setMarketLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    loadMarketPartner();
+  }, [authLoading, loadMarketPartner]);
+
+  useEffect(() => {
+    const sync = async () => {
+      if (!marketPartner?.id) return;
+      if (!marketPartner?.stripe_connect_account_id) return;
+      if (String(marketPartner?.payout_status || '').toLowerCase() !== 'incomplete') return;
+      if (!session?.access_token) return;
+      if (marketSyncRef.current) return;
+
+      marketSyncRef.current = true;
+      try {
+        const res = await fetch(`${serverLabUrl}/api/partner/connect/sync-status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ partnerId: marketPartner.id }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.error || 'sync_status_failed');
         }
+
+        await loadMarketPartner();
+      } catch (_e) {
+        // Silent fail: on garde l'état actuel, l'utilisateur peut retenter via reload/retour onboarding
       } finally {
-        setMarketLoading(false);
+        marketSyncRef.current = false;
       }
     };
 
-    if (!authLoading) {
-      loadMarketPartner();
-    }
-  }, [user, authLoading]);
+    sync();
+  }, [marketPartner, session, serverLabUrl, loadMarketPartner]);
 
   const fetchPartenaires = useCallback(async () => {
     setLoading(true);
