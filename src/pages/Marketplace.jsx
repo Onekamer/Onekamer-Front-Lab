@@ -126,6 +126,28 @@ const Marketplace = () => {
     });
   }, [partners, search]);
 
+  const buildMapsUrl = (address) => {
+    const addr = String(address || '').trim();
+    if (!addr) return null;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`;
+  };
+
+  const buildWhatsappUrl = (phoneOrWhatsapp) => {
+    const raw = String(phoneOrWhatsapp || '').trim();
+    if (!raw) return null;
+    const digits = raw.replace(/[^0-9]/g, '');
+    if (!digits) return null;
+    return `https://wa.me/${digits}`;
+  };
+
+  const buildTelUrl = (phone) => {
+    const raw = String(phone || '').trim();
+    if (!raw) return null;
+    const digits = raw.replace(/[^0-9+]/g, '');
+    if (!digits) return null;
+    return `tel:${digits}`;
+  };
+
   return (
     <>
       <Helmet>
@@ -136,7 +158,7 @@ const Marketplace = () => {
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-2xl font-bold text-[#2BA84A]">Marketplace</h1>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {shopAccess && (
               <Button variant="outline" onClick={handleGoMyShop} className="shrink-0">
                 {myPartnerId ? 'Ma boutique' : 'Créer ma boutique'}
@@ -163,17 +185,66 @@ const Marketplace = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((p) => {
               const commandable = p?.commandable === true;
+              const mapUrl = buildMapsUrl(p?.address);
+              const whatsappUrl = buildWhatsappUrl(p?.whatsapp || p?.phone);
+              const telUrl = buildTelUrl(p?.phone);
+              const contactUrl = whatsappUrl || telUrl;
               return (
                 <Card key={p.id} className="h-full flex flex-col">
                   <CardHeader className="p-4">
-                    <CardTitle className="text-lg font-semibold">{p.display_name || 'Boutique partenaire'}</CardTitle>
-                    <div className="text-xs text-gray-500">{p.category || ''}</div>
+                    <div className="flex items-start gap-3">
+                      {p?.logo_url ? (
+                        <img
+                          alt="Logo boutique"
+                          src={p.logo_url}
+                          className="h-12 w-12 rounded-md object-cover border shrink-0"
+                        />
+                      ) : null}
+                      <div className="min-w-0">
+                        <CardTitle className="text-lg font-semibold">{p.display_name || 'Boutique partenaire'}</CardTitle>
+                        <div className="text-xs text-gray-500">{p.category || ''}</div>
+                      </div>
+                    </div>
                   </CardHeader>
                   <CardContent className="p-4 pt-0 flex-1 flex flex-col gap-3">
                     {p.description ? (
                       <p className="text-sm text-gray-600 line-clamp-3">{p.description}</p>
                     ) : (
                       <p className="text-sm text-gray-500">Description indisponible.</p>
+                    )}
+
+                    {(p?.hours || p?.address) && (
+                      <div className="space-y-1">
+                        {p?.hours ? <div className="text-xs text-gray-600">{p.hours}</div> : null}
+                        {p?.address ? <div className="text-xs text-gray-600">{p.address}</div> : null}
+                      </div>
+                    )}
+
+                    {(mapUrl || contactUrl) && (
+                      <div className="flex flex-wrap gap-2">
+                        {mapUrl ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => window.open(mapUrl, '_blank', 'noopener,noreferrer')}
+                            className="shrink-0"
+                          >
+                            S’y rendre
+                          </Button>
+                        ) : null}
+                        {contactUrl ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              window.location.href = contactUrl;
+                            }}
+                            className="shrink-0"
+                          >
+                            Contacter
+                          </Button>
+                        ) : null}
+                      </div>
                     )}
 
                     <div className="mt-auto flex items-center justify-between gap-2">

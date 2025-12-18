@@ -177,13 +177,7 @@ const MarketplaceMyShop = () => {
         if (!res.ok) throw new Error(data?.error || 'Erreur création boutique');
 
         toast({ title: 'Boutique créée', description: 'Ta boutique est en attente de validation.' });
-
-        const meRes = await fetch(`${serverLabUrl}/api/market/partners/me`, {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-        const meData = await meRes.json().catch(() => ({}));
-        if (!meRes.ok) throw new Error(meData?.error || 'Erreur rechargement boutique');
-        setPartner(meData?.partner || null);
+        navigate('/marketplace');
         return;
       }
 
@@ -199,12 +193,7 @@ const MarketplaceMyShop = () => {
       if (!res.ok) throw new Error(data?.error || 'Erreur mise à jour boutique');
 
       toast({ title: 'Boutique mise à jour', description: 'Modifications enregistrées.' });
-
-      const meRes = await fetch(`${serverLabUrl}/api/market/partners/me`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      const meData = await meRes.json().catch(() => ({}));
-      if (meRes.ok) setPartner(meData?.partner || null);
+      navigate('/marketplace');
     } catch (e) {
       toast({ title: 'Erreur', description: e?.message || 'Impossible de sauvegarder', variant: 'destructive' });
     } finally {
