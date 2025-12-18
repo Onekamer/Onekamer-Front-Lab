@@ -22,6 +22,8 @@ const MarketplaceMyShop = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const [partner, setPartner] = useState(null);
 
@@ -137,6 +139,73 @@ const MarketplaceMyShop = () => {
     }
   };
 
+  const reloadPartner = async () => {
+    if (!session?.access_token) return;
+    const res = await fetch(`${serverLabUrl}/api/market/partners/me`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || 'Erreur chargement boutique');
+    const me = data?.partner || null;
+    setPartner(me);
+  };
+
+  const handleConnectOnboarding = async () => {
+    if (!partner?.id) return;
+    if (!session?.access_token) return;
+    if (connecting) return;
+
+    setConnecting(true);
+    try {
+      const res = await fetch(`${serverLabUrl}/api/partner/connect/onboarding-link`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ partnerId: partner.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur Stripe Connect');
+      if (!data?.url) throw new Error('URL Stripe manquante');
+
+      window.location.href = data.url;
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || 'Impossible de démarrer Stripe Connect', variant: 'destructive' });
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleSyncPayoutStatus = async () => {
+    if (!partner?.id) return;
+    if (!session?.access_token) return;
+    if (syncing) return;
+
+    setSyncing(true);
+    try {
+      const res = await fetch(`${serverLabUrl}/api/partner/connect/sync-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ partnerId: partner.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur sync Stripe');
+
+      await reloadPartner();
+      toast({ title: 'Statut mis à jour', description: 'Le statut de paiement a été rafraîchi.' });
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || 'Impossible de synchroniser le statut', variant: 'destructive' });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!session?.access_token) return;
@@ -229,6 +298,28 @@ const MarketplaceMyShop = () => {
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <div className="text-sm text-gray-700">{statusLabel}</div>
+            {partner?.id ? (
+              <div className="mt-3 space-y-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleConnectOnboarding}
+                  disabled={connecting}
+                  className="w-full"
+                >
+                  {connecting ? 'Redirection…' : 'Activer mes paiements'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleSyncPayoutStatus}
+                  disabled={syncing}
+                  className="w-full"
+                >
+                  {syncing ? 'Vérification…' : 'Vérifier le statut'}
+                </Button>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
