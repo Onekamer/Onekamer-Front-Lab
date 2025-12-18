@@ -46,6 +46,15 @@ const MarketplaceMyShop = () => {
     return partner ? (partner.status || '—') : '—';
   }, [partner]);
 
+  const payoutLabel = useMemo(() => {
+    const s = String(partner?.payout_status || '').toLowerCase();
+    if (!partner) return '—';
+    if (s === 'complete') return 'Configurés';
+    if (s === 'incomplete') return 'À configurer';
+    if (s === 'not_started') return 'À configurer';
+    return partner.payout_status || '—';
+  }, [partner]);
+
   useEffect(() => {
     const init = async () => {
       if (!session?.access_token) {
@@ -297,7 +306,16 @@ const MarketplaceMyShop = () => {
             <CardTitle className="text-base font-semibold">Statut</CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className="text-sm text-gray-700">{statusLabel}</div>
+            <div className="text-sm text-gray-700 space-y-1">
+              <div>
+                <span className="text-gray-600">Validation : </span>
+                <span>{statusLabel}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">Paiements : </span>
+                <span>{payoutLabel}</span>
+              </div>
+            </div>
             {partner?.id ? (
               <div className="mt-3 space-y-2">
                 <Button
