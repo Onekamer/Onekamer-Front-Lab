@@ -14,6 +14,7 @@ const PaiementSuccess = () => {
   const packId = query.get('packId');
   const eventId = query.get('eventId');
   const sessionId = query.get('session_id');
+  const isMarketplacePayment = !!sessionId && !packId && !eventId;
   const marketSyncRef = useRef(false);
   const serverLabUrl = import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com';
 
@@ -73,7 +74,9 @@ const PaiementSuccess = () => {
             <CardDescription className="text-gray-600 mt-2">
               {eventId
                 ? "Merci, votre paiement pour l'événement a été validé."
-                : "Merci pour votre achat. Vos OK COINS seront crédités automatiquement dans quelques instants."}
+                : isMarketplacePayment
+                  ? "Commande marketplace OneKamer confirmée"
+                  : "Merci pour votre achat. Vos OK COINS seront crédités automatiquement dans quelques instants."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
