@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
@@ -8,11 +8,14 @@ import { CheckCircle, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const PaiementSuccess = () => {
-  const { refreshBalance } = useAuth();
+  const { refreshBalance, session } = useAuth();
   const location = useLocation();
   const query = new URLSearchParams(location.search);
   const packId = query.get('packId');
   const eventId = query.get('eventId');
+  const sessionId = query.get('session_id');
+  const marketSyncRef = useRef(false);
+  const serverLabUrl = import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com';
 
   useEffect(() => {
     if (!packId) return;
@@ -22,6 +25,33 @@ const PaiementSuccess = () => {
 
     return () => clearTimeout(timer);
   }, [refreshBalance, packId]);
+
+  useEffect(() => {
+    const syncMarketplacePayment = async () => {
+      if (!sessionId) return;
+      if (packId || eventId) return;
+      if (!session?.access_token) return;
+      if (marketSyncRef.current) return;
+
+      marketSyncRef.current = true;
+      try {
+        await fetch(`${serverLabUrl}/api/market/orders/sync-payment`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ sessionId }),
+        });
+      } catch (_e) {
+        // silent
+      } finally {
+        marketSyncRef.current = false;
+      }
+    };
+
+    syncMarketplacePayment();
+  }, [sessionId, packId, eventId, session, serverLabUrl]);
 
   return (
     <>
