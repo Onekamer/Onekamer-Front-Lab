@@ -10,6 +10,7 @@ import Partenaires from '@/pages/Partenaires';
 import Marketplace from '@/pages/Marketplace';
 import MarketplacePartner from '@/pages/MarketplacePartner';
 import MarketplaceCart from '@/pages/MarketplaceCart';
+import MarketplaceMyShop from '@/pages/MarketplaceMyShop';
 import Echange from '@/pages/Echange';
 import Evenements from '@/pages/Evenements';
 import Rencontre from '@/pages/Rencontre';
@@ -108,6 +109,7 @@ const AppContent = () => {
           <Route path="/" element={<Home />} />
           <Route path="/annonces" element={<Annonces />} />
           <Route path="/marketplace" element={<Marketplace />} />
+          <Route path="/marketplace/ma-boutique" element={<MarketplaceMyShop />} />
           <Route path="/marketplace/partner/:partnerId" element={<MarketplacePartner />} />
           <Route path="/marketplace/cart" element={<MarketplaceCart />} />
           <Route path="/partenaires" element={<Partenaires />} />

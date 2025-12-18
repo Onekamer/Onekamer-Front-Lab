@@ -7,10 +7,13 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { ShoppingBag } from 'lucide-react';
 import { readMarketplaceCart, getMarketplaceCartCount } from '@/lib/marketplaceCart';
+import { useAuth } from '@/contexts/SupabaseAuthContext';
+import { canUserAccess } from '@/lib/accessControl';
 
 const Marketplace = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { session, profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [partners, setPartners] = useState([]);
   const [search, setSearch] = useState('');
@@ -18,6 +21,8 @@ const Marketplace = () => {
     const cart = readMarketplaceCart();
     return getMarketplaceCartCount(cart);
   });
+  const [shopAccess, setShopAccess] = useState(false);
+  const [myPartnerId, setMyPartnerId] = useState(null);
   const serverLabUrl = import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com';
 
   useEffect(() => {
@@ -58,6 +63,58 @@ const Marketplace = () => {
     load();
   }, [serverLabUrl, toast]);
 
+  useEffect(() => {
+    const loadMe = async () => {
+      try {
+        const allowed = await canUserAccess(profile, 'partenaires', 'create');
+        setShopAccess(Boolean(allowed));
+
+        if (!allowed || !session?.access_token) {
+          setMyPartnerId(null);
+          return;
+        }
+
+        const res = await fetch(`${serverLabUrl}/api/market/partners/me`, {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || 'Erreur chargement boutique');
+        setMyPartnerId(data?.partner?.id || null);
+      } catch (_e) {
+        setShopAccess(false);
+        setMyPartnerId(null);
+      }
+    };
+
+    loadMe();
+  }, [profile, serverLabUrl, session?.access_token]);
+
+  const handleGoMyShop = async () => {
+    if (!session?.access_token) {
+      toast({
+        title: 'Connexion requise',
+        description: 'Connecte-toi pour créer ta boutique.',
+        variant: 'destructive',
+      });
+      navigate('/auth');
+      return;
+    }
+
+    const allowed = await canUserAccess(profile, 'partenaires', 'create');
+    if (!allowed) {
+      toast({
+        title: 'Réservé VIP',
+        description: 'La création de boutique est réservée aux VIP.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    navigate('/marketplace/ma-boutique');
+  };
+
   const filtered = useMemo(() => {
     const term = String(search || '').trim().toLowerCase();
     if (!term) return partners;
@@ -79,10 +136,17 @@ const Marketplace = () => {
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-2xl font-bold text-[#2BA84A]">Marketplace</h1>
-          <Button variant="outline" onClick={() => navigate('/marketplace/cart')} className="shrink-0">
-            <ShoppingBag className="h-4 w-4 mr-2" />
-            Panier{cartCount > 0 ? ` (${cartCount})` : ''}
-          </Button>
+          <div className="flex items-center gap-2">
+            {shopAccess && (
+              <Button variant="outline" onClick={handleGoMyShop} className="shrink-0">
+                {myPartnerId ? 'Ma boutique' : 'Créer ma boutique'}
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => navigate('/marketplace/cart')} className="shrink-0">
+              <ShoppingBag className="h-4 w-4 mr-2" />
+              Panier{cartCount > 0 ? ` (${cartCount})` : ''}
+            </Button>
+          </div>
         </div>
 
         <Input
