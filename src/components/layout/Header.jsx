@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Menu, Search, User, Download, Users, Heart, Bell } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
+
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -55,7 +56,10 @@ const Header = ({ deferredPrompt }) => {
               <DropdownMenuItem onClick={() => navigate('/faits-divers')}>
                 📰 Faits Divers
               </DropdownMenuItem>
-               <DropdownMenuItem onClick={() => navigate('/groupes')}>
+              <DropdownMenuItem onClick={() => navigate('/partenaires')}>
+                <Users className="mr-2 h-4 w-4" /> Partenaires
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/groupes')}>
                 <Users className="mr-2 h-4 w-4" /> Groupes
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate('/publier')}>

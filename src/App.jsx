@@ -7,6 +7,9 @@ import BottomNav from '@/components/layout/BottomNav';
 import Home from '@/pages/Home';
 import Annonces from '@/pages/Annonces';
 import Partenaires from '@/pages/Partenaires';
+import Marketplace from '@/pages/Marketplace';
+import MarketplacePartner from '@/pages/MarketplacePartner';
+import MarketplaceCart from '@/pages/MarketplaceCart';
 import Echange from '@/pages/Echange';
 import Evenements from '@/pages/Evenements';
 import Rencontre from '@/pages/Rencontre';
@@ -104,6 +107,9 @@ const AppContent = () => {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/annonces" element={<Annonces />} />
+          <Route path="/marketplace" element={<Marketplace />} />
+          <Route path="/marketplace/partner/:partnerId" element={<MarketplacePartner />} />
+          <Route path="/marketplace/cart" element={<MarketplaceCart />} />
           <Route path="/partenaires" element={<Partenaires />} />
           <Route path="/echange" element={<Echange />} />
           <Route path="/evenements" element={<Evenements />} />
