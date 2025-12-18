@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { CheckCircle, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { clearMarketplaceCart } from '@/lib/marketplaceCart';
 
 const PaiementSuccess = () => {
   const { refreshBalance, session } = useAuth();
@@ -47,6 +48,7 @@ const PaiementSuccess = () => {
       } catch (_e) {
         // silent
       } finally {
+        clearMarketplaceCart();
         marketSyncRef.current = false;
       }
     };
