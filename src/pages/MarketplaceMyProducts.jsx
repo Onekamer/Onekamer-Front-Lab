@@ -21,6 +21,7 @@ const MarketplaceMyProducts = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [togglingPublishId, setTogglingPublishId] = useState(null);
 
   const [partner, setPartner] = useState(null);
   const [items, setItems] = useState([]);
@@ -93,6 +94,40 @@ const MarketplaceMyProducts = () => {
       toast({ title: 'Erreur', description: e?.message || 'Impossible de charger', variant: 'destructive' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTogglePublish = async (item) => {
+    if (!session?.access_token || !partner?.id) return;
+    const itemId = item?.id ? String(item.id) : null;
+    if (!itemId) return;
+    if (togglingPublishId) return;
+
+    const nextPublished = item?.is_published !== true;
+    setTogglingPublishId(itemId);
+    try {
+      const res = await fetch(
+        `${serverLabUrl}/api/market/partners/${encodeURIComponent(partner.id)}/items/${encodeURIComponent(itemId)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ is_published: nextPublished }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur publication produit');
+      toast({
+        title: nextPublished ? 'Publié' : 'Brouillon',
+        description: nextPublished ? 'Le produit est visible dans ta boutique.' : 'Le produit est caché de ta boutique.',
+      });
+      await loadAll({ keepForm: true });
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || 'Impossible de mettre à jour', variant: 'destructive' });
+    } finally {
+      setTogglingPublishId(null);
     }
   };
 
@@ -294,8 +329,20 @@ const MarketplaceMyProducts = () => {
                   <span className="text-sm text-gray-700">Disponible</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Switch checked={form.is_published} onCheckedChange={onToggle('is_published')} />
-                  <span className="text-sm text-gray-700">Publié</span>
+                  <Button
+                    type="button"
+                    variant={form.is_published ? 'outline' : 'default'}
+                    onClick={() => setForm((p) => ({ ...p, is_published: false }))}
+                  >
+                    Brouillon
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={form.is_published ? 'default' : 'outline'}
+                    onClick={() => setForm((p) => ({ ...p, is_published: true }))}
+                  >
+                    Publier
+                  </Button>
                 </div>
               </div>
 
@@ -349,6 +396,18 @@ const MarketplaceMyProducts = () => {
                         <div className="flex flex-wrap gap-2 mt-2">
                           <Button type="button" variant="outline" onClick={() => startEdit(it)}>
                             Modifier
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={it.is_published ? 'secondary' : 'default'}
+                            disabled={String(togglingPublishId || '') === String(it.id || '')}
+                            onClick={() => handleTogglePublish(it)}
+                          >
+                            {String(togglingPublishId || '') === String(it.id || '')
+                              ? '…'
+                              : it.is_published
+                                ? 'Mettre en brouillon'
+                                : 'Publier'}
                           </Button>
                           <Button type="button" variant="destructive" onClick={() => handleDelete(it.id)}>
                             Supprimer
