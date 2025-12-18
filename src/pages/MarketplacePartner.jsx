@@ -105,31 +105,46 @@ const MarketplacePartner = () => {
           <div className="text-gray-600">Aucun article disponible.</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((it) => (
-              <Card key={it.id} className="h-full flex flex-col">
-                <CardHeader className="p-4">
-                  <CardTitle className="text-base font-semibold">{it.title || 'Article'}</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-0 flex-1 flex flex-col gap-3">
-                  {it.description ? (
-                    <p className="text-sm text-gray-600 line-clamp-3">{it.description}</p>
-                  ) : (
-                    <p className="text-sm text-gray-500">Description indisponible.</p>
-                  )}
+            {items.map((it) => {
+              const media = it?.media && typeof it.media === 'object' ? it.media : {};
+              const imageUrl = media?.image_url || '';
+              return (
+                <Card key={it.id} className="h-full flex flex-col">
+                  <CardHeader className="p-4">
+                    <CardTitle className="text-base font-semibold">{it.title || 'Article'}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0 flex-1 flex flex-col gap-3">
+                    <div className="flex items-start gap-3">
+                      {imageUrl ? (
+                        <img
+                          alt="Produit"
+                          src={imageUrl}
+                          className="h-12 w-12 rounded-md object-cover border shrink-0"
+                        />
+                      ) : null}
+                      <div className="min-w-0 flex-1">
+                        {it.description ? (
+                          <p className="text-sm text-gray-600 line-clamp-3">{it.description}</p>
+                        ) : (
+                          <p className="text-sm text-gray-500">Description indisponible.</p>
+                        )}
+                      </div>
+                    </div>
 
-                  <div className="mt-auto flex items-center justify-between gap-2">
-                    <div className="text-sm font-semibold text-gray-800">{Number(it.base_price_amount || 0) / 100} €</div>
-                    <Button
-                      onClick={() => handleAdd(it)}
-                      disabled={String(addingItemId || '') === String(it.id || '')}
-                      className="shrink-0"
-                    >
-                      {String(addingItemId || '') === String(it.id || '') ? 'Ajout…' : 'Ajouter'}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    <div className="mt-auto flex items-center justify-between gap-2">
+                      <div className="text-sm font-semibold text-gray-800">{Number(it.base_price_amount || 0) / 100} €</div>
+                      <Button
+                        onClick={() => handleAdd(it)}
+                        disabled={String(addingItemId || '') === String(it.id || '')}
+                        className="shrink-0"
+                      >
+                        {String(addingItemId || '') === String(it.id || '') ? 'Ajout…' : 'Ajouter'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>

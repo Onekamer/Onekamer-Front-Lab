@@ -299,6 +299,10 @@ const MarketplaceMyProducts = () => {
                 </div>
               </div>
 
+              <div className="text-xs text-gray-500">
+                Un produit doit être <span className="font-semibold">Publié</span> pour apparaître dans ta boutique.
+              </div>
+
               <div className="flex flex-col gap-2">
                 <Button type="submit" disabled={saving || uploading} className="w-full">
                   {saving ? 'Enregistrement…' : isEditing ? 'Enregistrer' : 'Créer'}
