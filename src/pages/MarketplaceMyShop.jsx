@@ -238,6 +238,17 @@ const MarketplaceMyShop = () => {
               <CardTitle className="text-base font-semibold">Informations boutique</CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0 space-y-4">
+              {partner?.id ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate('/marketplace/ma-boutique/produits')}
+                  className="w-full"
+                >
+                  Gérer mes produits
+                </Button>
+              ) : null}
+
               <div className="space-y-2">
                 <Label htmlFor="display_name">Nom</Label>
                 <Input id="display_name" value={form.display_name} onChange={onChange('display_name')} required />
@@ -303,7 +314,13 @@ const MarketplaceMyShop = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="hours">Horaires</Label>
-                <Input id="hours" value={form.hours} onChange={onChange('hours')} placeholder="Ex: Lun-Sam 10h-19h" />
+                <Textarea
+                  id="hours"
+                  value={form.hours}
+                  onChange={onChange('hours')}
+                  rows={3}
+                  placeholder="Ex:\nLundi: 10h-20h\nMardi: 10h-20h\nMercredi: fermé"
+                />
               </div>
 
               <Button type="submit" disabled={saving || uploading} className="w-full">

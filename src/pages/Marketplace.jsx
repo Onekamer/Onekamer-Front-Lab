@@ -215,7 +215,7 @@ const Marketplace = () => {
 
                     {(p?.hours || p?.address) && (
                       <div className="space-y-1">
-                        {p?.hours ? <div className="text-xs text-gray-600">{p.hours}</div> : null}
+                        {p?.hours ? <div className="text-xs text-gray-600 whitespace-pre-line">{p.hours}</div> : null}
                         {p?.address ? <div className="text-xs text-gray-600">{p.address}</div> : null}
                       </div>
                     )}
@@ -225,9 +225,9 @@ const Marketplace = () => {
                         {mapUrl ? (
                           <Button
                             type="button"
-                            variant="outline"
+                            variant="default"
                             onClick={() => window.open(mapUrl, '_blank', 'noopener,noreferrer')}
-                            className="shrink-0"
+                            className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white"
                           >
                             S’y rendre
                           </Button>
@@ -235,11 +235,11 @@ const Marketplace = () => {
                         {contactUrl ? (
                           <Button
                             type="button"
-                            variant="outline"
+                            variant="default"
                             onClick={() => {
                               window.location.href = contactUrl;
                             }}
-                            className="shrink-0"
+                            className="shrink-0 bg-[#2BA84A] hover:bg-[#2BA84A]/90 text-white"
                           >
                             Contacter
                           </Button>
