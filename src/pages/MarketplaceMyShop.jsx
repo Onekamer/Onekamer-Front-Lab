@@ -35,11 +35,18 @@ const MarketplaceMyShop = () => {
   const [orders, setOrders] = useState([]);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
 
+  const formatEur = (amountMinor) => {
+    const v = Number(amountMinor);
+    if (!Number.isFinite(v)) return '—';
+    return `${(v / 100).toFixed(2)}€`;
+  };
+
   const totalSalesEur = useMemo(() => {
-    return (Array.isArray(orders) ? orders : [])
+    const totalMinor = (Array.isArray(orders) ? orders : [])
       .filter((o) => String(o?.status || '').toLowerCase() === 'paid')
       .filter((o) => String(o?.charge_currency || '').toUpperCase() === 'EUR')
       .reduce((sum, o) => sum + Number(o?.charge_amount_total || 0), 0);
+    return totalMinor / 100;
   }, [orders]);
 
   const [form, setForm] = useState({
@@ -389,7 +396,7 @@ const MarketplaceMyShop = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="border rounded-md p-3 bg-white">
                   <div className="text-xs text-gray-500">Total des ventes (payées)</div>
-                  <div className="text-lg font-semibold text-gray-900">{totalSalesEur.toFixed(2)} EUR</div>
+                  <div className="text-lg font-semibold text-gray-900">{totalSalesEur.toFixed(2)}€</div>
                 </div>
                 <div className="border rounded-md p-3 bg-white">
                   <div className="text-xs text-gray-500">Commandes payées</div>
@@ -452,10 +459,8 @@ const MarketplaceMyShop = () => {
                       const isExpanded = expandedOrderId && String(expandedOrderId) === String(o.id);
                       const createdAt = o?.created_at ? new Date(o.created_at) : null;
                       const createdLabel = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.toLocaleString() : '—';
-                      const totalLabel =
-                        o?.charge_amount_total !== undefined && o?.charge_amount_total !== null
-                          ? `${Number(o.charge_amount_total).toFixed(2)} ${String(o.charge_currency || '').toUpperCase() || ''}`
-                          : '—';
+                      const currency = String(o?.charge_currency || '').toUpperCase();
+                      const totalLabel = currency === 'EUR' ? formatEur(o?.charge_amount_total) : currency ? `${o?.charge_amount_total} ${currency}` : '—';
 
                       return (
                         <div key={o.id} className="p-3">
