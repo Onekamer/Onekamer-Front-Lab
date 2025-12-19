@@ -35,6 +35,13 @@ const MarketplaceMyShop = () => {
   const [orders, setOrders] = useState([]);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
 
+  const totalSalesEur = useMemo(() => {
+    return (Array.isArray(orders) ? orders : [])
+      .filter((o) => String(o?.status || '').toLowerCase() === 'paid')
+      .filter((o) => String(o?.charge_currency || '').toUpperCase() === 'EUR')
+      .reduce((sum, o) => sum + Number(o?.charge_amount_total || 0), 0);
+  }, [orders]);
+
   const [form, setForm] = useState({
     display_name: '',
     description: '',
@@ -379,6 +386,23 @@ const MarketplaceMyShop = () => {
               <CardTitle className="text-base font-semibold">Mes commandes</CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="border rounded-md p-3 bg-white">
+                  <div className="text-xs text-gray-500">Total des ventes (payées)</div>
+                  <div className="text-lg font-semibold text-gray-900">{totalSalesEur.toFixed(2)} EUR</div>
+                </div>
+                <div className="border rounded-md p-3 bg-white">
+                  <div className="text-xs text-gray-500">Commandes payées</div>
+                  <div className="text-lg font-semibold text-gray-900">
+                    {(Array.isArray(orders) ? orders : []).filter((o) => String(o?.status || '').toLowerCase() === 'paid').length}
+                  </div>
+                </div>
+                <div className="border rounded-md p-3 bg-white">
+                  <div className="text-xs text-gray-500">Commandes (filtre actuel)</div>
+                  <div className="text-lg font-semibold text-gray-900">{Array.isArray(orders) ? orders.length : 0}</div>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <div className="text-sm font-medium">Statut</div>
                 <select
@@ -404,69 +428,88 @@ const MarketplaceMyShop = () => {
               ) : null}
 
               {!ordersLoading && orders.length > 0 ? (
-                <div className="space-y-3">
-                  {orders.map((o) => {
-                    const rawStatus = String(o?.status || '').toLowerCase();
-                    const statusLabel =
-                      rawStatus === 'paid'
-                        ? 'Payée'
-                        : rawStatus === 'created' || rawStatus === 'payment_pending'
-                        ? 'En attente'
-                        : rawStatus === 'canceled' || rawStatus === 'cancelled'
-                        ? 'Annulée'
-                        : rawStatus || '—';
+                <div className="border rounded-md bg-white overflow-hidden">
+                  <div className="hidden md:grid grid-cols-12 gap-3 px-3 py-2 bg-gray-50 text-xs text-gray-600 font-medium">
+                    <div className="col-span-3">Commande</div>
+                    <div className="col-span-3">Client</div>
+                    <div className="col-span-2">Total</div>
+                    <div className="col-span-2">Statut</div>
+                    <div className="col-span-2 text-right">Actions</div>
+                  </div>
 
-                    const isExpanded = expandedOrderId && String(expandedOrderId) === String(o.id);
-                    const createdAt = o?.created_at ? new Date(o.created_at) : null;
-                    const createdLabel = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.toLocaleString() : '—';
+                  <div className="divide-y">
+                    {orders.map((o) => {
+                      const rawStatus = String(o?.status || '').toLowerCase();
+                      const statusLabel =
+                        rawStatus === 'paid'
+                          ? 'Payée'
+                          : rawStatus === 'created' || rawStatus === 'payment_pending'
+                          ? 'En attente'
+                          : rawStatus === 'canceled' || rawStatus === 'cancelled'
+                          ? 'Annulée'
+                          : rawStatus || '—';
 
-                    return (
-                      <div key={o.id} className="border rounded-md p-3 bg-white space-y-2">
-                        <div className="space-y-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="font-semibold">Commande #{String(o.id).slice(0, 8)}</div>
-                            <div className="text-xs text-gray-600">{statusLabel}</div>
+                      const isExpanded = expandedOrderId && String(expandedOrderId) === String(o.id);
+                      const createdAt = o?.created_at ? new Date(o.created_at) : null;
+                      const createdLabel = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.toLocaleString() : '—';
+                      const totalLabel =
+                        o?.charge_amount_total !== undefined && o?.charge_amount_total !== null
+                          ? `${Number(o.charge_amount_total).toFixed(2)} ${String(o.charge_currency || '').toUpperCase() || ''}`
+                          : '—';
+
+                      return (
+                        <div key={o.id} className="p-3">
+                          <div className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-3 items-start">
+                            <div className="md:col-span-3">
+                              <div className="text-sm font-semibold">Commande #{String(o.id).slice(0, 8)}</div>
+                              <div className="text-xs text-gray-500">{createdLabel}</div>
+                            </div>
+
+                            <div className="md:col-span-3">
+                              <div className="text-sm text-gray-800 break-all">{o?.customer_email || '—'}</div>
+                            </div>
+
+                            <div className="md:col-span-2">
+                              <div className="text-sm text-gray-800">{totalLabel}</div>
+                            </div>
+
+                            <div className="md:col-span-2">
+                              <div className="text-sm text-gray-800">{statusLabel}</div>
+                            </div>
+
+                            <div className="md:col-span-2 md:text-right">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full md:w-auto"
+                                onClick={() => setExpandedOrderId(isExpanded ? null : o.id)}
+                              >
+                                {isExpanded ? 'Masquer' : 'Détail'}
+                              </Button>
+                            </div>
                           </div>
-                          <div className="text-xs text-gray-500">
-                            {createdLabel}
-                            {' • '}
-                            {o?.charge_amount_total ? `${o.charge_amount_total} ${o.charge_currency || ''}` : '—'}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            Client: {o?.customer_email || '—'}
-                          </div>
-                        </div>
 
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full"
-                          onClick={() => setExpandedOrderId(isExpanded ? null : o.id)}
-                        >
-                          {isExpanded ? 'Masquer le détail' : 'Voir le détail'}
-                        </Button>
-
-                        {isExpanded ? (
-                          <div className="space-y-2">
-                            {(Array.isArray(o?.items) ? o.items : []).length === 0 ? (
-                              <div className="text-sm text-gray-600">Aucun article.</div>
-                            ) : (
-                              <div className="space-y-2">
-                                {(o.items || []).map((it) => (
-                                  <div key={it.id} className="flex items-start justify-between gap-2 text-sm">
-                                    <div className="text-gray-800">
-                                      {it.title_snapshot || 'Produit'}
+                          {isExpanded ? (
+                            <div className="mt-3 rounded-md border bg-gray-50 p-3 space-y-2">
+                              <div className="text-xs text-gray-600 font-medium">Produits</div>
+                              {(Array.isArray(o?.items) ? o.items : []).length === 0 ? (
+                                <div className="text-sm text-gray-600">Aucun article.</div>
+                              ) : (
+                                <div className="space-y-2">
+                                  {(o.items || []).map((it) => (
+                                    <div key={it.id} className="flex items-start justify-between gap-2 text-sm">
+                                      <div className="text-gray-800">{it.title_snapshot || 'Produit'}</div>
+                                      <div className="text-gray-600">x{it.quantity || 1}</div>
                                     </div>
-                                    <div className="text-gray-600">x{it.quantity || 1}</div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : null}
             </CardContent>
