@@ -19,6 +19,8 @@ const MarketplaceMyShop = () => {
 
   const serverLabUrl = import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com';
 
+  const [activeTab, setActiveTab] = useState('shop');
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -26,6 +28,12 @@ const MarketplaceMyShop = () => {
   const [syncing, setSyncing] = useState(false);
 
   const [partner, setPartner] = useState(null);
+
+  const [ordersStatus, setOrdersStatus] = useState('pending');
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [expandedOrderId, setExpandedOrderId] = useState(null);
 
   const [form, setForm] = useState({
     display_name: '',
@@ -115,6 +123,49 @@ const MarketplaceMyShop = () => {
 
     init();
   }, [navigate, profile, serverLabUrl, session?.access_token, toast]);
+
+  const fetchOrders = async () => {
+    if (!session?.access_token) return;
+    if (!partner?.id) return;
+    if (ordersLoading) return;
+
+    setOrdersLoading(true);
+    setOrdersError(null);
+
+    try {
+      const qs = new URLSearchParams();
+      qs.set('status', ordersStatus);
+      qs.set('limit', '100');
+      qs.set('offset', '0');
+
+      const res = await fetch(
+        `${serverLabUrl}/api/market/partners/${encodeURIComponent(partner.id)}/orders?${qs.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur chargement commandes');
+
+      setOrders(Array.isArray(data?.orders) ? data.orders : []);
+    } catch (e) {
+      const msg = e?.message || 'Erreur chargement commandes';
+      setOrdersError(msg);
+      toast({ title: 'Erreur', description: msg, variant: 'destructive' });
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'orders') return;
+    if (!partner?.id) return;
+    fetchOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, partner?.id, ordersStatus]);
 
   const onChange = (key) => (e) => {
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
@@ -301,6 +352,129 @@ const MarketplaceMyShop = () => {
           </Button>
         </div>
 
+        {partner?.id ? (
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={activeTab === 'shop' ? 'default' : 'outline'}
+              onClick={() => setActiveTab('shop')}
+              className="flex-1"
+            >
+              Ma boutique
+            </Button>
+            <Button
+              type="button"
+              variant={activeTab === 'orders' ? 'default' : 'outline'}
+              onClick={() => setActiveTab('orders')}
+              className="flex-1"
+            >
+              Mes commandes
+            </Button>
+          </div>
+        ) : null}
+
+        {activeTab === 'orders' ? (
+          <Card>
+            <CardHeader className="p-4">
+              <CardTitle className="text-base font-semibold">Mes commandes</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 space-y-3">
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Statut</div>
+                <select
+                  value={ordersStatus}
+                  onChange={(e) => setOrdersStatus(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-[#2BA84A]/30 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="pending">En attente</option>
+                  <option value="paid">Payées</option>
+                  <option value="canceled">Annulées</option>
+                  <option value="all">Toutes</option>
+                </select>
+              </div>
+
+              <Button type="button" variant="outline" onClick={fetchOrders} disabled={ordersLoading} className="w-full">
+                {ordersLoading ? 'Chargement…' : 'Recharger'}
+              </Button>
+
+              {!ordersLoading && ordersError ? <div className="text-sm text-red-600">{ordersError}</div> : null}
+
+              {!ordersLoading && !ordersError && orders.length === 0 ? (
+                <div className="text-sm text-gray-600">Aucune commande.</div>
+              ) : null}
+
+              {!ordersLoading && orders.length > 0 ? (
+                <div className="space-y-3">
+                  {orders.map((o) => {
+                    const rawStatus = String(o?.status || '').toLowerCase();
+                    const statusLabel =
+                      rawStatus === 'paid'
+                        ? 'Payée'
+                        : rawStatus === 'created' || rawStatus === 'payment_pending'
+                        ? 'En attente'
+                        : rawStatus === 'canceled' || rawStatus === 'cancelled'
+                        ? 'Annulée'
+                        : rawStatus || '—';
+
+                    const isExpanded = expandedOrderId && String(expandedOrderId) === String(o.id);
+                    const createdAt = o?.created_at ? new Date(o.created_at) : null;
+                    const createdLabel = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.toLocaleString() : '—';
+
+                    return (
+                      <div key={o.id} className="border rounded-md p-3 bg-white space-y-2">
+                        <div className="space-y-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="font-semibold">Commande #{String(o.id).slice(0, 8)}</div>
+                            <div className="text-xs text-gray-600">{statusLabel}</div>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {createdLabel}
+                            {' • '}
+                            {o?.charge_amount_total ? `${o.charge_amount_total} ${o.charge_currency || ''}` : '—'}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Client: {o?.customer_email || '—'}
+                          </div>
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => setExpandedOrderId(isExpanded ? null : o.id)}
+                        >
+                          {isExpanded ? 'Masquer le détail' : 'Voir le détail'}
+                        </Button>
+
+                        {isExpanded ? (
+                          <div className="space-y-2">
+                            {(Array.isArray(o?.items) ? o.items : []).length === 0 ? (
+                              <div className="text-sm text-gray-600">Aucun article.</div>
+                            ) : (
+                              <div className="space-y-2">
+                                {(o.items || []).map((it) => (
+                                  <div key={it.id} className="flex items-start justify-between gap-2 text-sm">
+                                    <div className="text-gray-800">
+                                      {it.title_snapshot || 'Produit'}
+                                    </div>
+                                    <div className="text-gray-600">x{it.quantity || 1}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {activeTab === 'shop' ? (
+          <>
         <Card>
           <CardHeader className="p-4">
             <CardTitle className="text-base font-semibold">Statut</CardTitle>
@@ -438,6 +612,8 @@ const MarketplaceMyShop = () => {
             </CardContent>
           </Card>
         </form>
+          </>
+        ) : null}
       </div>
     </>
   );
