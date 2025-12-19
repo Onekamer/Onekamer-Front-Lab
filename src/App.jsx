@@ -12,6 +12,7 @@ import MarketplacePartner from '@/pages/MarketplacePartner';
 import MarketplaceCart from '@/pages/MarketplaceCart';
 import MarketplaceMyShop from '@/pages/MarketplaceMyShop';
 import MarketplaceMyProducts from '@/pages/MarketplaceMyProducts';
+import MarketplaceAdmin from '@/pages/MarketplaceAdmin';
 import Echange from '@/pages/Echange';
 import Evenements from '@/pages/Evenements';
 import Rencontre from '@/pages/Rencontre';
@@ -133,6 +134,7 @@ const AppContent = () => {
           <Route path="/compte/emails-admin" element={<EmailsAdminLab />} />
           <Route path="/compte/moderation" element={<ModerationAdminLab />} />
           <Route path="/compte/influenceurs-admin" element={<InfluenceursAdmin />} />
+          <Route path="/compte/marketplace-admin" element={<MarketplaceAdmin />} />
           <Route path="/compte/mes-stats-influenceur" element={<InfluenceurStats />} />
           <Route path="/compte/modifier" element={<ModifierProfil />} />
           <Route path="/compte/notifications" element={<Notifications />} />

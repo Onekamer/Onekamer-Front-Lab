@@ -204,6 +204,20 @@ const Compte = () => {
           </Card>
         )}
 
+        {isAdmin && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Marketplace (Admin)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p className="text-gray-600">Gérez les boutiques et consultez leurs performances.</p>
+              <Button type="button" className="w-full sm:w-auto" onClick={() => navigate('/compte/marketplace-admin')}>
+                Ouvrir la gestion marketplace
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle>Espace influenceur (LAB)</CardTitle>
