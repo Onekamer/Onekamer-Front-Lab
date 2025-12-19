@@ -28,9 +28,13 @@ const MarketplaceAdmin = () => {
 
   const [perfPeriod, setPerfPeriod] = useState('30d');
   const [perfCurrency, setPerfCurrency] = useState('ALL');
+  const [perfSearch, setPerfSearch] = useState('');
+  const [perfIncludeEmpty, setPerfIncludeEmpty] = useState(false);
+  const [perfLimit, setPerfLimit] = useState(5);
   const [perfLoading, setPerfLoading] = useState(false);
   const [perfError, setPerfError] = useState(null);
   const [perfRows, setPerfRows] = useState([]);
+  const [perfCount, setPerfCount] = useState(null);
 
   const currencyOptions = useMemo(() => {
     const set = new Set(['ALL', 'EUR', 'USD', 'GBP', 'XAF']);
@@ -80,7 +84,7 @@ const MarketplaceAdmin = () => {
     }
   };
 
-  const fetchPerformance = async () => {
+  const fetchPerformance = async (opts = {}) => {
     try {
       setPerfLoading(true);
       setPerfError(null);
@@ -89,10 +93,18 @@ const MarketplaceAdmin = () => {
       if (!token) throw new Error('Session expirée');
       if (!API_PREFIX) throw new Error('API non configurée');
 
+      const period = opts?.period ?? perfPeriod;
+      const currency = opts?.currency ?? perfCurrency;
+      const searchText = opts?.search ?? perfSearch;
+      const includeEmpty = opts?.includeEmpty ?? perfIncludeEmpty;
+      const limitValue = opts?.limit ?? perfLimit;
+
       const qs = new URLSearchParams();
-      qs.set('period', perfPeriod);
-      qs.set('currency', perfCurrency);
-      qs.set('limit', '50');
+      qs.set('period', period);
+      qs.set('currency', currency);
+      if (String(searchText || '').trim()) qs.set('search', String(searchText || '').trim());
+      if (includeEmpty) qs.set('includeEmpty', 'true');
+      qs.set('limit', String(limitValue));
       qs.set('offset', '0');
 
       const res = await fetch(`${API_PREFIX}/admin/market/partners/performance?${qs.toString()}`, {
@@ -102,6 +114,7 @@ const MarketplaceAdmin = () => {
       if (!res.ok) throw new Error(data?.error || 'Erreur serveur');
 
       setPerfRows(Array.isArray(data?.rows) ? data.rows : []);
+      setPerfCount(typeof data?.count === 'number' ? data.count : null);
     } catch (e) {
       const msg = e?.message || 'Erreur interne';
       setPerfError(msg);
@@ -205,7 +218,7 @@ const MarketplaceAdmin = () => {
             <CardTitle>Performance boutiques</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div className="space-y-2">
                 <div className="text-sm font-medium">Période</div>
                 <select
@@ -234,6 +247,10 @@ const MarketplaceAdmin = () => {
                   ))}
                 </select>
               </div>
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Recherche boutique</div>
+                <Input value={perfSearch} onChange={(e) => setPerfSearch(e.target.value)} placeholder="Ex: African Food" />
+              </div>
               <div className="flex items-end">
                 <Button type="button" variant="outline" disabled={perfLoading} onClick={fetchPerformance} className="w-full">
                   {perfLoading ? 'Chargement…' : 'Recharger'}
@@ -241,10 +258,56 @@ const MarketplaceAdmin = () => {
               </div>
             </div>
 
+            <div className="flex flex-col md:flex-row gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={perfLoading}
+                onClick={() => {
+                  setPerfIncludeEmpty(false);
+                  setPerfLimit(5);
+                  fetchPerformance({ includeEmpty: false, limit: 5 });
+                }}
+                className="w-full md:w-auto"
+              >
+                Top 5
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={perfLoading}
+                onClick={() => {
+                  setPerfIncludeEmpty(true);
+                  setPerfLimit(50);
+                  fetchPerformance({ includeEmpty: true, limit: 50 });
+                }}
+                className="w-full md:w-auto"
+              >
+                Voir toutes les boutiques
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={perfLoading}
+                onClick={() => {
+                  const next = perfLimit + 5;
+                  setPerfLimit(next);
+                  fetchPerformance({ limit: next });
+                }}
+                className="w-full md:w-auto"
+              >
+                Voir plus
+              </Button>
+            </div>
+
             {!perfLoading && perfError ? <div className="text-sm text-red-600">{perfError}</div> : null}
 
             {!perfLoading && !perfError && perfRows.length === 0 ? (
               <div className="text-sm text-gray-600">Aucune vente payée sur la période.</div>
+            ) : null}
+
+            {!perfLoading && !perfError && perfRows.length > 0 && typeof perfCount === 'number' ? (
+              <div className="text-xs text-gray-500">Affichage: {perfRows.length} / {perfCount}</div>
             ) : null}
 
             {!perfLoading && perfRows.length > 0 ? (
