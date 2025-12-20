@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
     import { Helmet } from 'react-helmet';
     import { motion } from 'framer-motion';
-    import { useNavigate } from 'react-router-dom';
+    import { useNavigate, useSearchParams } from 'react-router-dom';
+
     import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
     import { Button } from '@/components/ui/button';
     import { Input } from '@/components/ui/input';
@@ -10,43 +11,51 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
     import { ArrowLeft, Clock, Euro, MapPin, Image as ImageIcon, Loader2, X, Tag, Phone, Mail, Globe, User } from 'lucide-react';
     import { toast } from '@/components/ui/use-toast';
     import { supabase } from '@/lib/customSupabaseClient';
-import { useAuth } from '@/contexts/SupabaseAuthContext';
-import { notifyNewEvenement } from '@/services/supabaseNotifications';
+    import { useAuth } from '@/contexts/SupabaseAuthContext';
+    import { notifyNewEvenement } from '@/services/supabaseNotifications';
     import imageCompression from 'browser-image-compression';
     import { GoogleMap, Marker, useJsApiLoader, Autocomplete } from '@react-google-maps/api';
-    
+
     const mapContainerStyle = {
       width: '100%',
       height: '250px',
       borderRadius: '0.5rem',
     };
-    
+
     const defaultCenter = {
       lat: 48.8566,
       lng: 2.3522,
     };
-    
+
     const libraries = ['places'];
-    
+
     const CreateEvenement = () => {
       const navigate = useNavigate();
-      const { user, profile } = useAuth();
+      const [searchParams] = useSearchParams();
+      const { user, profile, session } = useAuth();
+      const eventId = searchParams.get('eventId');
+      const isEditMode = !!eventId;
       const [formData, setFormData] = useState({ title: '', date: '', time: '', location: '', price: '', description: '', type_id: '', telephone: '', email: '', site_web: '', organisateur: '', latitude: null, longitude: null, devise_id: '' });
+
       const [types, setTypes] = useState([]);
       const [devises, setDevises] = useState([]);
       const [mediaFile, setMediaFile] = useState(null);
       const [mediaPreview, setMediaPreview] = useState(null);
       const [isUploading, setIsUploading] = useState(false);
+      const [existingEvent, setExistingEvent] = useState(null);
+      const API_PREFIX = import.meta.env.VITE_API_URL || '/api';
+
       const [coords, setCoords] = useState(null);
       const autocompleteRef = useRef(null);
-    
+
       const { isLoaded, loadError } = useJsApiLoader({
         googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
         libraries,
       });
-    
+
       useEffect(() => {
         const fetchInitialData = async () => {
+
           const { data: typesData, error: typesError } = await supabase.from('evenements_types').select('id, nom');
           if (typesError) {
             toast({ title: 'Erreur', description: 'Impossible de charger les types d\'événements.', variant: 'destructive' });
@@ -56,26 +65,85 @@ import { notifyNewEvenement } from '@/services/supabaseNotifications';
           const { data: devisesData, error: devisesError } = await supabase.from('devises').select('id, nom, symbole');
           if (devisesError) toast({ title: 'Erreur', description: 'Impossible de charger les devises.', variant: 'destructive' });
           else {
-              setDevises(devisesData);
-              const defaultDevise = devisesData.find(d => d.code_iso === 'EUR') || devisesData[0];
-              if(defaultDevise) {
-                setFormData(prev => ({...prev, devise_id: defaultDevise.id}));
-              }
+            setDevises(devisesData);
+            const defaultDevise = devisesData.find(d => d.code_iso === 'EUR') || devisesData[0];
+            if (defaultDevise) {
+              setFormData(prev => ({ ...prev, devise_id: defaultDevise.id }));
+            }
           }
         };
         fetchInitialData();
       }, []);
-    
+
+      useEffect(() => {
+        const run = async () => {
+          if (!isEditMode) return;
+          if (!user) return;
+          try {
+            const { data, error } = await supabase
+              .from('evenements')
+              .select('id, user_id, title, date, time, location, price, description, type_id, telephone, email, site_web, organisateur, latitude, longitude, devise_id, media_url, media_type')
+              .eq('id', eventId)
+              .maybeSingle();
+            if (error) throw error;
+            if (!data) {
+              toast({ title: 'Événement introuvable', variant: 'destructive' });
+              navigate('/evenements');
+              return;
+            }
+
+            const isAdmin = profile?.is_admin === true || profile?.is_admin === 1 || profile?.is_admin === 'true' || String(profile?.role || '').toLowerCase() === 'admin';
+            const isOwner = user?.id === data.user_id;
+            if (!isAdmin && !isOwner) {
+              toast({ title: 'Accès refusé', description: "Vous n'êtes pas autorisé à modifier cet événement.", variant: 'destructive' });
+              navigate('/evenements');
+              return;
+            }
+
+            setExistingEvent(data);
+            setFormData({
+              title: data.title || '',
+              date: data.date || '',
+              time: data.time || '',
+              location: data.location || '',
+              price: data.price ?? '',
+              description: data.description || '',
+              type_id: data.type_id || '',
+              telephone: data.telephone || '',
+              email: data.email || '',
+              site_web: data.site_web || '',
+              organisateur: data.organisateur || '',
+              latitude: data.latitude ?? null,
+              longitude: data.longitude ?? null,
+              devise_id: data.devise_id || '',
+            });
+
+            setCoords(
+              data.latitude && data.longitude
+                ? { lat: data.latitude, lng: data.longitude }
+                : null
+            );
+
+            setMediaPreview(data.media_url || null);
+            setMediaFile(null);
+          } catch (e) {
+            toast({ title: 'Erreur', description: e?.message || "Impossible de charger l'événement.", variant: 'destructive' });
+            navigate('/evenements');
+          }
+        };
+        run();
+      }, [eventId, isEditMode, navigate, profile?.is_admin, profile?.role, toast, user]);
+
       const handleInputChange = (e) => {
         const { id, value } = e.target;
         if (id === 'price') {
-             const numericValue = value.replace(/[^0-9,.]/g, '').replace(',', '.');
-             setFormData(prev => ({ ...prev, [id]: numericValue }));
+          const numericValue = value.replace(/[^0-9,.]/g, '').replace(',', '.');
+          setFormData(prev => ({ ...prev, [id]: numericValue }));
         } else {
-            setFormData(prev => ({ ...prev, [id]: value }));
+          setFormData(prev => ({ ...prev, [id]: value }));
         }
       };
-      
+
       const handleMediaChange = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -83,12 +151,12 @@ import { notifyNewEvenement } from '@/services/supabaseNotifications';
           setMediaPreview(URL.createObjectURL(file));
         }
       };
-    
+
       const removeMedia = () => {
         setMediaFile(null);
         setMediaPreview(null);
       };
-    
+
       const onPlaceChanged = useCallback(() => {
         if (autocompleteRef.current !== null) {
           const place = autocompleteRef.current.getPlace();
@@ -102,8 +170,9 @@ import { notifyNewEvenement } from '@/services/supabaseNotifications';
           }
         }
       }, []);
-      
+
       const handleSubmit = async (e) => {
+
         e.preventDefault();
         if (!user) {
           toast({ title: 'Erreur', description: 'Vous devez être connecté pour publier.', variant: 'destructive' });
@@ -113,11 +182,11 @@ import { notifyNewEvenement } from '@/services/supabaseNotifications';
           toast({ title: 'Erreur', description: 'Veuillez remplir tous les champs obligatoires.', variant: 'destructive' });
           return;
         }
-        
+
         setIsUploading(true);
-        let mediaUrl = null;
-        let mediaType = null;
-    
+        let mediaUrl = existingEvent?.media_url || null;
+        let mediaType = existingEvent?.media_type || null;
+
         try {
           if (mediaFile) {
             let finalFile = mediaFile;
@@ -125,7 +194,7 @@ import { notifyNewEvenement } from '@/services/supabaseNotifications';
               const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
               finalFile = await imageCompression(mediaFile, options);
             }
-            
+
             const uploadFormData = new FormData();
             const safeFile = new File(
               [finalFile],
@@ -137,8 +206,8 @@ import { notifyNewEvenement } from '@/services/supabaseNotifications';
             uploadFormData.append("recordId", user.id);
 
             const res = await fetch("https://onekamer-server.onrender.com/api/upload-media", {
-                method: "POST",
-                body: uploadFormData,
+              method: "POST",
+              body: uploadFormData,
             });
 
             if (!res.ok) {
@@ -148,8 +217,45 @@ import { notifyNewEvenement } from '@/services/supabaseNotifications';
             mediaUrl = uploadResult.url;
             mediaType = mediaFile.type.startsWith('video') ? 'video' : 'image';
           }
-    
-          const submissionData = { ...formData, user_id: user.id, author_id: user.id, media_url: mediaUrl, media_type: mediaType, price: parseFloat(formData.price) || 0 };
+
+          const payload = {
+            ...formData,
+            media_url: mediaUrl,
+            media_type: mediaType,
+            price: parseFloat(formData.price) || 0,
+          };
+
+          if (isEditMode) {
+            const isAdmin = profile?.is_admin === true || profile?.is_admin === 1 || profile?.is_admin === 'true' || String(profile?.role || '').toLowerCase() === 'admin';
+            const isOwner = user?.id && existingEvent?.user_id === user.id;
+
+            if (isAdmin && !isOwner) {
+              const token = session?.access_token;
+              if (!token) throw new Error('Session expirée');
+              const res = await fetch(`${API_PREFIX}/admin/evenements/${encodeURIComponent(eventId)}`, {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(payload),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(data?.error || 'Erreur serveur');
+            } else {
+              const { error } = await supabase
+                .from('evenements')
+                .update({ ...payload, updated_at: new Date().toISOString() })
+                .eq('id', eventId);
+              if (error) throw error;
+            }
+
+            toast({ title: 'Succès !', description: 'Événement modifié.' });
+            navigate('/evenements');
+            return;
+          }
+
+          const submissionData = { ...payload, user_id: user.id, author_id: user.id };
 
           const { data: newEvent, error } = await supabase
             .from('evenements')
@@ -171,10 +277,10 @@ import { notifyNewEvenement } from '@/services/supabaseNotifications';
               console.error('Erreur notification (événement):', notificationError);
             }
           }
-          
+
           toast({ title: 'Succès !', description: 'Votre événement a été publié.' });
           navigate('/evenements');
-    
+
         } catch (error) {
           toast({ title: 'Erreur de publication', description: error.message, variant: 'destructive' });
         } finally {
@@ -266,7 +372,7 @@ import { notifyNewEvenement } from '@/services/supabaseNotifications';
                       <Card className="p-4 border-dashed"><CardContent className="flex flex-col items-center justify-center text-center p-0">
                           {mediaPreview ? (
                             <div className="relative">
-                              {mediaFile.type.startsWith('image') ? <img alt="Aperçu" src={mediaPreview} className="max-h-48 rounded-md mb-4"/> : <video src={mediaPreview} className="max-h-48 rounded-md mb-4" controls />}
+                              {(mediaFile ? mediaFile.type.startsWith('image') : existingEvent?.media_type === 'image') ? <img alt="Aperçu" src={mediaPreview} className="max-h-48 rounded-md mb-4"/> : <video src={mediaPreview} className="max-h-48 rounded-md mb-4" controls />}
                               <Button size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 rounded-full" onClick={removeMedia}><X className="h-4 w-4" /></Button>
                             </div>
                           ) : (<ImageIcon className="h-12 w-12 text-gray-400 mb-2" />)}

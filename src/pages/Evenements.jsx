@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
     import { motion, AnimatePresence } from 'framer-motion';
     import { Card, CardContent } from '@/components/ui/card';
     import { Button } from '@/components/ui/button';
-    import { Calendar, MapPin, Clock, Banknote, Share2, ArrowLeft, Ticket, Plus, Loader2, Trash2 } from 'lucide-react';
+    import { Calendar, MapPin, Clock, Banknote, Share2, ArrowLeft, Ticket, Plus, Loader2, Trash2, Pencil } from 'lucide-react';
     import { useToast } from '@/components/ui/use-toast';
     import { useNavigate, useSearchParams } from 'react-router-dom';
     import { supabase } from '@/lib/customSupabaseClient';
@@ -56,11 +56,12 @@ import React, { useState, useEffect, useCallback } from 'react';
     };
 
 
-    const EvenementDetail = ({ event, onBack, onDelete }) => {
-      const { user } = useAuth();
+    const EvenementDetail = ({ event, onBack, onDelete, onEdit }) => {
+      const { user, profile } = useAuth();
       const { toast } = useToast();
       const navigate = useNavigate();
       const isOwner = user?.id === event.user_id;
+      const isAdmin = profile?.is_admin === true || profile?.is_admin === 1 || profile?.is_admin === 'true' || String(profile?.role || '').toLowerCase() === 'admin';
       
       const handleShare = async () => {
         const shareData = { title: event.title, text: event.description, url: window.location.href };
@@ -124,8 +125,26 @@ import React, { useState, useEffect, useCallback } from 'react';
             </div>
             <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
                 <FavoriteButton contentType="evenement" contentId={event.id} />
-                {isOwner && (
-                    <Button variant="ghost" size="icon" className="text-red-500 bg-white/80 backdrop-blur-sm rounded-full h-8 w-8" onClick={() => { onDelete(event.id, event.media_url); onBack(); }}>
+                {(isOwner || isAdmin) && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-gray-700 bg-white/80 backdrop-blur-sm rounded-full h-8 w-8"
+                      onClick={() => onEdit(event.id)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                )}
+                {(isOwner || isAdmin) && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-red-500 bg-white/80 backdrop-blur-sm rounded-full h-8 w-8"
+                      onClick={async () => {
+                        await onDelete(event.id, event.media_url);
+                        onBack();
+                      }}
+                    >
                     <Trash2 className="h-4 w-4" />
                     </Button>
                 )}
@@ -290,9 +309,12 @@ import React, { useState, useEffect, useCallback } from 'react';
       const [selectedEvent, setSelectedEvent] = useState(null);
       const navigate = useNavigate();
       const [searchParams] = useSearchParams();
-      const { user, loading: authLoading } = useAuth();
+      const { user, profile, session, loading: authLoading } = useAuth();
       const { toast } = useToast();
       const [canCreateEvent, setCanCreateEvent] = useState(false);
+
+      const API_BASE_URL = (import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com').replace(/\/$/, '');
+      const API_PREFIX = `${API_BASE_URL}/api`;
 
       // Vérifie automatiquement les droits d'accès (Supabase)
       useEffect(() => {
@@ -342,13 +364,35 @@ import React, { useState, useEffect, useCallback } from 'react';
       const handleDelete = async (eventId, mediaUrl) => {
         if (!user) return;
         try {
+          const isAdmin = profile?.is_admin === true || profile?.is_admin === 1 || profile?.is_admin === 'true' || String(profile?.role || '').toLowerCase() === 'admin';
+          const isOwner = user?.id && events.find((e) => e.id === eventId)?.user_id === user.id;
+
+          if (isAdmin && !isOwner) {
+            const token = session?.access_token;
+            if (!token) throw new Error('Session expirée');
+            const res = await fetch(`${API_PREFIX}/admin/evenements/${encodeURIComponent(eventId)}`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.error || 'Erreur serveur');
+            toast({ title: 'Succès', description: 'Événement supprimé (admin).' });
+            setEvents((prev) => (prev || []).filter((e) => e.id !== eventId));
+            return;
+          }
+
           if (mediaUrl) await supabase.storage.from('evenements').remove([mediaUrl]);
           const { error } = await supabase.from('evenements').delete().eq('id', eventId);
           if (error) throw error;
           toast({ title: 'Succès', description: 'Événement supprimé.' });
+          setEvents((prev) => (prev || []).filter((e) => e.id !== eventId));
         } catch (error) {
           toast({ title: "Erreur de suppression", description: error.message, variant: "destructive" });
         }
+      };
+
+      const handleEdit = (eventId) => {
+        navigate(`/publier/evenement?eventId=${encodeURIComponent(eventId)}`);
       };
 
       const handleCreateClick = async () => {
@@ -393,6 +437,7 @@ import React, { useState, useEffect, useCallback } from 'react';
                 event={selectedEvent}
                 onBack={() => setSelectedEvent(null)}
                 onDelete={handleDelete}
+                onEdit={handleEdit}
               />
             )}
           </AnimatePresence>
