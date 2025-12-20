@@ -9,13 +9,23 @@ import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Search, Star, Share2, MessageSquare, Mail, ArrowLeft, Lock, MapPin } from 'lucide-react';
+import { Plus, Search, Star, Share2, MessageSquare, Mail, ArrowLeft, Lock, MapPin, Pencil, Trash2 } from 'lucide-react';
 import { canUserAccess } from '@/lib/accessControl';
 import FavoriteButton from '@/components/FavoriteButton';
 import { applyAutoAccessProtection } from "@/lib/autoAccessWrapper";
 
-const PartenaireDetail = ({ partenaire, onBack, onRecommander }) => {
+const PartenaireDetail = ({ partenaire, onBack, onRecommander, onDelete }) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { user, profile } = useAuth();
+
+  const isAdmin =
+    profile?.is_admin === true ||
+    profile?.is_admin === 1 ||
+    profile?.is_admin === 'true' ||
+    String(profile?.role || '').toLowerCase() === 'admin';
+  const isOwner = user?.id && partenaire?.user_id === user.id;
+  const canManage = Boolean(isOwner || isAdmin);
 
   const handleShare = () => {
     if (navigator.share) {
@@ -77,6 +87,32 @@ const PartenaireDetail = ({ partenaire, onBack, onRecommander }) => {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-gray-600">{partenaire.description}</p>
+
+            {canManage && (
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => navigate(`/publier/partenaire?partnerId=${partenaire.id}`)}
+                >
+                  <Pencil className="w-4 h-4 mr-2" /> Modifier
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={async () => {
+                    if (!onDelete) return;
+                    const ok = window.confirm('Confirmer la suppression de ce partenaire ?');
+                    if (!ok) return;
+                    await onDelete(partenaire);
+                  }}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> Supprimer
+                </Button>
+              </div>
+            )}
             <div className="text-sm text-gray-500 space-y-2">
               <p><span className="font-semibold">Adresse:</span> {partenaire.address}</p>
               <p><span className="font-semibold">Téléphone:</span> <a href={`tel:${partenaire.phone}`} className="text-green-600">{partenaire.phone}</a></p>
@@ -127,7 +163,7 @@ const Partenaires = () => {
   const marketSyncRef = useRef(false);
   const [selectedPartenaire, setSelectedPartenaire] = useState(null);
   const { toast } = useToast();
-  const { user, session, loading: authLoading } = useAuth();
+  const { user, session, profile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [canCreate, setCanCreate] = useState(false);
   const [searchParams] = useSearchParams();
@@ -136,6 +172,13 @@ const Partenaires = () => {
   const [marketOnboarding, setMarketOnboarding] = useState(false);
   const [marketCheckoutLoading, setMarketCheckoutLoading] = useState(false);
   const serverLabUrl = import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com';
+  const API_PREFIX = `${serverLabUrl.replace(/\/$/, '')}/api`;
+
+  const isAdmin =
+    profile?.is_admin === true ||
+    profile?.is_admin === 1 ||
+    profile?.is_admin === 'true' ||
+    String(profile?.role || '').toLowerCase() === 'admin';
 
   // 🟢 Vérifie automatiquement les droits d'accès à la page "Partenaires"
   useEffect(() => {
@@ -233,6 +276,28 @@ const Partenaires = () => {
     setLoading(false);
   }, [searchTerm, toast]);
 
+  const selectPartenaireWithOwner = useCallback(
+    async (p) => {
+      if (!p?.id) {
+        setSelectedPartenaire(null);
+        return;
+      }
+
+      try {
+        if (p.user_id) {
+          setSelectedPartenaire(p);
+          return;
+        }
+        const { data, error } = await supabase.from('partenaires').select('user_id').eq('id', p.id).maybeSingle();
+        if (error) throw error;
+        setSelectedPartenaire({ ...p, user_id: data?.user_id || null });
+      } catch {
+        setSelectedPartenaire(p);
+      }
+    },
+    []
+  );
+
   useEffect(() => {
     fetchPartenaires();
   }, [fetchPartenaires]);
@@ -243,9 +308,9 @@ const Partenaires = () => {
     if (!partnerId) return;
     const found = partenaires.find((p) => String(p.id) === String(partnerId));
     if (found) {
-      setSelectedPartenaire(found);
+      selectPartenaireWithOwner(found);
     }
-  }, [partenaires, searchParams]);
+  }, [partenaires, searchParams, selectPartenaireWithOwner]);
 
   // Autocomplete en temps réel (Partenaires uniquement)
   useEffect(() => {
@@ -293,6 +358,40 @@ const Partenaires = () => {
 
   const handleRecommander = (partenaireId) => {
     toast({ title: 'Bientôt disponible', description: 'La fonctionnalité de recommandation sera bientôt activée.' });
+  };
+
+  const handleDeletePartenaire = async (partenaire) => {
+    if (!partenaire?.id) return;
+    if (!user) {
+      toast({ title: 'Connexion requise', variant: 'destructive' });
+      return;
+    }
+
+    const isOwner = partenaire?.user_id === user.id;
+
+    try {
+      if (isAdmin && !isOwner) {
+        const token = session?.access_token;
+        if (!token) throw new Error('Session expirée');
+        const resp = await fetch(`${API_PREFIX}/admin/partenaires/${encodeURIComponent(partenaire.id)}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const out = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(out?.error || 'Erreur serveur');
+      } else {
+        const { error } = await supabase.from('partenaires').delete().eq('id', partenaire.id);
+        if (error) throw error;
+      }
+
+      setPartenaires((prev) => prev.filter((p) => String(p.id) !== String(partenaire.id)));
+      setSelectedPartenaire(null);
+      toast({ title: 'Supprimé', description: 'Le partenaire a été supprimé.' });
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || 'Suppression impossible.', variant: 'destructive' });
+    }
   };
 
   const handleOpenMapsQuick = (e, partenaire) => {
@@ -402,6 +501,8 @@ const Partenaires = () => {
     }
   };
 
+  const filteredPartenaires = Array.isArray(partenaires) ? partenaires : [];
+
   return (
   <>
     <Helmet>
@@ -415,6 +516,7 @@ const Partenaires = () => {
           partenaire={selectedPartenaire} 
           onBack={() => setSelectedPartenaire(null)} 
           onRecommander={handleRecommander}
+          onDelete={handleDeletePartenaire}
         />
       )}
     </AnimatePresence>
@@ -563,16 +665,16 @@ const Partenaires = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {partenaires.map((partenaire, index) => (
-              <motion.div
-                key={partenaire.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-                onClick={() => setSelectedPartenaire(partenaire)}
-                className="cursor-pointer"
-              >
-                <Card className="relative overflow-hidden hover:shadow-xl transition-shadow h-full flex flex-col group">
+            {filteredPartenaires.map((partenaire, index) => (
+            <motion.div
+              key={partenaire.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+              onClick={() => selectPartenaireWithOwner(partenaire)}
+              className="cursor-pointer"
+            >
+              <Card className="relative overflow-hidden hover:shadow-xl transition-shadow h-full flex flex-col group">
                   <div className="h-40 w-full relative">
                     <MediaDisplay
                       bucket="partenaires"
