@@ -115,7 +115,7 @@ const Compte = () => {
             <CardTitle>Paramètres</CardTitle>
           </CardHeader>
           <CardContent className="divide-y">
-            <MenuItem onClick={() => navigate('/compte/modifier')} title="Modifier le profil" />
+            <MenuItem onClick={() => navigate('/compte/modifier')} title="Mon profil" />
             <MenuItem onClick={() => navigate('/compte/notifications')} title="Notifications" />
             <MenuItem onClick={() => navigate('/compte/favoris')} title="Mes favoris" />
             <MenuItem onClick={() => navigate('/compte/confidentialite')} title="Confidentialité" />
