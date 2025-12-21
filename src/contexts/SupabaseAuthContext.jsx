@@ -154,9 +154,23 @@ export const AuthProvider = ({ children }) => {
     const profileChannel = supabase
       .channel(`profile-updates-for-${user.id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}`}, payload => {
-        setProfile(payload.new);
-        fetchAllPermissions(user.id);
-        toast({ title: 'Profil mis à jour!', description: 'Votre abonnement a été mis à jour.' });
+        const next = payload?.new;
+        setProfile((prev) => {
+          const shouldNotify = Boolean(
+            prev && next && (
+              String(prev.plan || '') !== String(next.plan || '') ||
+              String(prev.role || '') !== String(next.role || '') ||
+              Boolean(prev.is_admin) !== Boolean(next.is_admin)
+            )
+          );
+
+          if (shouldNotify) {
+            toast({ title: 'Profil mis à jour!', description: 'Votre abonnement a été mis à jour.' });
+            fetchAllPermissions(user.id);
+          }
+
+          return next;
+        });
       })
       .subscribe();
     return () => {
