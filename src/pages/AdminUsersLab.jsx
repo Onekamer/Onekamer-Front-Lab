@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { supabase } from '@/lib/customSupabaseClient';
 
 const PLAN_OPTIONS = [
   { value: 'free', label: 'Free' },
@@ -64,11 +65,18 @@ const AdminUsersLab = () => {
   const canPrev = offset > 0;
   const canNext = total == null ? items.length === limit : offset + limit < total;
 
+  const getFreshAccessToken = async () => {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw new Error('Session expirée');
+    const token = data?.session?.access_token;
+    if (!token) throw new Error('Session expirée');
+    return token;
+  };
+
   const fetchUsers = async (opts = {}) => {
     try {
       setLoading(true);
-      const token = session?.access_token;
-      if (!token) throw new Error('Session expirée');
+      const token = await getFreshAccessToken();
       if (!API_PREFIX) throw new Error('API non configurée');
 
       const qs = new URLSearchParams();
@@ -82,6 +90,11 @@ const AdminUsersLab = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        toast({ title: 'Session expirée', description: 'Veuillez vous reconnecter.', variant: 'destructive' });
+        navigate('/auth');
+        return;
+      }
       if (!res.ok) throw new Error(data?.error || 'Erreur serveur');
 
       const rows = Array.isArray(data?.items) ? data.items : [];
@@ -118,8 +131,7 @@ const AdminUsersLab = () => {
 
   const onSave = async (row) => {
     try {
-      const token = session?.access_token;
-      if (!token) throw new Error('Session expirée');
+      const token = await getFreshAccessToken();
       if (!API_PREFIX) throw new Error('API non configurée');
 
       setSubmittingId(row.id);
@@ -138,6 +150,11 @@ const AdminUsersLab = () => {
         body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        toast({ title: 'Session expirée', description: 'Veuillez vous reconnecter.', variant: 'destructive' });
+        navigate('/auth');
+        return;
+      }
       if (!res.ok) throw new Error(data?.error || 'Erreur serveur');
 
       const updated = data?.item;
