@@ -29,6 +29,7 @@ import InfluenceursAdmin from '@/pages/InfluenceursAdmin';
 import InfluenceurStats from '@/pages/InfluenceurStats';
 import ModerationAdminLab from '@/pages/ModerationAdminLab';
 import AdminUsersLab from '@/pages/AdminUsersLab';
+import AdminInvitationsLab from '@/pages/AdminInvitationsLab';
 import Publier from '@/pages/Publier';
 import Rechercher from '@/pages/Rechercher';
 import Messages from '@/pages/Messages';
@@ -136,6 +137,7 @@ const AppContent = () => {
           <Route path="/compte" element={<Compte />} />
           <Route path="/compte/emails-admin" element={<EmailsAdminLab />} />
           <Route path="/compte/admin-utilisateurs" element={<AdminUsersLab />} />
+          <Route path="/compte/admin-invitations" element={<AdminInvitationsLab />} />
           <Route path="/compte/moderation" element={<ModerationAdminLab />} />
           <Route path="/compte/influenceurs-admin" element={<InfluenceursAdmin />} />
           <Route path="/compte/marketplace-admin" element={<MarketplaceAdmin />} />

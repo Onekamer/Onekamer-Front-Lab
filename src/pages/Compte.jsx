@@ -428,6 +428,26 @@ const Compte = () => {
         {isAdmin && (
           <Card>
             <CardHeader>
+              <CardTitle>Invitations (Admin)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p className="text-gray-600">
+                Consultez les statistiques d'invitations de chaque utilisateur.
+              </p>
+              <Button
+                type="button"
+                className="w-full sm:w-auto"
+                onClick={() => navigate('/compte/admin-invitations')}
+              >
+                Ouvrir le dashboard invitations
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {isAdmin && (
+          <Card>
+            <CardHeader>
               <CardTitle>Emails admin (LAB)</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
