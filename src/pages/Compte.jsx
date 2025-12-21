@@ -130,12 +130,14 @@ const Compte = () => {
                 <div className="text-xs text-gray-500">Activez pour que les autres membres voient votre statut.</div>
               </div>
               <Switch
+                className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300 border border-gray-300"
                 checked={onlineVisible}
                 disabled={onlineSaving}
                 onCheckedChange={async (checked) => {
                   try {
                     setOnlineSaving(true);
                     setOnlineVisible(Boolean(checked));
+
                     const { error } = await supabase
                       .from('profiles')
                       .update({ show_online_status: Boolean(checked), updated_at: new Date().toISOString() })

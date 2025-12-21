@@ -203,6 +203,13 @@ const AdminUsersLab = () => {
     return 'Hors ligne';
   };
 
+  const isRowOnline = (row) => {
+    const visible = row?.show_online_status !== false;
+    if (!visible) return false;
+    const uid = row?.id ? String(row.id) : null;
+    return Boolean(uid && onlineUserIds instanceof Set && onlineUserIds.has(uid));
+  };
+
   return (
     <>
       <Helmet>
@@ -242,7 +249,10 @@ const AdminUsersLab = () => {
                     <div className="space-y-1">
                       <div className="font-semibold">{row.username || row.full_name || row.id}</div>
                       <div className="text-xs text-gray-600 break-all">{row.email || '—'}</div>
-                      <div className="text-xs text-gray-500">{getStatusLabel(row)}</div>
+                      <div className="text-xs text-gray-500 flex items-center gap-2">
+                        <span className={`inline-block h-2 w-2 rounded-full ${isRowOnline(row) ? 'bg-green-500' : 'bg-gray-400'}`} />
+                        <span>{getStatusLabel(row)}</span>
+                      </div>
                       <div className="text-xs text-gray-500">ID: {row.id}</div>
                     </div>
 
