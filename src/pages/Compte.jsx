@@ -10,14 +10,21 @@ import { LogOut, ChevronRight, Coins, ShieldCheck, Loader2 } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/customSupabaseClient';
 import MediaDisplay from '@/components/MediaDisplay';
+import { Switch } from '@/components/ui/switch';
 
 const Compte = () => {
-  const { user, profile, signOut, balance, loading } = useAuth();
+  const { user, profile, signOut, balance, loading, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [adminSubject, setAdminSubject] = useState('');
   const [adminMessage, setAdminMessage] = useState('');
   const [adminEmails, setAdminEmails] = useState('');
   const [adminSending, setAdminSending] = useState(false);
+  const [onlineVisible, setOnlineVisible] = useState(true);
+  const [onlineSaving, setOnlineSaving] = useState(false);
+
+  useEffect(() => {
+    setOnlineVisible(profile?.show_online_status !== false);
+  }, [profile?.show_online_status]);
 
   if (loading) {
     return (
@@ -117,6 +124,33 @@ const Compte = () => {
             <CardTitle>Paramètres</CardTitle>
           </CardHeader>
           <CardContent className="divide-y">
+            <div className="w-full flex justify-between items-center py-4 text-left">
+              <div>
+                <div className="font-medium">Apparaître en ligne</div>
+                <div className="text-xs text-gray-500">Activez pour que les autres membres voient votre statut.</div>
+              </div>
+              <Switch
+                checked={onlineVisible}
+                disabled={onlineSaving}
+                onCheckedChange={async (checked) => {
+                  try {
+                    setOnlineSaving(true);
+                    setOnlineVisible(Boolean(checked));
+                    const { error } = await supabase
+                      .from('profiles')
+                      .update({ show_online_status: Boolean(checked), updated_at: new Date().toISOString() })
+                      .eq('id', user.id);
+                    if (error) throw error;
+                    await refreshProfile();
+                  } catch (e) {
+                    toast({ title: 'Erreur', description: e?.message || 'Erreur interne', variant: 'destructive' });
+                    setOnlineVisible(profile?.show_online_status !== false);
+                  } finally {
+                    setOnlineSaving(false);
+                  }
+                }}
+              />
+            </div>
             <MenuItem onClick={() => navigate('/compte/modifier')} title="Mon profil" />
             <MenuItem onClick={() => navigate('/compte/notifications')} title="Notifications" />
             <MenuItem onClick={() => navigate('/compte/favoris')} title="Mes favoris" />

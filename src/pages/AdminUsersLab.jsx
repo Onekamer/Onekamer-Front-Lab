@@ -9,6 +9,8 @@ import { Loader2 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/lib/customSupabaseClient';
+import { formatDistanceToNow } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 const PLAN_OPTIONS = [
   { value: 'free', label: 'Free' },
@@ -38,7 +40,7 @@ const normalizePlan = (plan) => {
 };
 
 const AdminUsersLab = () => {
-  const { user, profile, session } = useAuth();
+  const { user, profile, session, onlineUserIds } = useAuth();
   const navigate = useNavigate();
 
   if (!user || !profile) {
@@ -185,6 +187,22 @@ const AdminUsersLab = () => {
     return `${items.length} utilisateur(s)`;
   }, [total, items.length]);
 
+  const getStatusLabel = (row) => {
+    const visible = row?.show_online_status !== false;
+    if (!visible) return 'Hors ligne';
+    const uid = row?.id ? String(row.id) : null;
+    const isOnline = uid && onlineUserIds instanceof Set ? onlineUserIds.has(uid) : false;
+    if (isOnline) return 'En ligne';
+    if (row?.last_seen_at) {
+      try {
+        return `Vu ${formatDistanceToNow(new Date(row.last_seen_at), { addSuffix: true, locale: fr })}`;
+      } catch {
+        return 'Hors ligne';
+      }
+    }
+    return 'Hors ligne';
+  };
+
   return (
     <>
       <Helmet>
@@ -224,6 +242,7 @@ const AdminUsersLab = () => {
                     <div className="space-y-1">
                       <div className="font-semibold">{row.username || row.full_name || row.id}</div>
                       <div className="text-xs text-gray-600 break-all">{row.email || '—'}</div>
+                      <div className="text-xs text-gray-500">{getStatusLabel(row)}</div>
                       <div className="text-xs text-gray-500">ID: {row.id}</div>
                     </div>
 
