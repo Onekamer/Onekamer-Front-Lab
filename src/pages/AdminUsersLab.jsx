@@ -57,10 +57,12 @@ const AdminUsersLab = () => {
   const API_PREFIX = `${apiBaseUrl}/api`;
 
   const [search, setSearch] = useState('');
+  const [planFilter, setPlanFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [submittingId, setSubmittingId] = useState(null);
   const [items, setItems] = useState([]);
-  const [limit] = useState(20);
+  const [limit, setLimit] = useState(20);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(null);
 
@@ -122,6 +124,11 @@ const AdminUsersLab = () => {
     fetchUsers({ offset: 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    fetchUsers({ offset: 0 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [limit]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -210,6 +217,23 @@ const AdminUsersLab = () => {
     return Boolean(uid && onlineUserIds instanceof Set && onlineUserIds.has(uid));
   };
 
+  const filteredItems = useMemo(() => {
+    const plan = String(planFilter || 'all');
+    const status = String(statusFilter || 'all');
+    return (items || []).filter((row) => {
+      if (plan !== 'all') {
+        const p = normalizePlan(row?.plan);
+        if (p !== plan) return false;
+      }
+      if (status !== 'all') {
+        const online = isRowOnline(row);
+        if (status === 'online' && !online) return false;
+        if (status === 'offline' && online) return false;
+      }
+      return true;
+    });
+  }, [items, planFilter, statusFilter, onlineUserIds]);
+
   return (
     <>
       <Helmet>
@@ -225,26 +249,76 @@ const AdminUsersLab = () => {
           <CardHeader>
             <CardTitle>Admin — Utilisateurs (LAB)</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             <div className="space-y-2">
               <div className="text-sm font-medium">Recherche</div>
               <Input
+                placeholder="Rechercher par username, nom complet ou email"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Rechercher par username, nom complet ou email"
               />
-              <div className="text-xs text-gray-500">{totalLabel}</div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <div className="text-xs text-gray-600">Plan</div>
+                <Select value={planFilter} onValueChange={(v) => setPlanFilter(v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tous" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous</SelectItem>
+                    {PLAN_OPTIONS.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <div className="text-xs text-gray-600">Statut</div>
+                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tous" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous</SelectItem>
+                    <SelectItem value="online">En ligne</SelectItem>
+                    <SelectItem value="offline">Hors ligne</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <div className="text-xs text-gray-600">Afficher</div>
+                <Select value={String(limit)} onValueChange={(v) => setLimit(Number(v) || 20)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="20" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-xs text-gray-600">{filteredItems.length} affiché(s) — {totalLabel}</div>
             </div>
 
             {loading ? (
               <div className="flex justify-center p-8">
                 <Loader2 className="h-8 w-8 animate-spin text-[#2BA84A]" />
               </div>
-            ) : items.length === 0 ? (
+            ) : filteredItems.length === 0 ? (
               <div className="text-sm text-gray-600">Aucun utilisateur trouvé.</div>
             ) : (
               <div className="space-y-3">
-                {items.map((row) => (
+                {filteredItems.map((row) => (
                   <div key={row.id} className="border rounded p-3 space-y-3">
                     <div className="space-y-1">
                       <div className="font-semibold">{row.username || row.full_name || row.id}</div>
