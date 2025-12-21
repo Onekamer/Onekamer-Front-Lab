@@ -31,7 +31,9 @@ const Compte = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  const isAdmin = profile.role === 'admin';
+  const isAdmin =
+    String(profile?.role || '').toLowerCase() === 'admin' ||
+    Boolean(profile?.is_admin);
 
   const adminApiToken = import.meta.env.VITE_ADMIN_API_TOKEN_LAB;
   const serverLabUrl = import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com';
@@ -123,6 +125,26 @@ const Compte = () => {
             <MenuItem onClick={() => navigate('/forfaits')} title="Changer de forfait" />
           </CardContent>
         </Card>
+
+        {isAdmin && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Utilisateurs (Admin)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p className="text-gray-600">
+                Consultez les utilisateurs et gérez les plans et rôles.
+              </p>
+              <Button
+                type="button"
+                className="w-full sm:w-auto"
+                onClick={() => navigate('/compte/admin-utilisateurs')}
+              >
+                Ouvrir le dashboard utilisateurs
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {isAdmin && (
           <Card>
