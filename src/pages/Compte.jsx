@@ -297,12 +297,8 @@ const Compte = () => {
                     const count = Array.isArray(contacts) ? contacts.length : 0;
                     toast({ title: 'Contacts sélectionnés', description: `${count} contact(s) sélectionné(s).` });
                     const text = `Rejoins-moi sur OneKamer : ${inviteLink}`;
-                    if (navigator.share) {
-                      await navigator.share({ title: 'OneKamer', text, url: inviteLink });
-                    } else {
-                      await navigator.clipboard.writeText(text);
-                      toast({ title: 'Copié', description: 'Message d’invitation copié.' });
-                    }
+                    await navigator.clipboard.writeText(text);
+                    toast({ title: 'Copié', description: 'Message d’invitation copié. Appuyez sur “Partager” pour l’envoyer.' });
                   } catch (e) {
                     toast({ title: 'Erreur', description: e?.message || 'Action annulée.', variant: 'destructive' });
                   }
