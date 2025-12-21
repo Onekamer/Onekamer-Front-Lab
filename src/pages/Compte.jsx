@@ -32,21 +32,12 @@ const Compte = () => {
     setOnlineVisible(profile?.show_online_status !== false);
   }, [profile?.show_online_status]);
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-full">
-        <Loader2 className="h-8 w-8 animate-spin text-green-500" />
-      </div>
-    );
-  }
-
-  if (!user || !profile) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  const isAdmin =
-    String(profile?.role || '').toLowerCase() === 'admin' ||
-    Boolean(profile?.is_admin);
+  const isAdmin = Boolean(
+    profile && (
+      String(profile?.role || '').toLowerCase() === 'admin' ||
+      Boolean(profile?.is_admin)
+    )
+  );
 
   const adminApiToken = import.meta.env.VITE_ADMIN_API_TOKEN_LAB;
   const serverLabUrl = import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com';
@@ -63,6 +54,7 @@ const Compte = () => {
   useEffect(() => {
     const run = async () => {
       if (!session?.access_token) return;
+
       try {
         setInviteLoading(true);
         const res = await fetch(`${API_PREFIX}/invites/my-code`, {
@@ -88,6 +80,7 @@ const Compte = () => {
   useEffect(() => {
     const run = async () => {
       if (!session?.access_token) return;
+
       try {
         setInviteStatsLoading(true);
         const res = await fetch(`${API_PREFIX}/invites/my-stats?period=${encodeURIComponent(invitePeriod)}`, {
@@ -110,6 +103,18 @@ const Compte = () => {
 
     run();
   }, [session?.access_token, API_PREFIX, invitePeriod]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-green-500" />
+      </div>
+    );
+  }
+
+  if (!user || !profile) {
+    return <Navigate to="/auth" replace />;
+  }
 
   const handleLogout = async () => {
     const { error } = await signOut();
