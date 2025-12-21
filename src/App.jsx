@@ -62,6 +62,7 @@ import RgpdPage from '@/pages/Rgpd';
 import MentionsLegalesPage from '@/pages/MentionLegales';
 import Landing from '@/pages/Landing';
 import PublicHeader from '@/pages/public/PublicHeader';
+import Invite from '@/pages/Invite';
 
 const AppLayout = () => {
   const { profile } = useAuth();
@@ -81,7 +82,7 @@ const AppContent = () => {
   const { showCharte, acceptCharte } = useCharteValidation();
   const { session } = useAuth();
   const location = useLocation();
-  const publicPaths = ['/', '/cgu', '/rgpd', '/mentions-legales'];
+  const publicPaths = ['/', '/invite', '/cgu', '/rgpd', '/mentions-legales'];
   const isPublic = !session && publicPaths.includes(location.pathname);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
@@ -101,6 +102,7 @@ const AppContent = () => {
       {isPublic ? (
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/invite" element={<Invite />} />
           <Route path="/cgu" element={<CguPage />} />
           <Route path="/rgpd" element={<RgpdPage />} />
           <Route path="/mentions-legales" element={<MentionsLegalesPage />} />

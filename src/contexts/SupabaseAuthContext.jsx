@@ -120,6 +120,38 @@ export const AuthProvider = ({ children }) => {
     return () => subscription.unsubscribe();
   }, [handleSession]);
 
+  useEffect(() => {
+    if (!session?.access_token) return;
+
+    const INVITE_CODE_STORAGE_KEY = 'onekamer_invite_code';
+    const code = String(localStorage.getItem(INVITE_CODE_STORAGE_KEY) || '').trim();
+    if (!code) return;
+
+    const trackedKey = `onekamer_invite_first_login_tracked:${code}`;
+    const alreadyTracked = String(localStorage.getItem(trackedKey) || '') === '1';
+    if (alreadyTracked) return;
+
+    const serverLabUrl = (import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com').replace(/\/$/, '');
+    const API_PREFIX = `${serverLabUrl}/api`;
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_PREFIX}/invites/track`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ code, event: 'first_login' }),
+        });
+        if (res.ok) {
+          localStorage.setItem(trackedKey, '1');
+          localStorage.removeItem(INVITE_CODE_STORAGE_KEY);
+        }
+      } catch {}
+    })();
+  }, [session?.access_token]);
+
   const refreshBalance = useCallback(async () => {
     if (user) {
       const userBalance = await fetchBalance(user.id);
