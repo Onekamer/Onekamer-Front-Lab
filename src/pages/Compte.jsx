@@ -297,8 +297,23 @@ const Compte = () => {
                     const count = Array.isArray(contacts) ? contacts.length : 0;
                     toast({ title: 'Contacts sélectionnés', description: `${count} contact(s) sélectionné(s).` });
                     const text = `Rejoins-moi sur OneKamer : ${inviteLink}`;
-                    await navigator.clipboard.writeText(text);
-                    toast({ title: 'Copié', description: 'Message d’invitation copié. Appuyez sur “Partager” pour l’envoyer.' });
+
+                    const tels = (Array.isArray(contacts) ? contacts : [])
+                      .flatMap((c) => (Array.isArray(c?.tel) ? c.tel : []))
+                      .map((t) => String(t || '').trim())
+                      .filter(Boolean);
+
+                    if (tels.length === 0) {
+                      await navigator.clipboard.writeText(text);
+                      toast({ title: 'Copié', description: 'Aucun numéro trouvé sur les contacts sélectionnés. Message copié.' });
+                      return;
+                    }
+
+                    const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent || '');
+                    const recipients = tels.join(',');
+                    const sep = isIOS ? '&' : '?';
+                    const smsUrl = `sms:${recipients}${sep}body=${encodeURIComponent(text)}`;
+                    window.location.href = smsUrl;
                   } catch (e) {
                     toast({ title: 'Erreur', description: e?.message || 'Action annulée.', variant: 'destructive' });
                   }
