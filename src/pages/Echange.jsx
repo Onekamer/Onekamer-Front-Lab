@@ -255,9 +255,16 @@ const CommentMedia = ({ url, type }) => {
   return null; // Audio is handled separately
 };
 
-const CommentAvatar = ({ avatarPath, username }) => {
+const CommentAvatar = ({ avatarPath, username, userId }) => {
+  const { onlineUserIds } = useAuth();
+  const isOnline = Boolean(userId && onlineUserIds instanceof Set && onlineUserIds.has(String(userId)));
   return (
-    <UserAvatar avatarUrl={avatarPath} username={username} className="w-8 h-8" />
+    <div className="relative">
+      <UserAvatar avatarUrl={avatarPath} username={username} className="w-8 h-8" />
+      {isOnline && (
+        <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-white" />
+      )}
+    </div>
   );
 };
 
@@ -685,7 +692,7 @@ const CommentSection = ({ postId, highlightCommentId }) => {
                   className="flex gap-2 items-start"
                 >
                   <div className="cursor-pointer" onClick={() => navigate(`/profil/${comment.author?.id}`)}>
-                    <CommentAvatar avatarPath={comment.author?.avatar_url} username={comment.author?.username} />
+                    <CommentAvatar avatarPath={comment.author?.avatar_url} username={comment.author?.username} userId={comment.author?.id} />
                   </div>
                   <div className="bg-gray-100 rounded-lg px-3 py-2 w-full">
                     <p className="text-sm font-semibold cursor-pointer" onClick={() => navigate(`/profil/${comment.author?.id}`)}>{comment.author?.username}</p>
@@ -766,6 +773,8 @@ const CommentSection = ({ postId, highlightCommentId }) => {
 
 const PostCard = ({ post, user, profile, onLike, onDelete, onWarn, showComments, onToggleComments, refreshBalance }) => {
   const navigate = useNavigate();
+  const { onlineUserIds } = useAuth();
+  const isOnline = Boolean(post?.user_id && onlineUserIds instanceof Set && onlineUserIds.has(String(post.user_id)));
   const [isLiked, setIsLiked] = useState(false);
   const isMyPost = user?.id === post.user_id;
   const isAdmin = profile?.is_admin === true || profile?.is_admin === 1 || profile?.is_admin === 'true';
@@ -833,10 +842,13 @@ const PostCard = ({ post, user, profile, onLike, onDelete, onWarn, showComments,
       <CardContent className="pt-6">
         <div className="flex items-start gap-3 mb-4">
           <div
-            className="shrink-0 cursor-pointer"
+            className="relative shrink-0 cursor-pointer"
             onClick={() => navigate(`/profil/${post.user_id}`)}
           >
             <UserAvatar avatarUrl={post.profiles?.avatar_url} username={post.profiles?.username} className="w-10 h-10" />
+            {isOnline && (
+              <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-white" />
+            )}
           </div>
           <div className="flex-1">
             <div className="flex justify-between items-start">
@@ -988,6 +1000,8 @@ const PostCard = ({ post, user, profile, onLike, onDelete, onWarn, showComments,
 
 const AudioPostCard = ({ post, user, profile, onDelete, onWarn }) => {
   const navigate = useNavigate();
+  const { onlineUserIds } = useAuth();
+  const isOnline = Boolean(post?.user_id && onlineUserIds instanceof Set && onlineUserIds.has(String(post.user_id)));
   const isMyPost = user?.id === post.user_id;
   const isAdmin = profile?.is_admin === true || profile?.is_admin === 1 || profile?.is_admin === 'true';
   const [warnOpen, setWarnOpen] = useState(false);
@@ -1000,10 +1014,13 @@ const AudioPostCard = ({ post, user, profile, onDelete, onWarn }) => {
       <CardContent className="pt-6">
         <div className="flex items-start gap-3">
           <div
-            className="shrink-0 cursor-pointer"
+            className="relative shrink-0 cursor-pointer"
             onClick={() => navigate(`/profil/${post.user_id}`)}
           >
             <UserAvatar avatarUrl={post.author?.avatar_url} username={post.author?.username} className="w-10 h-10" />
+            {isOnline && (
+              <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-white" />
+            )}
           </div>
           <div className="flex-1">
             <div className="flex justify-between items-start">

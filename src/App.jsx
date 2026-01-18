@@ -22,6 +22,7 @@ import GroupeDetail from '@/pages/GroupeDetail';
 import CreateGroupe from '@/pages/groupes/CreateGroupe';
 import GroupInvitations from '@/pages/groupes/GroupInvitations';
 import OKCoins from '@/pages/OKCoins';
+import PayOKCoins from '@/pages/pay/PayOKCoins';
 import Forfaits from '@/pages/Forfaits';
 import Compte from '@/pages/Compte';
 import EmailsAdminLab from '@/pages/EmailsAdminLab';
@@ -133,6 +134,7 @@ const AppContent = () => {
           <Route path="/groupes/invitations" element={<GroupInvitations />} />
           <Route path="/groupes/:groupId" element={<GroupeDetail />} />
           <Route path="/ok-coins" element={<OKCoins />} />
+          <Route path="/pay/okcoins/:packId" element={<PayOKCoins />} />
           <Route path="/forfaits" element={<Forfaits />} />
           <Route path="/compte" element={<Compte />} />
           <Route path="/compte/emails-admin" element={<EmailsAdminLab />} />

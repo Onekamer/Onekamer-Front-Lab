@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 
 const OKCoins = () => {
   const { user, profile, balance, refreshBalance } = useAuth();
+  const navigate = useNavigate();
   const [packs, setPacks] = useState([]);
   const [levels, setLevels] = useState([]);
   const [topDonors, setTopDonors] = useState([]);
@@ -157,33 +159,9 @@ const OKCoins = () => {
 
   const handleBuyPack = async (pack) => {
     if (!user) return toast({ title: "Veuillez vous connecter", variant: "destructive" });
-    
     setBuyingPackId(pack.id);
     try {
-      const response = await fetch('https://onekamer-server.onrender.com/create-checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ packId: pack.id, userId: user.id }),
-      });
-
-      const session = await response.json();
-
-      if (!response.ok) {
-        throw new Error(session.error || 'Une erreur est survenue.');
-      }
-
-      if (session.url) {
-        window.location.href = session.url;
-      }
-
-    } catch (error) {
-      toast({
-        title: "Erreur de paiement",
-        description: error.message || "Impossible de contacter le serveur de paiement. Veuillez réessayer.",
-        variant: "destructive",
-      });
+      navigate(`/pay/okcoins/${pack.id}`);
     } finally {
       setBuyingPackId(null);
     }
