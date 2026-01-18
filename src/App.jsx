@@ -23,6 +23,8 @@ import CreateGroupe from '@/pages/groupes/CreateGroupe';
 import GroupInvitations from '@/pages/groupes/GroupInvitations';
 import OKCoins from '@/pages/OKCoins';
 import PayOKCoins from '@/pages/pay/PayOKCoins';
+import MarketplaceOrders from '@/pages/MarketplaceOrders';
+import MarketplaceOrderDetail from '@/pages/MarketplaceOrderDetail';
 import Forfaits from '@/pages/Forfaits';
 import Compte from '@/pages/Compte';
 import EmailsAdminLab from '@/pages/EmailsAdminLab';
@@ -120,6 +122,8 @@ const AppContent = () => {
           <Route path="/marketplace/ma-boutique/produits" element={<MarketplaceMyProducts />} />
           <Route path="/marketplace/partner/:partnerId" element={<MarketplacePartner />} />
           <Route path="/marketplace/cart" element={<MarketplaceCart />} />
+          <Route path="/market/orders" element={<MarketplaceOrders />} />
+          <Route path="/market/orders/:orderId" element={<MarketplaceOrderDetail />} />
           <Route path="/partenaires" element={<Partenaires />} />
           <Route path="/echange" element={<Echange />} />
           <Route path="/evenements" element={<Evenements />} />
