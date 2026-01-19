@@ -22,6 +22,7 @@ const MarketplaceOrderDetail = () => {
   const [conversationId, setConversationId] = useState(null);
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
+  const [updatingFulfillment, setUpdatingFulfillment] = useState(false);
 
   const listRef = useRef(null);
 
@@ -45,7 +46,7 @@ const MarketplaceOrderDetail = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Erreur chargement commande');
-      setOrder(data?.order || null);
+      setOrder(data?.order ? { ...data.order, customer_email: data?.customer_email || null } : null);
       setItems(Array.isArray(data?.items) ? data.items : []);
       setRole(data?.role || null);
       setConversationId(data?.conversationId || null);
@@ -123,6 +124,43 @@ const MarketplaceOrderDetail = () => {
     }
   };
 
+  const handleUpdateFulfillment = async (next) => {
+    if (!orderId || !session?.access_token) return;
+    if (!next) return;
+    setUpdatingFulfillment(true);
+    try {
+      const res = await fetch(`${serverLabUrl}/api/market/orders/${encodeURIComponent(orderId)}/fulfillment`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ status: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur mise à jour du statut');
+      await loadOrder();
+      toast({ title: 'Statut mis à jour' });
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || 'Impossible de mettre à jour le statut', variant: 'destructive' });
+    } finally {
+      setUpdatingFulfillment(false);
+    }
+  };
+
+  const handleBuyerConfirmReceived = async () => {
+    if (!orderId || !session?.access_token) return;
+    try {
+      const res = await fetch(`${serverLabUrl}/api/market/orders/${encodeURIComponent(orderId)}/confirm-received`, {
+        method: 'POST',
+        headers,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur confirmation');
+      await loadOrder();
+      toast({ title: 'Confirmation envoyée' });
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || "Impossible de confirmer la réception", variant: 'destructive' });
+    }
+  };
+
   return (
     <>
       <Helmet>
@@ -131,7 +169,7 @@ const MarketplaceOrderDetail = () => {
 
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-2">
-          <Button variant="ghost" onClick={() => navigate('/market/orders')} className="px-2">Retour</Button>
+          <Button variant="ghost" onClick={() => navigate(role === 'seller' ? '/marketplace/ma-boutique?tab=chat' : '/market/orders')} className="px-2">Retour</Button>
           <div className="text-sm text-gray-600">{role ? (role === 'buyer' ? 'Acheteur' : 'Vendeur') : ''}</div>
         </div>
 
@@ -154,6 +192,32 @@ const MarketplaceOrderDetail = () => {
                   <div className="text-gray-700 font-medium">Montant</div>
                   <div>{renderAmount(order.charge_amount_total, order.charge_currency)}</div>
                 </div>
+                {role === 'seller' ? (
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="text-gray-700 font-medium">Client</div>
+                    <div className="truncate max-w-[60%]">{order?.customer_email || '—'}</div>
+                  </div>
+                ) : null}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="text-gray-700 font-medium">Livraison</div>
+                    <div className="capitalize">{String(order.delivery_mode || '—')}</div>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="text-gray-700 font-medium">Préparation</div>
+                    <div className="capitalize">{String(order.fulfillment_status || '—')}</div>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="text-gray-700 font-medium">MAJ préparation</div>
+                    <div>{order?.fulfillment_updated_at ? new Date(order.fulfillment_updated_at).toLocaleString() : '—'}</div>
+                  </div>
+                </div>
+                {order?.customer_note ? (
+                  <div className="pt-2">
+                    <div className="text-gray-700 font-medium text-sm mb-1">Note client</div>
+                    <div className="text-sm text-gray-700 whitespace-pre-wrap">{order.customer_note}</div>
+                  </div>
+                ) : null}
                 <div className="pt-2">
                   <div className="text-gray-700 font-medium text-sm mb-1">Articles</div>
                   <div className="space-y-2">
@@ -167,6 +231,39 @@ const MarketplaceOrderDetail = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {role === 'seller' ? (
+              <Card>
+                <CardHeader className="p-4">
+                  <CardTitle className="text-base font-semibold">Gérer la préparation</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={String(order?.fulfillment_status || 'preparing')}
+                      onChange={(e) => handleUpdateFulfillment(e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-[#2BA84A]/30 bg-white px-3 py-2 text-sm"
+                      disabled={updatingFulfillment}
+                    >
+                      <option value="preparing">En cours de préparation</option>
+                      <option value="shipping">En cours de livraison</option>
+                      <option value="delivered">Livré</option>
+                    </select>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+
+            {role === 'buyer' && String(order?.fulfillment_status || '').toLowerCase() === 'delivered' && !order?.buyer_received_at ? (
+              <Card>
+                <CardHeader className="p-4">
+                  <CardTitle className="text-base font-semibold">Réception</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  <Button onClick={handleBuyerConfirmReceived} className="w-full">J'ai bien reçu la commande</Button>
+                </CardContent>
+              </Card>
+            ) : null}
 
             {String(order?.status||'').toLowerCase() === 'paid' ? (
               <Card className="h-[60vh] flex flex-col">

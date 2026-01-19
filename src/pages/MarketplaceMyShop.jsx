@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ const CATEGORIES = ['Restauration', 'Mode', 'Beauté', 'Services', 'High-tech', 
 const MarketplaceMyShop = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const { session, user, profile } = useAuth();
 
   const serverLabUrl = import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com';
@@ -45,6 +46,14 @@ const MarketplaceMyShop = () => {
   const [chatError, setChatError] = useState(null);
   const [chatOrders, setChatOrders] = useState([]);
   const [chatExpandedOrderId, setChatExpandedOrderId] = useState(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const t = params.get('tab');
+    if (t && ['shop', 'orders', 'chat'].includes(t) && t !== activeTab) {
+      setActiveTab(t);
+    }
+  }, [location.search]);
 
   const formatEur = (amountMinor) => {
     const v = Number(amountMinor);
@@ -553,9 +562,9 @@ const MarketplaceMyShop = () => {
                                   type="button"
                                   variant="outline"
                                   className="hidden md:inline-flex"
-                                  onClick={() => setChatExpandedOrderId(isExpanded ? null : o.id)}
+                                  onClick={() => navigate(`/market/orders/${encodeURIComponent(o.id)}`)}
                                 >
-                                  {isExpanded ? 'Masquer' : 'Détail'}
+                                  Détail
                                 </Button>
                               </div>
                             </div>
