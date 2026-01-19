@@ -168,27 +168,38 @@ const MarketplaceOrderDetail = () => {
               </CardContent>
             </Card>
 
-            <Card className="h-[60vh] flex flex-col">
-              <CardHeader className="p-4">
-                <CardTitle className="text-base font-semibold">Chat commande</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0 flex-1 flex flex-col">
-                <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-3">
-                  {messages.length === 0 ? (
-                    <div className="text-gray-500 text-sm">Aucun message pour le moment.</div>
-                  ) : messages.map((m) => (
-                    <div key={m.id} className={`max-w-[80%] rounded px-3 py-2 text-sm ${String(m.sender_id||'')===String(session?.user?.id||'') ? 'bg-[#DCFCE7] ml-auto' : 'bg-white border'}`}>
-                      <div className="whitespace-pre-wrap break-words">{m.content}</div>
-                      <div className="text-[11px] text-gray-500 mt-1">{new Date(m.created_at).toLocaleString()}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="border-t p-3 flex items-center gap-2">
-                  <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Votre message…" onKeyDown={(e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); onSend(); } }} />
-                  <Button onClick={onSend} disabled={sending || !text.trim()} className="shrink-0">Envoyer</Button>
-                </div>
-              </CardContent>
-            </Card>
+            {String(order?.status||'').toLowerCase() === 'paid' ? (
+              <Card className="h-[60vh] flex flex-col">
+                <CardHeader className="p-4">
+                  <CardTitle className="text-base font-semibold">Chat commande</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0 flex-1 flex flex-col">
+                  <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {messages.length === 0 ? (
+                      <div className="text-gray-500 text-sm">Aucun message pour le moment.</div>
+                    ) : messages.map((m) => (
+                      <div key={m.id} className={`max-w-[80%] rounded px-3 py-2 text-sm ${String(m.sender_id||'')===String(session?.user?.id||'') ? 'bg-[#DCFCE7] ml-auto' : 'bg-white border'}`}>
+                        <div className="whitespace-pre-wrap break-words">{m.content}</div>
+                        <div className="text-[11px] text-gray-500 mt-1">{new Date(m.created_at).toLocaleString()}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border-t p-3 flex items-center gap-2">
+                    <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Votre message…" onKeyDown={(e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); onSend(); } }} />
+                    <Button onClick={onSend} disabled={sending || !text.trim()} className="shrink-0">Envoyer</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader className="p-4">
+                  <CardTitle className="text-base font-semibold">Chat commande</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  <div className="text-sm text-gray-600">Le chat sera disponible une fois le paiement validé.</div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
       </div>
