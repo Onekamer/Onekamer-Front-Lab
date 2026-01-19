@@ -688,9 +688,9 @@ const MarketplaceMyShop = () => {
                                 type="button"
                                 variant="outline"
                                 className="w-full md:w-auto"
-                                onClick={() => setExpandedOrderId(isExpanded ? null : o.id)}
+                                onClick={() => navigate(`/market/orders/${encodeURIComponent(o.id)}`, { state: { from: 'myshop-chat' } })}
                               >
-                                {isExpanded ? 'Masquer' : 'Détail'}
+                                Détail
                               </Button>
                             </div>
                           </div>
