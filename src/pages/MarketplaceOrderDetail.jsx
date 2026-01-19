@@ -24,6 +24,7 @@ const MarketplaceOrderDetail = () => {
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
   const [updatingFulfillment, setUpdatingFulfillment] = useState(false);
+  const [actioning, setActioning] = useState(null);
 
   const listRef = useRef(null);
 
@@ -177,6 +178,43 @@ const MarketplaceOrderDetail = () => {
     }
   };
 
+  const handleResumePayment = async () => {
+    if (!orderId || !session?.access_token) return;
+    setActioning('pay');
+    try {
+      const res = await fetch(`${serverLabUrl}/api/market/orders/${encodeURIComponent(orderId)}/pay`, {
+        method: 'GET',
+        headers,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.url) throw new Error(data?.error || 'Impossible de relancer le paiement');
+      window.location.href = data.url;
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || 'Échec du paiement', variant: 'destructive' });
+    } finally {
+      setActioning(null);
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!orderId || !session?.access_token) return;
+    setActioning('cancel');
+    try {
+      const res = await fetch(`${serverLabUrl}/api/market/orders/${encodeURIComponent(orderId)}/cancel`, {
+        method: 'POST',
+        headers,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Annulation impossible');
+      await loadOrder();
+      toast({ title: 'Commande annulée' });
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || "Impossible d'annuler la commande", variant: 'destructive' });
+    } finally {
+      setActioning(null);
+    }
+  };
+
   return (
     <>
       <Helmet>
@@ -291,6 +329,14 @@ const MarketplaceOrderDetail = () => {
                     ))}
                   </div>
                 </div>
+                {effectiveRole === 'buyer' && String(order?.status || '').toLowerCase() !== 'paid' ? (
+                  <div className="pt-2 space-y-2">
+                    <Button onClick={handleResumePayment} disabled={actioning === 'pay'} className="w-full">Reprendre le paiement</Button>
+                    {!['cancelled', 'canceled'].includes(String(order?.status || '').toLowerCase()) ? (
+                      <Button onClick={handleCancelOrder} disabled={actioning === 'cancel'} variant="outline" className="w-full">Annuler la commande</Button>
+                    ) : null}
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
 

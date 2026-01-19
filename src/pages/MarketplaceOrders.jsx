@@ -15,6 +15,7 @@ const MarketplaceOrders = () => {
 
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState([]);
+  const [actioning, setActioning] = useState(null);
   // Filtre supprimé (toujours 'all')
 
   const headers = useMemo(() => {
@@ -48,6 +49,46 @@ const MarketplaceOrders = () => {
     load();
     return () => { aborted = true; };
   }, [session?.access_token, serverLabUrl, headers, toast]);
+
+  const resumePayment = async (orderId) => {
+    if (!orderId || !session?.access_token) return;
+    setActioning(orderId);
+    try {
+      const res = await fetch(`${serverLabUrl}/api/market/orders/${encodeURIComponent(orderId)}/pay`, {
+        method: 'GET',
+        headers,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.url) throw new Error(data?.error || 'Impossible de relancer le paiement');
+      window.location.href = data.url;
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || 'Échec du paiement', variant: 'destructive' });
+    } finally {
+      setActioning(null);
+    }
+  };
+
+  const cancelOrder = async (orderId) => {
+    if (!orderId || !session?.access_token) return;
+    setActioning(orderId);
+    try {
+      const res = await fetch(`${serverLabUrl}/api/market/orders/${encodeURIComponent(orderId)}/cancel`, {
+        method: 'POST',
+        headers,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Annulation impossible");
+      // Reload list
+      const list = await fetch(`${serverLabUrl}/api/market/orders?status=all`, { method: 'GET', headers });
+      const payload = await list.json().catch(() => ({}));
+      if (list.ok) setOrders(Array.isArray(payload?.orders) ? payload.orders : []);
+      toast({ title: 'Commande annulée' });
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || "Impossible d'annuler la commande", variant: 'destructive' });
+    } finally {
+      setActioning(null);
+    }
+  };
 
   const renderAmount = (amt, cur) => {
     const n = Number(amt || 0);
@@ -153,8 +194,20 @@ const MarketplaceOrders = () => {
                               <div className="text-gray-700 font-medium">Articles</div>
                               <div>{Array.isArray(o.items) ? o.items.length : 0}</div>
                             </div>
-                            <div className="pt-2">
+                            <div className="pt-2 flex flex-col gap-2">
                               <Button className="w-full" onClick={() => navigate(`/market/orders/${o.id}`)}>Voir le détail</Button>
+                              {String(o.status || '').toLowerCase() !== 'paid' ? (
+                                <>
+                                  <Button className="w-full" variant="outline" onClick={() => resumePayment(o.id)} disabled={actioning === o.id}>
+                                    Reprendre le paiement
+                                  </Button>
+                                  {!["cancelled", "canceled"].includes(String(o.status || '').toLowerCase()) ? (
+                                    <Button className="w-full" variant="outline" onClick={() => cancelOrder(o.id)} disabled={actioning === o.id}>
+                                      Annuler la commande
+                                    </Button>
+                                  ) : null}
+                                </>
+                              ) : null}
                             </div>
                           </CardContent>
                         </Card>
