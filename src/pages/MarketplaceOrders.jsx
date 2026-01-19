@@ -114,46 +114,45 @@ const MarketplaceOrders = () => {
         ) : (
           <div className="grid grid-cols-1 gap-4">
             {groups.map((g) => (
-              <div key={g.name} className="space-y-2">
-                <div
-                  className="text-sm font-semibold text-gray-700 cursor-pointer"
-                  onClick={() => setExpanded((prev) => ({ ...prev, [g.name]: !prev[g.name] }))}
-                >
-                  {g.name}
-                </div>
+              <Card key={g.name} className="hover:shadow-sm transition">
+                <CardHeader className="p-4 cursor-pointer" onClick={() => setExpanded((prev) => ({ ...prev, [g.name]: !prev[g.name] }))}>
+                  <CardTitle className="text-base font-semibold">{g.name}</CardTitle>
+                </CardHeader>
                 {expanded[g.name] !== false ? (
-                  <div className="grid grid-cols-1 gap-3">
-                    {g.items.map((o) => (
-                    <Card key={o.id} className="hover:shadow-sm transition">
-                      <CardHeader className="p-4">
-                        <CardTitle className="text-base font-semibold">Commande #{o.id}</CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-4 pt-0 space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <div className="text-gray-700 font-medium">Statut paiement</div>
-                          <div className="capitalize">{String(o.status || '').replace('_', ' ')}</div>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <div className="text-gray-700 font-medium">Statut commande</div>
-                          <div className="capitalize">{String(o.fulfillment_status || '—').replace('_', ' ')}</div>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <div className="text-gray-700 font-medium">Montant</div>
-                          <div>{renderAmount(o.charge_amount_total, o.charge_currency)}</div>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <div className="text-gray-700 font-medium">Articles</div>
-                          <div>{Array.isArray(o.items) ? o.items.length : 0}</div>
-                        </div>
-                        <div className="pt-2">
-                          <Button className="w-full" onClick={() => navigate(`/market/orders/${o.id}`)}>Voir le détail</Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                  <CardContent className="p-4 pt-0">
+                    <div className="grid grid-cols-1 gap-3">
+                      {g.items.map((o) => (
+                        <Card key={o.id} className="hover:shadow-sm transition">
+                          <CardHeader className="p-4">
+                            <CardTitle className="text-base font-semibold">Commande #{o.id}</CardTitle>
+                          </CardHeader>
+                          <CardContent className="p-4 pt-0 space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <div className="text-gray-700 font-medium">Statut paiement</div>
+                              <div className="capitalize">{String(o.status || '').replace('_', ' ')}</div>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <div className="text-gray-700 font-medium">Statut commande</div>
+                              <div className="capitalize">{String(o.fulfillment_status || '—').replace('_', ' ')}</div>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <div className="text-gray-700 font-medium">Montant</div>
+                              <div>{renderAmount(o.charge_amount_total, o.charge_currency)}</div>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <div className="text-gray-700 font-medium">Articles</div>
+                              <div>{Array.isArray(o.items) ? o.items.length : 0}</div>
+                            </div>
+                            <div className="pt-2">
+                              <Button className="w-full" onClick={() => navigate(`/market/orders/${o.id}`)}>Voir le détail</Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </CardContent>
                 ) : null}
-              </div>
+              </Card>
             ))}
           </div>
         )}
