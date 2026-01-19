@@ -41,6 +41,11 @@ const MarketplaceMyShop = () => {
   const [abandonedCarts, setAbandonedCarts] = useState([]);
   const [expandedCartId, setExpandedCartId] = useState(null);
 
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState(null);
+  const [chatOrders, setChatOrders] = useState([]);
+  const [chatExpandedOrderId, setChatExpandedOrderId] = useState(null);
+
   const formatEur = (amountMinor) => {
     const v = Number(amountMinor);
     if (!Number.isFinite(v)) return '—';
@@ -230,6 +235,49 @@ const MarketplaceMyShop = () => {
     fetchAbandonedCarts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, partner?.id, abandonedMinutes]);
+
+  const fetchChatOrders = async () => {
+    if (!session?.access_token) return;
+    if (!partner?.id) return;
+    if (chatLoading) return;
+
+    setChatLoading(true);
+    setChatError(null);
+
+    try {
+      const qs = new URLSearchParams();
+      qs.set('status', 'paid');
+      qs.set('limit', '100');
+      qs.set('offset', '0');
+
+      const res = await fetch(
+        `${serverLabUrl}/api/market/partners/${encodeURIComponent(partner.id)}/orders?${qs.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur chargement commandes');
+
+      setChatOrders(Array.isArray(data?.orders) ? data.orders : []);
+    } catch (e) {
+      const msg = e?.message || 'Erreur chargement commandes';
+      setChatError(msg);
+      toast({ title: 'Erreur', description: msg, variant: 'destructive' });
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'chat') return;
+    if (!partner?.id) return;
+    fetchChatOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, partner?.id]);
 
   const onChange = (key) => (e) => {
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
@@ -436,112 +484,89 @@ const MarketplaceMyShop = () => {
             </Button>
             <Button
               type="button"
-              variant={activeTab === 'abandoned' ? 'default' : 'outline'}
-              onClick={() => setActiveTab('abandoned')}
+              variant={activeTab === 'chat' ? 'default' : 'outline'}
+              onClick={() => setActiveTab('chat')}
               className="flex-1"
             >
-              Paniers abandonnés
+              Chat
             </Button>
           </div>
         ) : null}
 
-        {activeTab === 'abandoned' ? (
+        {activeTab === 'chat' ? (
           <Card>
             <CardHeader className="p-4">
-              <CardTitle className="text-base font-semibold">Paniers abandonnés</CardTitle>
+              <CardTitle className="text-base font-semibold">Chat</CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0 space-y-3">
-              <div className="space-y-2">
-                <div className="text-sm font-medium">Seuil d’abandon</div>
-                <select
-                  value={String(abandonedMinutes)}
-                  onChange={(e) => setAbandonedMinutes(parseInt(e.target.value, 10) || 60)}
-                  className="flex h-10 w-full rounded-md border border-[#2BA84A]/30 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="30">30 min</option>
-                  <option value="60">1 h</option>
-                  <option value="180">3 h</option>
-                  <option value="1440">24 h</option>
-                </select>
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={fetchAbandonedCarts}
-                disabled={abandonedLoading}
-                className="w-full"
-              >
-                {abandonedLoading ? 'Chargement…' : 'Recharger'}
+              <Button type="button" variant="outline" onClick={fetchChatOrders} disabled={chatLoading} className="w-full">
+                {chatLoading ? 'Chargement…' : 'Recharger'}
               </Button>
 
-              {!abandonedLoading && abandonedError ? <div className="text-sm text-red-600">{abandonedError}</div> : null}
+              {!chatLoading && chatError ? <div className="text-sm text-red-600">{chatError}</div> : null}
 
-              {!abandonedLoading && !abandonedError && abandonedCarts.length === 0 ? (
-                <div className="text-sm text-gray-600">Aucun panier abandonné.</div>
+              {!chatLoading && !chatError && chatOrders.length === 0 ? (
+                <div className="text-sm text-gray-600">Aucune commande payée.</div>
               ) : null}
 
-              {!abandonedLoading && abandonedCarts.length > 0 ? (
+              {!chatLoading && chatOrders.length > 0 ? (
                 <div className="border rounded-md bg-white overflow-hidden">
                   <div className="hidden md:grid grid-cols-12 gap-3 px-3 py-2 bg-gray-50 text-xs text-gray-600 font-medium">
-                    <div className="col-span-3">Dernière activité</div>
+                    <div className="col-span-3">Commande</div>
                     <div className="col-span-4">Client</div>
-                    <div className="col-span-2">Total estimé</div>
-                    <div className="col-span-1">Articles</div>
+                    <div className="col-span-3">Total</div>
                     <div className="col-span-2 text-right">Actions</div>
                   </div>
 
                   <div className="divide-y">
-                    {abandonedCarts.map((c) => {
-                      const isExpanded = expandedCartId && String(expandedCartId) === String(c.id);
-                      const updatedAt = c?.updated_at ? new Date(c.updated_at) : null;
-                      const updatedLabel = updatedAt && !Number.isNaN(updatedAt.getTime()) ? updatedAt.toLocaleString() : '—';
-                      const its = Array.isArray(c?.items) ? c.items : [];
-                      const totalMinor = Number(c?.total_minor || 0);
-                      const totalLabel = `${(totalMinor / 100).toFixed(2)}€`;
+                    {chatOrders.map((o) => {
+                      const createdAt = o?.created_at ? new Date(o.created_at) : null;
+                      const createdLabel = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.toLocaleString() : '—';
+                      const currency = String(o?.charge_currency || '').toUpperCase();
+                      const totalLabel = currency === 'EUR' ? formatEur(o?.charge_amount_total) : currency ? `${o?.charge_amount_total} ${currency}` : '—';
+                      const isExpanded = chatExpandedOrderId && String(chatExpandedOrderId) === String(o.id);
 
                       return (
-                        <div key={c.id} className="p-3">
+                        <div key={o.id} className="p-3">
                           <div className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-3 items-start">
                             <div className="md:col-span-3">
-                              <div className="text-sm font-semibold">{updatedLabel}</div>
+                              <div className="text-sm font-semibold">Commande #{String(o.id).slice(0, 8)}</div>
+                              <div className="text-xs text-gray-500">{createdLabel}</div>
                             </div>
                             <div className="md:col-span-4">
-                              <div className="text-sm text-gray-800 break-all">{c?.customer_email || '—'}</div>
+                              <div className="text-sm text-gray-800 break-all">{o?.customer_email || '—'}</div>
                             </div>
-                            <div className="md:col-span-2">
+                            <div className="md:col-span-3">
                               <div className="text-sm text-gray-800">{totalLabel}</div>
                             </div>
-                            <div className="md:col-span-1">
-                              <div className="text-sm text-gray-800">{its.length}</div>
-                            </div>
                             <div className="md:col-span-2 md:text-right">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className="w-full md:w-auto"
-                                onClick={() => setExpandedCartId(isExpanded ? null : c.id)}
-                              >
-                                {isExpanded ? 'Masquer' : 'Détail'}
-                              </Button>
+                              <div className="flex gap-2 justify-end">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full md:w-auto"
+                                  onClick={() => navigate(`/market/orders/${encodeURIComponent(o.id)}`)}
+                                >
+                                  Ouvrir le chat
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="hidden md:inline-flex"
+                                  onClick={() => setChatExpandedOrderId(isExpanded ? null : o.id)}
+                                >
+                                  {isExpanded ? 'Masquer' : 'Détail'}
+                                </Button>
+                              </div>
                             </div>
                           </div>
 
                           {isExpanded ? (
                             <div className="mt-3 rounded-md border bg-gray-50 p-3 space-y-2">
-                              <div className="text-xs text-gray-600 font-medium">Produits</div>
-                              {its.length === 0 ? (
-                                <div className="text-sm text-gray-600">Aucun article.</div>
-                              ) : (
-                                <div className="space-y-2">
-                                  {its.map((it) => (
-                                    <div key={it.id} className="flex items-start justify-between gap-2 text-sm">
-                                      <div className="text-gray-800">{it.title_snapshot || 'Produit'}</div>
-                                      <div className="text-gray-600">x{it.quantity || 1}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
+                              <div className="text-xs text-gray-600 font-medium">Résumé</div>
+                              <div className="text-sm text-gray-700">
+                                Client: {o?.customer_email || '—'} • Montant: {totalLabel}
+                              </div>
                             </div>
                           ) : null}
                         </div>
