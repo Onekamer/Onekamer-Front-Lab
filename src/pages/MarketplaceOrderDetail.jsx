@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ const MarketplaceOrderDetail = () => {
   const { session } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const serverLabUrl = import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com';
 
   const [loading, setLoading] = useState(true);
@@ -169,7 +170,20 @@ const MarketplaceOrderDetail = () => {
 
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-2">
-          <Button variant="ghost" onClick={() => navigate(role === 'seller' ? '/marketplace/ma-boutique?tab=chat' : '/market/orders')} className="px-2">Retour</Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              const fromChat = location?.state && location.state.from === 'myshop-chat';
+              if (fromChat || role === 'seller') {
+                navigate('/marketplace/ma-boutique?tab=chat');
+              } else {
+                navigate('/market/orders');
+              }
+            }}
+            className="px-2"
+          >
+            Retour
+          </Button>
           <div className="text-sm text-gray-600">{role ? (role === 'buyer' ? 'Acheteur' : 'Vendeur') : ''}</div>
         </div>
 
