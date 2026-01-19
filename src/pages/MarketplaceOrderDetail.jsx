@@ -93,6 +93,12 @@ const MarketplaceOrderDetail = () => {
     }
   }, [messages.length]);
 
+  const effectiveRole = useMemo(() => {
+    const fromChat = location?.state && location.state.from === 'myshop-chat';
+    if (fromChat) return 'seller';
+    return role;
+  }, [location?.state, role]);
+
   const renderAmount = (amt, cur) => {
     const n = Number(amt || 0);
     const c = String(cur || '').toUpperCase();
@@ -173,8 +179,7 @@ const MarketplaceOrderDetail = () => {
           <Button
             variant="ghost"
             onClick={() => {
-              const fromChat = location?.state && location.state.from === 'myshop-chat';
-              if (fromChat || role === 'seller') {
+              if (effectiveRole === 'seller') {
                 navigate('/marketplace/ma-boutique?tab=chat');
               } else {
                 navigate('/market/orders');
@@ -184,7 +189,7 @@ const MarketplaceOrderDetail = () => {
           >
             Retour
           </Button>
-          <div className="text-sm text-gray-600">{role ? (role === 'buyer' ? 'Acheteur' : 'Vendeur') : ''}</div>
+          <div className="text-sm text-gray-600">{effectiveRole ? (effectiveRole === 'buyer' ? 'Acheteur' : 'Vendeur') : ''}</div>
         </div>
 
         {loading ? (
@@ -199,14 +204,14 @@ const MarketplaceOrderDetail = () => {
               </CardHeader>
               <CardContent className="p-4 pt-0 space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <div className="text-gray-700 font-medium">Statut</div>
+                  <div className="text-gray-700 font-medium">Statut de paiement</div>
                   <div className="capitalize">{String(order.status || '').replace('_', ' ')}</div>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <div className="text-gray-700 font-medium">Montant</div>
                   <div>{renderAmount(order.charge_amount_total, order.charge_currency)}</div>
                 </div>
-                {role === 'seller' ? (
+                {effectiveRole === 'seller' ? (
                   <div className="flex items-center justify-between text-sm">
                     <div className="text-gray-700 font-medium">Client</div>
                     <div className="truncate max-w-[60%]">{order?.customer_email || '—'}</div>
@@ -218,12 +223,8 @@ const MarketplaceOrderDetail = () => {
                     <div className="capitalize">{String(order.delivery_mode || '—')}</div>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <div className="text-gray-700 font-medium">Préparation</div>
+                    <div className="text-gray-700 font-medium">Statut</div>
                     <div className="capitalize">{String(order.fulfillment_status || '—')}</div>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="text-gray-700 font-medium">MAJ préparation</div>
-                    <div>{order?.fulfillment_updated_at ? new Date(order.fulfillment_updated_at).toLocaleString() : '—'}</div>
                   </div>
                 </div>
                 {order?.customer_note ? (
@@ -246,7 +247,7 @@ const MarketplaceOrderDetail = () => {
               </CardContent>
             </Card>
 
-            {role === 'seller' ? (
+            {effectiveRole === 'seller' ? (
               <Card>
                 <CardHeader className="p-4">
                   <CardTitle className="text-base font-semibold">Gérer la préparation</CardTitle>
@@ -268,7 +269,7 @@ const MarketplaceOrderDetail = () => {
               </Card>
             ) : null}
 
-            {role === 'buyer' && String(order?.fulfillment_status || '').toLowerCase() === 'delivered' && !order?.buyer_received_at ? (
+            {effectiveRole === 'buyer' && String(order?.fulfillment_status || '').toLowerCase() === 'delivered' && !order?.buyer_received_at ? (
               <Card>
                 <CardHeader className="p-4">
                   <CardTitle className="text-base font-semibold">Réception</CardTitle>
