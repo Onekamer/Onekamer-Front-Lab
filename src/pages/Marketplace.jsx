@@ -193,7 +193,7 @@ const Marketplace = () => {
               const telUrl = buildTelUrl(p?.phone);
               const contactUrl = whatsappUrl || telUrl;
               return (
-                <Card key={p.id} className="h-full flex flex-col">
+                <Card key={p.id} className={`h-full flex flex-col ${commandable ? '' : 'opacity-60'}`}>
                   <CardHeader className="p-4">
                     <div className="flex items-start gap-3">
                       {p?.logo_url ? (

@@ -77,7 +77,7 @@ const MarketplaceOrders = () => {
     setExpanded((prev) => {
       const next = { ...prev };
       for (const g of groups) {
-        if (typeof next[g.name] === 'undefined') next[g.name] = true;
+        if (typeof next[g.name] === 'undefined') next[g.name] = false;
       }
       return next;
     });
@@ -116,7 +116,10 @@ const MarketplaceOrders = () => {
             {groups.map((g) => (
               <Card key={g.name} className="hover:shadow-sm transition">
                 <CardHeader className="p-4 cursor-pointer" onClick={() => setExpanded((prev) => ({ ...prev, [g.name]: !prev[g.name] }))}>
-                  <CardTitle className="text-base font-semibold">{g.name}</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base font-semibold">{g.name}</CardTitle>
+                    <span className="text-gray-400">{expanded[g.name] !== false ? '▾' : '▸'}</span>
+                  </div>
                 </CardHeader>
                 {expanded[g.name] !== false ? (
                   <CardContent className="p-4 pt-0">

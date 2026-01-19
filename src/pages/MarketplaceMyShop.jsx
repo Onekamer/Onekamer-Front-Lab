@@ -27,6 +27,7 @@ const MarketplaceMyShop = () => {
   const [uploading, setUploading] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [togglingOpen, setTogglingOpen] = useState(false);
 
   const [partner, setPartner] = useState(null);
 
@@ -59,6 +60,33 @@ const MarketplaceMyShop = () => {
     const v = Number(amountMinor);
     if (!Number.isFinite(v)) return '—';
     return `${(v / 100).toFixed(2)}€`;
+  };
+
+  const handleToggleOpen = async () => {
+    if (!partner?.id) return;
+    if (!session?.access_token) return;
+    if (togglingOpen) return;
+
+    setTogglingOpen(true);
+    try {
+      const next = partner?.is_open === true ? false : true;
+      const res = await fetch(`${serverLabUrl}/api/market/partners/${encodeURIComponent(partner.id)}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ is_open: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur mise à jour disponibilité');
+      await reloadPartner();
+      toast({ title: 'Disponibilité mise à jour', description: next ? 'Boutique ouverte' : 'Boutique fermée' });
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || "Impossible de mettre à jour la disponibilité", variant: 'destructive' });
+    } finally {
+      setTogglingOpen(false);
+    }
   };
 
   const totalSalesEur = useMemo(() => {
@@ -730,6 +758,10 @@ const MarketplaceMyShop = () => {
                 <span className="text-gray-600">Paiements : </span>
                 <span>{payoutLabel}</span>
               </div>
+              <div>
+                <span className="text-gray-600">Disponibilité : </span>
+                <span>{partner?.is_open ? 'Ouverte' : 'Indisponible'}</span>
+              </div>
             </div>
             {partner?.id ? (
               <div className="mt-3 space-y-2">
@@ -750,6 +782,15 @@ const MarketplaceMyShop = () => {
                   className="w-full"
                 >
                   {syncing ? 'Vérification…' : 'Vérifier le statut'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleToggleOpen}
+                  disabled={togglingOpen}
+                  className="w-full"
+                >
+                  {togglingOpen ? 'Mise à jour…' : partner?.is_open ? 'Fermer la boutique' : 'Ouvrir la boutique'}
                 </Button>
               </div>
             ) : null}
