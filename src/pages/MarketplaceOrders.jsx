@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ArrowLeft } from 'lucide-react';
 
 const MarketplaceOrders = () => {
   const { session } = useAuth();
@@ -15,7 +15,7 @@ const MarketplaceOrders = () => {
 
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState([]);
-  const [status, setStatus] = useState('all');
+  // Filtre supprimé (toujours 'all')
 
   const headers = useMemo(() => {
     const h = { 'Content-Type': 'application/json' };
@@ -32,7 +32,7 @@ const MarketplaceOrders = () => {
           setOrders([]);
           return;
         }
-        const res = await fetch(`${serverLabUrl}/api/market/orders?status=${encodeURIComponent(status)}`, {
+        const res = await fetch(`${serverLabUrl}/api/market/orders?status=all`, {
           method: 'GET',
           headers,
         });
@@ -47,7 +47,7 @@ const MarketplaceOrders = () => {
     };
     load();
     return () => { aborted = true; };
-  }, [session?.access_token, serverLabUrl, headers, status, toast]);
+  }, [session?.access_token, serverLabUrl, headers, toast]);
 
   const renderAmount = (amt, cur) => {
     const n = Number(amt || 0);
@@ -100,20 +100,14 @@ const MarketplaceOrders = () => {
 
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-2">
-          <h1 className="text-xl font-bold text-[#2BA84A]">Mes commandes</h1>
           <div className="flex items-center gap-2">
-            <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Filtrer" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Toutes</SelectItem>
-                <SelectItem value="pending">En attente</SelectItem>
-                <SelectItem value="paid">Payées</SelectItem>
-                <SelectItem value="canceled">Annulées</SelectItem>
-              </SelectContent>
-            </Select>
+            <Button variant="ghost" onClick={() => navigate('/marketplace')} className="px-2">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Marketplace
+            </Button>
+            <h1 className="text-xl font-bold text-[#2BA84A]">Mes commandes</h1>
           </div>
+          <div />
         </div>
 
         {loading ? (
@@ -126,7 +120,7 @@ const MarketplaceOrders = () => {
               <Card key={g.name} className="hover:shadow-sm transition">
                 <CardHeader className="p-4 cursor-pointer" onClick={() => setExpanded((prev) => ({ ...prev, [g.name]: !prev[g.name] }))}>
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-base font-semibold">{g.name}</CardTitle>
+                    <CardTitle className="text-base font-semibold">{g.name} ({Array.isArray(g.items) ? g.items.length : 0})</CardTitle>
                     <span className="text-gray-400">{expanded[g.name] !== false ? '▾' : '▸'}</span>
                   </div>
                 </CardHeader>
@@ -142,6 +136,10 @@ const MarketplaceOrders = () => {
                             <div className="flex items-center justify-between text-sm">
                               <div className="text-gray-700 font-medium">Statut paiement</div>
                               <div className="capitalize">{String(o.status || '').replace('_', ' ')}</div>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <div className="text-gray-700 font-medium">Date de la commande</div>
+                              <div>{o?.created_at ? new Date(o.created_at).toLocaleString() : '—'}</div>
                             </div>
                             <div className="flex items-center justify-between text-sm">
                               <div className="text-gray-700 font-medium">Statut commande</div>
