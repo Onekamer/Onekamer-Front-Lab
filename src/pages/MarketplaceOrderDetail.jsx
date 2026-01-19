@@ -227,6 +227,40 @@ const MarketplaceOrderDetail = () => {
                     <div className="capitalize">{String(order.fulfillment_status || '—')}</div>
                   </div>
                 </div>
+                {effectiveRole === 'seller' ? (
+                  <div className="pt-2 space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="text-gray-700 font-medium">Nom</div>
+                      <div className="truncate max-w-[60%]">
+                        {(() => {
+                          const fn = String(order?.customer_first_name || '').trim();
+                          const ln = String(order?.customer_last_name || '').trim();
+                          const full = [fn, ln].filter(Boolean).join(' ').trim();
+                          return full || '—';
+                        })()}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="text-gray-700 font-medium">Téléphone</div>
+                      <div className="truncate max-w-[60%]">{order?.customer_phone || '—'}</div>
+                    </div>
+                    <div className="flex items-start justify-between text-sm">
+                      <div className="text-gray-700 font-medium">Adresse</div>
+                      <div className="text-right text-gray-700 whitespace-pre-wrap max-w-[60%]">
+                        {(() => {
+                          const a1 = String(order?.customer_address_line1 || '').trim();
+                          const a2 = String(order?.customer_address_line2 || '').trim();
+                          const pc = String(order?.customer_address_postal_code || '').trim();
+                          const city = String(order?.customer_address_city || '').trim();
+                          const cc = String(order?.customer_address_country || order?.customer_country_code || '').trim();
+                          const row3 = [pc, city].filter(Boolean).join(' ');
+                          const parts = [a1, a2, row3, cc].filter(Boolean);
+                          return parts.length ? parts.join('\n') : '—';
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
                 {order?.customer_note ? (
                   <div className="pt-2">
                     <div className="text-gray-700 font-medium text-sm mb-1">Note client</div>
