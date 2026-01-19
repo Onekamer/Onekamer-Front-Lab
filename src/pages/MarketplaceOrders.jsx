@@ -71,6 +71,18 @@ const MarketplaceOrders = () => {
     return out;
   }, [orders]);
 
+  const [expanded, setExpanded] = useState({});
+
+  useEffect(() => {
+    setExpanded((prev) => {
+      const next = { ...prev };
+      for (const g of groups) {
+        if (typeof next[g.name] === 'undefined') next[g.name] = true;
+      }
+      return next;
+    });
+  }, [groups]);
+
   return (
     <>
       <Helmet>
@@ -103,17 +115,27 @@ const MarketplaceOrders = () => {
           <div className="grid grid-cols-1 gap-4">
             {groups.map((g) => (
               <div key={g.name} className="space-y-2">
-                <div className="text-sm font-semibold text-gray-700">({g.name})</div>
-                <div className="grid grid-cols-1 gap-3">
-                  {g.items.map((o) => (
+                <div
+                  className="text-sm font-semibold text-gray-700 cursor-pointer"
+                  onClick={() => setExpanded((prev) => ({ ...prev, [g.name]: !prev[g.name] }))}
+                >
+                  {g.name}
+                </div>
+                {expanded[g.name] !== false ? (
+                  <div className="grid grid-cols-1 gap-3">
+                    {g.items.map((o) => (
                     <Card key={o.id} className="hover:shadow-sm transition">
                       <CardHeader className="p-4">
                         <CardTitle className="text-base font-semibold">Commande #{o.id}</CardTitle>
                       </CardHeader>
                       <CardContent className="p-4 pt-0 space-y-2">
                         <div className="flex items-center justify-between text-sm">
-                          <div className="text-gray-700 font-medium">Statut</div>
+                          <div className="text-gray-700 font-medium">Statut paiement</div>
                           <div className="capitalize">{String(o.status || '').replace('_', ' ')}</div>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="text-gray-700 font-medium">Statut commande</div>
+                          <div className="capitalize">{String(o.fulfillment_status || '—').replace('_', ' ')}</div>
                         </div>
                         <div className="flex items-center justify-between text-sm">
                           <div className="text-gray-700 font-medium">Montant</div>
@@ -130,6 +152,7 @@ const MarketplaceOrders = () => {
                     </Card>
                   ))}
                 </div>
+                ) : null}
               </div>
             ))}
           </div>
