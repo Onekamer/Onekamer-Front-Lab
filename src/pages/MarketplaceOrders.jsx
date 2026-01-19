@@ -196,18 +196,22 @@ const MarketplaceOrders = () => {
                             </div>
                             <div className="pt-2 flex flex-col gap-2">
                               <Button className="w-full" onClick={() => navigate(`/market/orders/${o.id}`)}>Voir le détail</Button>
-                              {String(o.status || '').toLowerCase() !== 'paid' ? (
-                                <>
-                                  <Button className="w-full" variant="outline" onClick={() => resumePayment(o.id)} disabled={actioning === o.id}>
-                                    Reprendre le paiement
-                                  </Button>
-                                  {!["cancelled", "canceled"].includes(String(o.status || '').toLowerCase()) ? (
-                                    <Button className="w-full" variant="outline" onClick={() => cancelOrder(o.id)} disabled={actioning === o.id}>
-                                      Annuler la commande
+                              {(() => {
+                                const s = String(o.status || '').toLowerCase();
+                                if (s === 'paid' || s === 'cancelled' || s === 'canceled') return null;
+                                return (
+                                  <>
+                                    <Button className="w-full" variant="outline" onClick={() => resumePayment(o.id)} disabled={actioning === o.id}>
+                                      Reprendre le paiement
                                     </Button>
-                                  ) : null}
-                                </>
-                              ) : null}
+                                    {!['cancelled', 'canceled'].includes(s) ? (
+                                      <Button className="w-full" variant="outline" onClick={() => cancelOrder(o.id)} disabled={actioning === o.id}>
+                                        Annuler la commande
+                                      </Button>
+                                    ) : null}
+                                  </>
+                                );
+                              })()}
                             </div>
                           </CardContent>
                         </Card>

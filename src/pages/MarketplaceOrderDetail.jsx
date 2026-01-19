@@ -329,14 +329,17 @@ const MarketplaceOrderDetail = () => {
                     ))}
                   </div>
                 </div>
-                {effectiveRole === 'buyer' && String(order?.status || '').toLowerCase() !== 'paid' ? (
-                  <div className="pt-2 space-y-2">
-                    <Button onClick={handleResumePayment} disabled={actioning === 'pay'} className="w-full">Reprendre le paiement</Button>
-                    {!['cancelled', 'canceled'].includes(String(order?.status || '').toLowerCase()) ? (
+                {(() => {
+                  const s = String(order?.status || '').toLowerCase();
+                  if (effectiveRole !== 'buyer') return null;
+                  if (s === 'paid' || s === 'cancelled' || s === 'canceled') return null;
+                  return (
+                    <div className="pt-2 space-y-2">
+                      <Button onClick={handleResumePayment} disabled={actioning === 'pay'} className="w-full">Reprendre le paiement</Button>
                       <Button onClick={handleCancelOrder} disabled={actioning === 'cancel'} variant="outline" className="w-full">Annuler la commande</Button>
-                    ) : null}
-                  </div>
-                ) : null}
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
 
