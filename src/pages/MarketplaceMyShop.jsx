@@ -62,6 +62,15 @@ const MarketplaceMyShop = () => {
     return `${(v / 100).toFixed(2)}€`;
   };
 
+  const formatOrderCode = (shopName, createdAt, orderNumber) => {
+    const raw = String(shopName || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z]/g, '').toUpperCase();
+    const prefix = (raw.slice(0, 3) || 'OK');
+    const d = createdAt ? new Date(createdAt) : new Date();
+    const year = Number.isNaN(d.getTime()) ? new Date().getFullYear() : d.getFullYear();
+    const num = String(Number(orderNumber || 0)).padStart(6, '0');
+    return `${prefix}-${year}-${num}`;
+  };
+
   const handleToggleOpen = async () => {
     if (!partner?.id) return;
     if (!session?.access_token) return;
@@ -567,7 +576,7 @@ const MarketplaceMyShop = () => {
                         <div key={o.id} className="p-3">
                           <div className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-3 items-start">
                             <div className="md:col-span-3">
-                              <div className="text-sm font-semibold">Commande #{String(o.id).slice(0, 8)}</div>
+                              <div className="text-sm font-semibold">Commande n°{formatOrderCode(partner?.display_name, o.created_at, o.order_number)}</div>
                               <div className="text-xs text-gray-500">{createdLabel}</div>
                             </div>
                             <div className="md:col-span-4">
@@ -687,7 +696,7 @@ const MarketplaceMyShop = () => {
                         <div key={o.id} className="p-3">
                           <div className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-3 items-start">
                             <div className="md:col-span-3">
-                              <div className="text-sm font-semibold">Commande #{String(o.id).slice(0, 8)}</div>
+                              <div className="text-sm font-semibold">Commande n°{formatOrderCode(partner?.display_name, o.created_at, o.order_number)}</div>
                               <div className="text-xs text-gray-500">{createdLabel}</div>
                             </div>
 

@@ -105,6 +105,15 @@ const MarketplaceOrderDetail = () => {
     return `${(n / 100).toFixed(2)} ${c}`;
   };
 
+  const formatOrderCode = (shopName, createdAt, orderNumber) => {
+    const raw = String(shopName || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z]/g, '').toUpperCase();
+    const prefix = (raw.slice(0, 3) || 'OK');
+    const d = createdAt ? new Date(createdAt) : new Date();
+    const year = Number.isNaN(d.getTime()) ? new Date().getFullYear() : d.getFullYear();
+    const num = String(Number(orderNumber || 0)).padStart(6, '0');
+    return `${prefix}-${year}-${num}`;
+  };
+
   const onSend = async () => {
     const content = String(text || '').trim();
     if (!content) return;
@@ -171,7 +180,9 @@ const MarketplaceOrderDetail = () => {
   return (
     <>
       <Helmet>
-        <title>Commande #{orderId} - OneKamer.co</title>
+        <title>
+          {order ? `Commande n°${formatOrderCode(order.partner_display_name, order.created_at, order.order_number)} - OneKamer.co` : 'Commande - OneKamer.co'}
+        </title>
       </Helmet>
 
       <div className="space-y-4">
@@ -200,7 +211,9 @@ const MarketplaceOrderDetail = () => {
           <div className="space-y-4">
             <Card>
               <CardHeader className="p-4">
-                <CardTitle className="text-base font-semibold">Commande #{order.id}</CardTitle>
+                <CardTitle className="text-base font-semibold">
+                  {order ? `Commande n°${formatOrderCode(order.partner_display_name, order.created_at, order.order_number)}` : 'Commande'}
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0 space-y-2">
                 <div className="flex items-center justify-between text-sm">

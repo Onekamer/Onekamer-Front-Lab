@@ -55,6 +55,15 @@ const MarketplaceOrders = () => {
     return `${(n / 100).toFixed(2)} ${c}`;
   };
 
+  const formatOrderCode = (shopName, createdAt, orderNumber) => {
+    const raw = String(shopName || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z]/g, '').toUpperCase();
+    const prefix = (raw.slice(0, 3) || 'OK');
+    const d = createdAt ? new Date(createdAt) : new Date();
+    const year = Number.isNaN(d.getTime()) ? new Date().getFullYear() : d.getFullYear();
+    const num = String(Number(orderNumber || 0)).padStart(6, '0');
+    return `${prefix}-${year}-${num}`;
+  };
+
   const groups = useMemo(() => {
     const arr = Array.isArray(orders) ? orders : [];
     const out = [];
@@ -127,7 +136,7 @@ const MarketplaceOrders = () => {
                       {g.items.map((o) => (
                         <Card key={o.id} className="hover:shadow-sm transition">
                           <CardHeader className="p-4">
-                            <CardTitle className="text-base font-semibold">Commande #{o.id}</CardTitle>
+                            <CardTitle className="text-base font-semibold">Commande n°{formatOrderCode(o.partner_display_name, o.created_at, o.order_number)}</CardTitle>
                           </CardHeader>
                           <CardContent className="p-4 pt-0 space-y-2">
                             <div className="flex items-center justify-between text-sm">
