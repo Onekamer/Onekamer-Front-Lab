@@ -94,6 +94,9 @@ const PaiementSuccess = () => {
             ) : isMarketplacePayment ? (
               <div className="flex flex-col sm:flex-row gap-2">
                 <Button asChild className="w-full">
+                  <Link to="/market/orders">Voir mes commandes</Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full">
                   <Link to="/marketplace">Retourner à la marketplace</Link>
                 </Button>
               </div>

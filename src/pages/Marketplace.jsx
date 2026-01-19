@@ -164,6 +164,9 @@ const Marketplace = () => {
                 {myPartnerId ? 'Ma boutique' : 'Créer ma boutique'}
               </Button>
             )}
+            <Button variant="outline" onClick={() => navigate('/market/orders')} className="shrink-0">
+              Mes commandes
+            </Button>
             <Button variant="outline" onClick={() => navigate('/marketplace/cart')} className="shrink-0">
               <ShoppingBag className="h-4 w-4 mr-2" />
               Panier{cartCount > 0 ? ` (${cartCount})` : ''}
