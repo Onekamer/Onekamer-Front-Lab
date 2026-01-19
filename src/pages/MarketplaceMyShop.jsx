@@ -556,14 +556,6 @@ const MarketplaceMyShop = () => {
                                   className="w-full md:w-auto"
                                   onClick={() => navigate(`/market/orders/${encodeURIComponent(o.id)}`, { state: { from: 'myshop-chat' } })}
                                 >
-                                  Ouvrir le chat
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="w-full md:w-auto"
-                                  onClick={() => navigate(`/market/orders/${encodeURIComponent(o.id)}`, { state: { from: 'myshop-chat' } })}
-                                >
                                   Détail
                                 </Button>
                               </div>

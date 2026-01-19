@@ -55,6 +55,22 @@ const MarketplaceOrders = () => {
     return `${(n / 100).toFixed(2)} ${c}`;
   };
 
+  const groups = useMemo(() => {
+    const arr = Array.isArray(orders) ? orders : [];
+    const out = [];
+    const idx = new Map();
+    for (const o of arr) {
+      const raw = (o?.partner_display_name || '—');
+      const name = String(raw).trim() || '—';
+      if (!idx.has(name)) {
+        idx.set(name, out.length);
+        out.push({ name, items: [] });
+      }
+      out[idx.get(name)].items.push(o);
+    }
+    return out;
+  }, [orders]);
+
   return (
     <>
       <Helmet>
@@ -84,30 +100,37 @@ const MarketplaceOrders = () => {
         ) : orders.length === 0 ? (
           <div className="text-gray-600">Aucune commande.</div>
         ) : (
-          <div className="grid grid-cols-1 gap-3">
-            {orders.map((o) => (
-              <Card key={o.id} className="hover:shadow-sm transition">
-                <CardHeader className="p-4">
-                  <CardTitle className="text-base font-semibold">Commande #{o.id}</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-0 space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="text-gray-700 font-medium">Statut</div>
-                    <div className="capitalize">{String(o.status || '').replace('_', ' ')}</div>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="text-gray-700 font-medium">Montant</div>
-                    <div>{renderAmount(o.charge_amount_total, o.charge_currency)}</div>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="text-gray-700 font-medium">Articles</div>
-                    <div>{Array.isArray(o.items) ? o.items.length : 0}</div>
-                  </div>
-                  <div className="pt-2">
-                    <Button className="w-full" onClick={() => navigate(`/market/orders/${o.id}`)}>Voir le détail</Button>
-                  </div>
-                </CardContent>
-              </Card>
+          <div className="grid grid-cols-1 gap-4">
+            {groups.map((g) => (
+              <div key={g.name} className="space-y-2">
+                <div className="text-sm font-semibold text-gray-700">({g.name})</div>
+                <div className="grid grid-cols-1 gap-3">
+                  {g.items.map((o) => (
+                    <Card key={o.id} className="hover:shadow-sm transition">
+                      <CardHeader className="p-4">
+                        <CardTitle className="text-base font-semibold">Commande #{o.id}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0 space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="text-gray-700 font-medium">Statut</div>
+                          <div className="capitalize">{String(o.status || '').replace('_', ' ')}</div>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="text-gray-700 font-medium">Montant</div>
+                          <div>{renderAmount(o.charge_amount_total, o.charge_currency)}</div>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="text-gray-700 font-medium">Articles</div>
+                          <div>{Array.isArray(o.items) ? o.items.length : 0}</div>
+                        </div>
+                        <div className="pt-2">
+                          <Button className="w-full" onClick={() => navigate(`/market/orders/${o.id}`)}>Voir le détail</Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}
