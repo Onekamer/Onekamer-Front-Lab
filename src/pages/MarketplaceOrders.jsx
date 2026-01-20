@@ -176,7 +176,7 @@ const MarketplaceOrders = () => {
                           <CardContent className="p-4 pt-0 space-y-2">
                             <div className="flex items-center justify-between text-sm">
                               <div className="text-gray-700 font-medium">Statut paiement</div>
-                              <div className="capitalize">{String(o.status || '').replace('_', ' ')}</div>
+                              <div>{String(o.status || '').toLowerCase() === 'pending' ? 'Waiting for payment' : String(o.status || '').replace('_', ' ')}</div>
                             </div>
                             <div className="flex items-center justify-between text-sm">
                               <div className="text-gray-700 font-medium">Date de la commande</div>
@@ -184,7 +184,7 @@ const MarketplaceOrders = () => {
                             </div>
                             <div className="flex items-center justify-between text-sm">
                               <div className="text-gray-700 font-medium">Statut commande</div>
-                              <div className="capitalize">{String(o.fulfillment_status || '—').replace('_', ' ')}</div>
+                              <div>{String(o.status || '').toLowerCase() === 'pending' ? 'Waiting for payment' : String(o.fulfillment_status || '—').replace('_', ' ')}</div>
                             </div>
                             <div className="flex items-center justify-between text-sm">
                               <div className="text-gray-700 font-medium">Montant</div>

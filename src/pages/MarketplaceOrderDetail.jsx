@@ -262,7 +262,7 @@ const MarketplaceOrderDetail = () => {
               <CardContent className="p-4 pt-0 space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <div className="text-gray-700 font-medium">Statut de paiement</div>
-                  <div className="capitalize">{String(order.status || '').replace('_', ' ')}</div>
+                  <div>{String(order.status || '').toLowerCase() === 'pending' ? 'Waiting for payment' : String(order.status || '').replace('_', ' ')}</div>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <div className="text-gray-700 font-medium">Montant</div>
@@ -281,7 +281,7 @@ const MarketplaceOrderDetail = () => {
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <div className="text-gray-700 font-medium">Statut</div>
-                    <div className="capitalize">{String(order.fulfillment_status || '—')}</div>
+                    <div>{String(order.status || '').toLowerCase() === 'pending' ? 'Waiting for payment' : String(order.fulfillment_status || '—')}</div>
                   </div>
                 </div>
                 {effectiveRole === 'seller' ? (
