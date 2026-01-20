@@ -21,6 +21,7 @@ const MarketplaceCart = () => {
   const { session } = useAuth();
   const [cart, setCart] = useState(() => readMarketplaceCart());
   const [payLoading, setPayLoading] = useState(false);
+  const [customerNote, setCustomerNote] = useState('');
   const serverLabUrl = import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com';
 
   const cartCount = useMemo(() => getMarketplaceCartCount(cart), [cart]);
@@ -87,6 +88,7 @@ const MarketplaceCart = () => {
           partnerId: cart.partnerId,
           items: cart.items.map((it) => ({ itemId: it.itemId, quantity: it.quantity })),
           delivery_mode: 'pickup',
+          customer_note: customerNote || undefined,
         }),
       });
       const createData = await createRes.json().catch(() => ({}));
@@ -185,6 +187,16 @@ const MarketplaceCart = () => {
                 ))}
               </div>
             )}
+
+            <div className="space-y-2">
+              <div className="text-sm text-gray-700 font-medium">Note pour le vendeur</div>
+              <textarea
+                value={customerNote}
+                onChange={(e) => setCustomerNote(e.target.value)}
+                placeholder="Ex: précisions de taille, remise en main propre, etc. (optionnel)"
+                className="w-full rounded-md border border-[#2BA84A]/30 bg-white px-3 py-2 text-sm min-h-[80px]"
+              />
+            </div>
 
             <div className="border-t pt-3 flex items-center justify-between">
               <div className="text-sm text-gray-600">Sous-total</div>
