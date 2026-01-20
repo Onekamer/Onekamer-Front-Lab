@@ -35,6 +35,7 @@ const MarketplaceMyShop = () => {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [ordersAll, setOrdersAll] = useState([]);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [markingOrderId, setMarkingOrderId] = useState(null);
 
@@ -100,10 +101,17 @@ const MarketplaceMyShop = () => {
   };
 
   const totalSalesEur = useMemo(() => {
-    const totalMinor = (Array.isArray(orders) ? orders : [])
+    const totalMinor = (Array.isArray(ordersAll) ? ordersAll : [])
       .filter((o) => String(o?.status || '').toLowerCase() === 'paid')
       .filter((o) => String(o?.charge_currency || '').toUpperCase() === 'EUR')
-      .reduce((sum, o) => sum + Number(o?.charge_amount_total || 0), 0);
+      .reduce((sum, o) => sum + Number(o?.partner_amount || 0), 0);
+    return totalMinor / 100;
+  }, [ordersAll]);
+
+  const filteredSalesEur = useMemo(() => {
+    const totalMinor = (Array.isArray(orders) ? orders : [])
+      .filter((o) => String(o?.charge_currency || '').toUpperCase() === 'EUR')
+      .reduce((sum, o) => sum + Number(o?.partner_amount || 0), 0);
     return totalMinor / 100;
   }, [orders]);
 
@@ -224,7 +232,25 @@ const MarketplaceMyShop = () => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Erreur chargement commandes');
 
-      setOrders(Array.isArray(data?.orders) ? data.orders : []);
+      const list = Array.isArray(data?.orders) ? data.orders : [];
+      setOrders(list);
+
+      // Charger également la liste "toutes" pour les compteurs globaux
+      const qsAll = new URLSearchParams();
+      qsAll.set('fulfillment', 'all');
+      qsAll.set('limit', '100');
+      qsAll.set('offset', '0');
+      const resAll = await fetch(
+        `${serverLabUrl}/api/market/partners/${encodeURIComponent(partner.id)}/orders?${qsAll.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
+      );
+      const dataAll = await resAll.json().catch(() => ({}));
+      const listAll = Array.isArray(dataAll?.orders) ? dataAll.orders : [];
+      setOrdersAll(listAll);
     } catch (e) {
       const msg = e?.message || 'Erreur chargement commandes';
       setOrdersError(msg);
@@ -653,16 +679,19 @@ const MarketplaceMyShop = () => {
               <CardTitle className="text-base font-semibold">Mes ventes</CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0 space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="border rounded-md p-3 bg-white">
-                  <div className="text-xs text-gray-500">Total des ventes (payées)</div>
+                  <div className="text-xs text-gray-500">Total des ventes</div>
                   <div className="text-lg font-semibold text-gray-900">{totalSalesEur.toFixed(2)}€</div>
+                  <div className="text-xs text-gray-500 mt-1">net de la commission d'OneKamer sur les ventes hors taxes</div>
                 </div>
                 <div className="border rounded-md p-3 bg-white">
-                  <div className="text-xs text-gray-500">Commandes payées</div>
-                  <div className="text-lg font-semibold text-gray-900">
-                    {(Array.isArray(orders) ? orders : []).filter((o) => String(o?.status || '').toLowerCase() === 'paid').length}
-                  </div>
+                  <div className="text-xs text-gray-500">Total des commandes</div>
+                  <div className="text-lg font-semibold text-gray-900">{Array.isArray(ordersAll) ? ordersAll.length : 0}</div>
+                </div>
+                <div className="border rounded-md p-3 bg-white">
+                  <div className="text-xs text-gray-500">Ventes (filtre actuel)</div>
+                  <div className="text-lg font-semibold text-gray-900">{filteredSalesEur.toFixed(2)}€</div>
                 </div>
                 <div className="border rounded-md p-3 bg-white">
                   <div className="text-xs text-gray-500">Commandes (filtre actuel)</div>
