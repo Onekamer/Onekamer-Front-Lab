@@ -48,7 +48,7 @@ const MarketplaceOrderDetail = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Erreur chargement commande');
-      setOrder(data?.order ? { ...data.order, customer_email: data?.customer_email || null } : null);
+      setOrder(data?.order || null);
       setItems(Array.isArray(data?.items) ? data.items : []);
       setRole(data?.role || null);
       setConversationId(data?.conversationId || null);
@@ -100,11 +100,10 @@ const MarketplaceOrderDetail = () => {
     return role;
   }, [location?.state, role]);
 
-  const chatDisabledForBuyer = useMemo(() => {
-    const isBuyer = effectiveRole === 'buyer';
+  const chatLocked = useMemo(() => {
     const fs = String(order?.fulfillment_status || '').toLowerCase();
-    return isBuyer && fs === 'completed';
-  }, [effectiveRole, order?.fulfillment_status]);
+    return fs === 'completed';
+  }, [order?.fulfillment_status]);
 
   const renderAmount = (amt, cur) => {
     const n = Number(amt || 0);
@@ -271,7 +270,7 @@ const MarketplaceOrderDetail = () => {
                 {effectiveRole === 'seller' ? (
                   <div className="flex items-center justify-between text-sm">
                     <div className="text-gray-700 font-medium">Client</div>
-                    <div className="truncate max-w-[60%]">{order?.customer_email || '—'}</div>
+                    <div className="truncate max-w-[60%]">{order?.customer_alias || '—'}</div>
                   </div>
                 ) : null}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-2">
@@ -349,7 +348,7 @@ const MarketplaceOrderDetail = () => {
               </CardContent>
             </Card>
 
-            {effectiveRole === 'seller' ? (
+            {effectiveRole === 'seller' && String(order?.fulfillment_status || '').toLowerCase() !== 'completed' ? (
               <Card>
                 <CardHeader className="p-4">
                   <CardTitle className="text-base font-semibold">Gérer la préparation</CardTitle>
@@ -382,7 +381,7 @@ const MarketplaceOrderDetail = () => {
               </Card>
             ) : null}
 
-            {chatDisabledForBuyer ? (
+            {chatLocked ? (
               messages.length > 0 ? (
                 <Card className="h-[60vh] flex flex-col">
                   <CardHeader className="p-4">

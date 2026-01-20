@@ -600,16 +600,17 @@ const MarketplaceMyShop = () => {
                       const currency = String(o?.charge_currency || '').toUpperCase();
                       const totalLabel = currency === 'EUR' ? formatEur(o?.charge_amount_total) : currency ? `${o?.charge_amount_total} ${currency}` : '—';
                       const isExpanded = chatExpandedOrderId && String(chatExpandedOrderId) === String(o.id);
+                      const isCompleted = String(o?.fulfillment_status || '').toLowerCase() === 'completed';
 
                       return (
-                        <div key={o.id} className="p-3">
+                        <div key={o.id} className={`p-3 ${isCompleted ? 'opacity-70' : ''}`}>
                           <div className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-3 items-start">
                             <div className="md:col-span-3">
                               <div className="text-sm font-semibold">Commande n°{formatOrderCode(partner?.display_name, o.created_at, o.order_number)}</div>
                               <div className="text-xs text-gray-500">{createdLabel}</div>
                             </div>
                             <div className="md:col-span-4">
-                              <div className="text-sm text-gray-800 break-all">{o?.customer_email || '—'}</div>
+                              <div className="text-sm text-gray-800 break-all">{o?.customer_alias || '—'}</div>
                             </div>
                             <div className="md:col-span-3">
                               <div className="text-sm text-gray-800">{totalLabel}</div>
@@ -632,7 +633,7 @@ const MarketplaceMyShop = () => {
                             <div className="mt-3 rounded-md border bg-gray-50 p-3 space-y-2">
                               <div className="text-xs text-gray-600 font-medium">Résumé</div>
                               <div className="text-sm text-gray-700">
-                                Client: {o?.customer_email || '—'} • Montant: {totalLabel}
+                                Client: {o?.customer_alias || '—'} • Montant: {totalLabel}
                               </div>
                             </div>
                           ) : null}
@@ -726,9 +727,10 @@ const MarketplaceMyShop = () => {
                       const createdLabel = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.toLocaleString() : '—';
                       const currency = String(o?.charge_currency || '').toUpperCase();
                       const totalLabel = currency === 'EUR' ? formatEur(o?.charge_amount_total) : currency ? `${o?.charge_amount_total} ${currency}` : '—';
+                      const isCompleted = fRaw === 'completed';
 
                       return (
-                        <div key={o.id} className="p-3">
+                        <div key={o.id} className={`p-3 ${isCompleted ? 'opacity-70' : ''}`}>
                           <div className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-3 items-start">
                             <div className="md:col-span-3">
                               <div className="text-sm font-semibold">Commande n°{formatOrderCode(partner?.display_name, o.created_at, o.order_number)}</div>
@@ -736,7 +738,7 @@ const MarketplaceMyShop = () => {
                             </div>
 
                             <div className="md:col-span-3">
-                              <div className="text-sm text-gray-800 break-all">{o?.customer_email || '—'}</div>
+                              <div className="text-sm text-gray-800 break-all">{o?.customer_alias || '—'}</div>
                             </div>
 
                             <div className="md:col-span-2">
