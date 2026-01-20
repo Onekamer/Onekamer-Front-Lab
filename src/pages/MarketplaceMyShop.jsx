@@ -31,11 +31,12 @@ const MarketplaceMyShop = () => {
 
   const [partner, setPartner] = useState(null);
 
-  const [ordersStatus, setOrdersStatus] = useState('pending');
+  const [ordersFulfillment, setOrdersFulfillment] = useState('sent_to_seller');
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState(null);
   const [orders, setOrders] = useState([]);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
+  const [markingOrderId, setMarkingOrderId] = useState(null);
 
   const [abandonedMinutes, setAbandonedMinutes] = useState(60);
   const [abandonedLoading, setAbandonedLoading] = useState(false);
@@ -205,7 +206,9 @@ const MarketplaceMyShop = () => {
 
     try {
       const qs = new URLSearchParams();
-      qs.set('status', ordersStatus);
+      if (ordersFulfillment && ordersFulfillment !== 'all') {
+        qs.set('fulfillment', ordersFulfillment);
+      }
       qs.set('limit', '100');
       qs.set('offset', '0');
 
@@ -236,7 +239,33 @@ const MarketplaceMyShop = () => {
     if (!partner?.id) return;
     fetchOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, partner?.id, ordersStatus]);
+  }, [activeTab, partner?.id, ordersFulfillment]);
+
+  const handleMarkReceived = async (orderId) => {
+    if (!orderId) return;
+    if (!session?.access_token) return;
+    if (!partner?.id) return;
+    if (markingOrderId) return;
+
+    setMarkingOrderId(orderId);
+    try {
+      const res = await fetch(`${serverLabUrl}/api/market/partners/${encodeURIComponent(partner.id)}/orders/${encodeURIComponent(orderId)}/mark-received`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Action impossible");
+      toast({ title: 'Commande mise à jour', description: 'Statut: en préparation' });
+      await fetchOrders();
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || 'Impossible de marquer comme reçue', variant: 'destructive' });
+    } finally {
+      setMarkingOrderId(null);
+    }
+  };
 
   const fetchAbandonedCarts = async () => {
     if (!session?.access_token) return;
@@ -526,7 +555,7 @@ const MarketplaceMyShop = () => {
               onClick={() => setActiveTab('orders')}
               className="flex-1"
             >
-              Mes commandes
+              Mes ventes
             </Button>
             <Button
               type="button"
@@ -620,7 +649,7 @@ const MarketplaceMyShop = () => {
         {activeTab === 'orders' ? (
           <Card>
             <CardHeader className="p-4">
-              <CardTitle className="text-base font-semibold">Mes commandes</CardTitle>
+              <CardTitle className="text-base font-semibold">Mes ventes</CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -641,15 +670,17 @@ const MarketplaceMyShop = () => {
               </div>
 
               <div className="space-y-2">
-                <div className="text-sm font-medium">Statut</div>
+                <div className="text-sm font-medium">Étape de préparation</div>
                 <select
-                  value={ordersStatus}
-                  onChange={(e) => setOrdersStatus(e.target.value)}
+                  value={ordersFulfillment}
+                  onChange={(e) => setOrdersFulfillment(e.target.value)}
                   className="flex h-10 w-full rounded-md border border-[#2BA84A]/30 bg-white px-3 py-2 text-sm"
                 >
-                  <option value="pending">En attente</option>
-                  <option value="paid">Payées</option>
-                  <option value="canceled">Annulées</option>
+                  <option value="sent_to_seller">En attente de préparation</option>
+                  <option value="preparing">En préparation</option>
+                  <option value="shipping">En cours d'envoi</option>
+                  <option value="delivered">Livrée</option>
+                  <option value="completed">Terminée</option>
                   <option value="all">Toutes</option>
                 </select>
               </div>
@@ -676,15 +707,19 @@ const MarketplaceMyShop = () => {
 
                   <div className="divide-y">
                     {orders.map((o) => {
-                      const rawStatus = String(o?.status || '').toLowerCase();
+                      const fRaw = String(o?.fulfillment_status || '').toLowerCase();
                       const statusLabel =
-                        rawStatus === 'paid'
-                          ? 'Payée'
-                          : rawStatus === 'created' || rawStatus === 'payment_pending'
-                          ? 'En attente'
-                          : rawStatus === 'canceled' || rawStatus === 'cancelled'
-                          ? 'Annulée'
-                          : rawStatus || '—';
+                        fRaw === 'sent_to_seller'
+                          ? 'En attente de préparation'
+                          : fRaw === 'preparing'
+                          ? 'En préparation'
+                          : fRaw === 'shipping'
+                          ? "En cours d'envoi"
+                          : fRaw === 'delivered'
+                          ? 'Livrée'
+                          : fRaw === 'completed'
+                          ? 'Terminée'
+                          : fRaw || '—';
 
                       const isExpanded = expandedOrderId && String(expandedOrderId) === String(o.id);
                       const createdAt = o?.created_at ? new Date(o.created_at) : null;
@@ -713,14 +748,27 @@ const MarketplaceMyShop = () => {
                             </div>
 
                             <div className="md:col-span-2 md:text-right">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className="w-full md:w-auto"
-                                onClick={() => navigate(`/market/orders/${encodeURIComponent(o.id)}`, { state: { from: 'myshop-chat' } })}
-                              >
-                                Détail
-                              </Button>
+                              <div className="flex gap-2 justify-end">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full md:w-auto"
+                                  onClick={() => navigate(`/market/orders/${encodeURIComponent(o.id)}`, { state: { from: 'myshop-chat' } })}
+                                >
+                                  Détail
+                                </Button>
+                                {String(o?.fulfillment_status || '').toLowerCase() === 'sent_to_seller' ? (
+                                  <Button
+                                    type="button"
+                                    variant="default"
+                                    className="w-full md:w-auto"
+                                    onClick={() => handleMarkReceived(o.id)}
+                                    disabled={markingOrderId === o.id}
+                                  >
+                                    {markingOrderId === o.id ? 'En cours…' : 'Commande reçue'}
+                                  </Button>
+                                ) : null}
+                              </div>
                             </div>
                           </div>
 
