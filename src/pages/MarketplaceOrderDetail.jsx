@@ -383,14 +383,35 @@ const MarketplaceOrderDetail = () => {
             ) : null}
 
             {chatDisabledForBuyer ? (
-              <Card>
-                <CardHeader className="p-4">
-                  <CardTitle className="text-base font-semibold">Chat commande</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-0">
-                  <div className="text-sm text-gray-600">La commande est terminée. Le chat n'est plus disponible.</div>
-                </CardContent>
-              </Card>
+              messages.length > 0 ? (
+                <Card className="h-[60vh] flex flex-col">
+                  <CardHeader className="p-4">
+                    <CardTitle className="text-base font-semibold">Chat commande</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0 flex-1 flex flex-col">
+                    <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+                      {messages.map((m) => (
+                        <div key={m.id} className={`max-w-[80%] rounded px-3 py-2 text-sm ${String(m.sender_id||'')===String(session?.user?.id||'') ? 'bg-[#DCFCE7] ml-auto' : 'bg-white border'}`}>
+                          <div className="whitespace-pre-wrap break-words">{m.content}</div>
+                          <div className="text-[11px] text-gray-500 mt-1">{new Date(m.created_at).toLocaleString()}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="border-t p-3">
+                      <div className="text-sm font-medium text-red-600">La commande est terminée. Le chat n'est plus disponible.</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardHeader className="p-4">
+                    <CardTitle className="text-base font-semibold">Chat commande</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <div className="text-sm text-gray-600">La commande est terminée. Le chat n'est plus disponible.</div>
+                  </CardContent>
+                </Card>
+              )
             ) : String(order?.status||'').toLowerCase() === 'paid' ? (
               <Card className="h-[60vh] flex flex-col">
                 <CardHeader className="p-4">
