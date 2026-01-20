@@ -100,6 +100,12 @@ const MarketplaceOrderDetail = () => {
     return role;
   }, [location?.state, role]);
 
+  const chatDisabledForBuyer = useMemo(() => {
+    const isBuyer = effectiveRole === 'buyer';
+    const fs = String(order?.fulfillment_status || '').toLowerCase();
+    return isBuyer && fs === 'completed';
+  }, [effectiveRole, order?.fulfillment_status]);
+
   const renderAmount = (amt, cur) => {
     const n = Number(amt || 0);
     const c = String(cur || '').toUpperCase();
@@ -376,7 +382,16 @@ const MarketplaceOrderDetail = () => {
               </Card>
             ) : null}
 
-            {String(order?.status||'').toLowerCase() === 'paid' ? (
+            {chatDisabledForBuyer ? (
+              <Card>
+                <CardHeader className="p-4">
+                  <CardTitle className="text-base font-semibold">Chat commande</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  <div className="text-sm text-gray-600">La commande est terminée. Le chat n'est plus disponible.</div>
+                </CardContent>
+              </Card>
+            ) : String(order?.status||'').toLowerCase() === 'paid' ? (
               <Card className="h-[60vh] flex flex-col">
                 <CardHeader className="p-4">
                   <CardTitle className="text-base font-semibold">Chat commande</CardTitle>
