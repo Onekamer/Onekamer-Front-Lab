@@ -84,6 +84,24 @@ const MarketplaceOrderDetail = () => {
       await loadMessages();
       id = setInterval(loadMessages, 4000);
     };
+
+  const autoCompleteDate = useMemo(() => {
+    const s = String(order?.status || '').toLowerCase();
+    const f = String(order?.fulfillment_status || '').toLowerCase();
+    if (s !== 'paid' || f !== 'delivered') return null;
+    const base = order?.payout_release_at ? new Date(order.payout_release_at) : (order?.fulfillment_updated_at ? new Date(order.fulfillment_updated_at) : null);
+    if (!base || Number.isNaN(base.getTime())) return null;
+    if (!order?.payout_release_at) {
+      base.setDate(base.getDate() + 14);
+    }
+    return base;
+  }, [order?.status, order?.fulfillment_status, order?.payout_release_at, order?.fulfillment_updated_at]);
+
+  const formatLongDate = (d) => {
+    try {
+      return d?.toLocaleString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch { return '' }
+  };
     start();
     return () => { if (id) clearInterval(id); };
   }, [loadMessages]);
@@ -375,8 +393,11 @@ const MarketplaceOrderDetail = () => {
                 <CardHeader className="p-4">
                   <CardTitle className="text-base font-semibold">Réception</CardTitle>
                 </CardHeader>
-                <CardContent className="p-4 pt-0">
+                <CardContent className="p-4 pt-0 space-y-2">
                   <Button onClick={handleBuyerConfirmReceived} className="w-full">J'ai bien reçu la commande</Button>
+                  {String(order?.status||'').toLowerCase() === 'paid' && autoCompleteDate ? (
+                    <div className="text-xs text-gray-500 text-center">La commande sera considérée automatiquement terminée au bout de 14 jours — soit le {formatLongDate(autoCompleteDate)}.</div>
+                  ) : null}
                 </CardContent>
               </Card>
             ) : null}
