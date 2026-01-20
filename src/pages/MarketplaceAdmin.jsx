@@ -53,6 +53,141 @@ const MarketplaceAdmin = () => {
     return cur ? `${amount} ${cur}` : `${amount}`;
   };
 
+  // ==========================
+  // Admin - Commandes
+  // ==========================
+  const [ordPartnerId, setOrdPartnerId] = useState('');
+  const [ordStatus, setOrdStatus] = useState('all');
+  const [ordFulfillment, setOrdFulfillment] = useState('');
+  const [ordOrderNumber, setOrdOrderNumber] = useState('');
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState(null);
+  const [adminOrders, setAdminOrders] = useState([]);
+  const [ordersCount, setOrdersCount] = useState(null);
+  const [ordersExpanded, setOrdersExpanded] = useState({});
+  const [orderDetails, setOrderDetails] = useState(new Map());
+
+  const formatOrderCode = (shopName, createdAt, orderNumber) => {
+    const raw = String(shopName || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z]/g, '').toUpperCase();
+    const prefix = (raw.slice(0, 3) || 'OK');
+    const d = createdAt ? new Date(createdAt) : new Date();
+    const year = Number.isNaN(d.getTime()) ? new Date().getFullYear() : d.getFullYear();
+    const num = String(Number(orderNumber || 0)).padStart(6, '0');
+    return `${prefix}-${year}-${num}`;
+  };
+
+  const fetchAdminOrders = async () => {
+    try {
+      setOrdersLoading(true);
+      setOrdersError(null);
+      const token = session?.access_token;
+      if (!token) throw new Error('Session expirée');
+      if (!API_PREFIX) throw new Error('API non configurée');
+
+      const qs = new URLSearchParams();
+      if (ordPartnerId) qs.set('partnerId', ordPartnerId);
+      if (ordStatus && ordStatus !== 'all') qs.set('status', ordStatus);
+      if (ordFulfillment) qs.set('fulfillment', ordFulfillment);
+      if (String(ordOrderNumber || '').trim()) qs.set('orderNumber', String(ordOrderNumber).trim());
+      qs.set('limit', '100');
+      qs.set('offset', '0');
+
+      const res = await fetch(`${API_PREFIX}/admin/market/orders?${qs.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur lecture commandes');
+      setAdminOrders(Array.isArray(data?.orders) ? data.orders : []);
+      setOrdersCount(typeof data?.count === 'number' ? data.count : null);
+    } catch (e) {
+      const msg = e?.message || 'Erreur interne';
+      setOrdersError(msg);
+      toast({ title: 'Erreur', description: msg, variant: 'destructive' });
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user && profile && isAdmin) {
+      fetchAdminOrders();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, profile, isAdmin]);
+
+  const loadOrderDetail = async (orderId) => {
+    try {
+      const token = session?.access_token;
+      if (!token) throw new Error('Session expirée');
+      const res = await fetch(`${API_PREFIX}/admin/market/orders/${encodeURIComponent(orderId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur détail commande');
+      setOrderDetails((prev) => {
+        const next = new Map(prev);
+        next.set(String(orderId), data || {});
+        return next;
+      });
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || 'Impossible de charger le détail.', variant: 'destructive' });
+    }
+  };
+
+  const patchOrderStatus = async (orderId, status, askReason = false) => {
+    if (!orderId || !status) return;
+    const token = session?.access_token;
+    if (!token) return toast({ title: 'Erreur', description: 'Session expirée', variant: 'destructive' });
+    const reason = askReason ? window.prompt('Motif (optionnel) :', '') : '';
+    try {
+      const res = await fetch(`${API_PREFIX}/admin/market/orders/${encodeURIComponent(orderId)}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status, reason: String(reason || '').trim() || undefined }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur mise à jour statut');
+      toast({ title: 'Statut mis à jour' });
+      await fetchAdminOrders();
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || 'Impossible de mettre à jour.', variant: 'destructive' });
+    }
+  };
+
+  const refundOrder = async (o) => {
+    if (!o?.id) return;
+    const token = session?.access_token;
+    if (!token) return toast({ title: 'Erreur', description: 'Session expirée', variant: 'destructive' });
+    const cur = String(o.charge_currency || '').toUpperCase();
+    const totalMinor = Number(o.charge_amount_total || 0);
+    const defaultAmount = (totalMinor / 100).toFixed(2);
+    const input = window.prompt(`Montant à rembourser en ${cur} (laisser vide pour ${defaultAmount} ${cur})`, '');
+    let amountMinor = totalMinor;
+    if (input && String(input).trim()) {
+      const parsed = parseFloat(String(input).replace(',', '.'));
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        return toast({ title: 'Montant invalide', description: 'Veuillez saisir un nombre positif.', variant: 'destructive' });
+      }
+      amountMinor = Math.round(parsed * 100);
+      if (amountMinor > totalMinor) {
+        return toast({ title: 'Montant trop élevé', description: 'Le montant dépasse le total de la commande.', variant: 'destructive' });
+      }
+    }
+    try {
+      const res = await fetch(`${API_PREFIX}/admin/market/orders/${encodeURIComponent(o.id)}/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ amount_minor: amountMinor }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur remboursement');
+      toast({ title: 'Remboursement effectué', description: `${(amountMinor / 100).toFixed(2)} ${cur}` });
+      await fetchAdminOrders();
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || 'Échec du remboursement', variant: 'destructive' });
+    }
+  };
+
   const fetchPartners = async () => {
     try {
       setLoading(true);
@@ -452,6 +587,174 @@ const MarketplaceAdmin = () => {
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Commandes Marketplace (Admin)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Boutique</div>
+                <select
+                  value={ordPartnerId}
+                  onChange={(e) => setOrdPartnerId(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-[#2BA84A]/30 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="">Toutes</option>
+                  {(Array.isArray(partners) ? partners : []).map((p) => (
+                    <option key={p.id} value={p.id}>{p.display_name || p.id}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Statut paiement</div>
+                <select
+                  value={ordStatus}
+                  onChange={(e) => setOrdStatus(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-[#2BA84A]/30 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="all">Tous</option>
+                  <option value="pending">pending</option>
+                  <option value="paid">paid</option>
+                  <option value="refunded">refunded</option>
+                  <option value="disputed">disputed</option>
+                  <option value="failed">failed</option>
+                  <option value="canceled">canceled</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Statut commande</div>
+                <select
+                  value={ordFulfillment}
+                  onChange={(e) => setOrdFulfillment(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-[#2BA84A]/30 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="">Tous</option>
+                  <option value="sent_to_seller">sent_to_seller</option>
+                  <option value="preparing">preparing</option>
+                  <option value="shipping">shipping</option>
+                  <option value="delivered">delivered</option>
+                  <option value="completed">completed</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <div className="text-sm font-medium">N° commande</div>
+                <Input value={ordOrderNumber} onChange={(e) => setOrdOrderNumber(e.target.value)} placeholder="Ex: 123" />
+              </div>
+              <div className="flex items-end">
+                <Button type="button" variant="outline" disabled={ordersLoading} onClick={fetchAdminOrders} className="w-full">{ordersLoading ? 'Chargement…' : 'Rechercher'}</Button>
+              </div>
+            </div>
+
+            {ordersError ? <div className="text-sm text-red-600">{ordersError}</div> : null}
+
+            {!ordersLoading && Array.isArray(adminOrders) && adminOrders.length === 0 ? (
+              <div className="text-sm text-gray-600">Aucune commande.</div>
+            ) : null}
+
+            {ordersCount != null && adminOrders.length > 0 ? (
+              <div className="text-xs text-gray-500">Affichage: {adminOrders.length}{typeof ordersCount === 'number' ? ` / ${ordersCount}` : ''}</div>
+            ) : null}
+
+            {adminOrders.length > 0 ? (
+              <div className="border rounded-md bg-white overflow-hidden">
+                <div className="hidden md:grid grid-cols-12 gap-3 px-3 py-2 bg-gray-50 text-xs text-gray-600 font-medium">
+                  <div className="col-span-3">Commande</div>
+                  <div className="col-span-2">Boutique</div>
+                  <div className="col-span-2">Montant</div>
+                  <div className="col-span-2">Statuts</div>
+                  <div className="col-span-3">Actions</div>
+                </div>
+                <div className="divide-y">
+                  {adminOrders.map((o) => {
+                    const code = formatOrderCode(o.partner_display_name, o.created_at, o.order_number);
+                    const money = formatMoney(o.charge_amount_total, o.charge_currency);
+                    const sPay = String(o.status || '').toLowerCase();
+                    const sFul = String(o.fulfillment_status || '').toLowerCase();
+                    const expanded = ordersExpanded[String(o.id)] === true;
+                    return (
+                      <div key={o.id} className="p-3">
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-3 items-start">
+                          <div className="md:col-span-3">
+                            <div className="text-sm font-semibold">{code}</div>
+                            <div className="text-xs text-gray-500">{o?.created_at ? new Date(o.created_at).toLocaleString() : '—'}</div>
+                          </div>
+                          <div className="md:col-span-2">
+                            <div className="text-sm text-gray-800">{o.partner_display_name || o.partner_id}</div>
+                          </div>
+                          <div className="md:col-span-2">
+                            <div className="text-sm text-gray-800">{money}</div>
+                          </div>
+                          <div className="md:col-span-2">
+                            <div className="text-sm text-gray-800">{sPay}</div>
+                            <div className="text-xs text-gray-500">{sFul || '—'}</div>
+                          </div>
+                          <div className="md:col-span-3 flex flex-wrap gap-2">
+                            <Button type="button" variant="outline" onClick={async () => {
+                              setOrdersExpanded((prev) => ({ ...prev, [String(o.id)]: !expanded }));
+                              if (!expanded && !orderDetails.get(String(o.id))) await loadOrderDetail(o.id);
+                            }}>
+                              {expanded ? 'Masquer' : 'Détail'}
+                            </Button>
+                            {sPay === 'paid' ? (
+                              <Button type="button" variant="outline" onClick={() => refundOrder(o)}>Refund</Button>
+                            ) : null}
+                            {sPay !== 'refunded' ? (
+                              <Button type="button" variant="outline" onClick={() => patchOrderStatus(o.id, 'disputed', true)}>Disputed</Button>
+                            ) : null}
+                            {sPay !== 'failed' ? (
+                              <Button type="button" variant="outline" onClick={() => patchOrderStatus(o.id, 'failed', true)}>Failed</Button>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {expanded ? (
+                          <div className="mt-3 text-sm">
+                            {(() => {
+                              const det = orderDetails.get(String(o.id)) || {};
+                              const ord = det.order || {};
+                              const items = Array.isArray(det.items) ? det.items : [];
+                              return (
+                                <div className="space-y-2">
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                    <div>
+                                      <div className="text-gray-500 text-xs">PI</div>
+                                      <div className="break-all">{ord.payment_intent_id || '—'}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-500 text-xs">Transfer</div>
+                                      <div className="break-all">{ord.transfer_id ? `${ord.transfer_id} (${ord.transfer_status || '—'})` : '—'}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-500 text-xs">Release prévu</div>
+                                      <div>{ord.payout_release_at ? new Date(ord.payout_release_at).toLocaleString() : '—'}</div>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="text-gray-500 text-xs mb-1">Articles ({items.length})</div>
+                                    <div className="space-y-1">
+                                      {items.map((it) => (
+                                        <div key={it.id} className="flex items-center justify-between text-sm">
+                                          <div className="truncate mr-2">{it.title_snapshot || it.item_id}</div>
+                                          <div className="text-gray-700">{Number(it.quantity || 0)} × {(Number(it.unit_base_price_amount || 0)/100).toFixed(2)}</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </div>
