@@ -84,6 +84,9 @@ const MarketplaceOrderDetail = () => {
       await loadMessages();
       id = setInterval(loadMessages, 4000);
     };
+    start();
+    return () => { if (id) clearInterval(id); };
+  }, [loadMessages]);
 
   const autoCompleteDate = useMemo(() => {
     const s = String(order?.status || '').toLowerCase();
@@ -102,9 +105,6 @@ const MarketplaceOrderDetail = () => {
       return d?.toLocaleString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     } catch { return '' }
   };
-    start();
-    return () => { if (id) clearInterval(id); };
-  }, [loadMessages]);
 
   useEffect(() => {
     if (listRef.current) {
