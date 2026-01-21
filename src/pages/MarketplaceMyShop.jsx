@@ -51,10 +51,22 @@ const MarketplaceMyShop = () => {
   const [chatOrders, setChatOrders] = useState([]);
   const [chatExpandedOrderId, setChatExpandedOrderId] = useState(null);
 
+  // Livraison (options d'expédition)
+  const [shipLoading, setShipLoading] = useState(false);
+  const [shipSaving, setShipSaving] = useState(false);
+  const [shipError, setShipError] = useState(null);
+  const [shipOptions, setShipOptions] = useState({
+    pickup: { label: 'Retrait sur place', price_cents: 0, is_active: true },
+    standard: { label: 'Livraison standard', price_cents: 0, is_active: false },
+    express: { label: 'Livraison express', price_cents: 0, is_active: false },
+    international: { label: 'Livraison internationale', price_cents: 0, is_active: false },
+  });
+  const [shipCurrency, setShipCurrency] = useState('EUR');
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const t = params.get('tab');
-    if (t && ['shop', 'orders', 'chat'].includes(t) && t !== activeTab) {
+    if (t && ['shop', 'orders', 'chat', 'shipping'].includes(t) && t !== activeTab) {
       setActiveTab(t);
     }
   }, [location.search]);
@@ -64,6 +76,78 @@ const MarketplaceMyShop = () => {
     if (!Number.isFinite(v)) return '—';
     return `${(v / 100).toFixed(2)}€`;
   };
+
+  const fetchShippingOptions = async () => {
+    if (!session?.access_token) return;
+    if (!partner?.id) return;
+    if (shipLoading) return;
+
+    setShipLoading(true);
+    setShipError(null);
+    try {
+      const res = await fetch(`${serverLabUrl}/api/market/partners/${encodeURIComponent(partner.id)}/shipping-options`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur chargement des options de livraison');
+
+      const opts = Array.isArray(data?.options) ? data.options : [];
+      const map = { ...shipOptions };
+      opts.forEach((o) => {
+        const t = String(o?.shipping_type || '').toLowerCase();
+        if (!['pickup', 'standard', 'express', 'international'].includes(t)) return;
+        map[t] = {
+          label: o?.label || map[t].label,
+          price_cents: Math.max(parseInt(o?.price_cents, 10) || 0, 0),
+          is_active: o?.shipping_type === 'pickup' ? true : o?.is_active === true,
+        };
+      });
+      setShipOptions(map);
+      if (data?.base_currency) setShipCurrency(String(data.base_currency).toUpperCase());
+    } catch (e) {
+      const msg = e?.message || 'Erreur chargement des options de livraison';
+      setShipError(msg);
+      toast({ title: 'Erreur', description: msg, variant: 'destructive' });
+    } finally {
+      setShipLoading(false);
+    }
+  };
+
+  const saveShippingOptions = async () => {
+    if (!session?.access_token) return;
+    if (!partner?.id) return;
+    if (shipSaving) return;
+
+    setShipSaving(true);
+    setShipError(null);
+    try {
+      const payload = ['pickup', 'standard', 'express', 'international'].map((t) => ({
+        shipping_type: t,
+        label: shipOptions[t]?.label || '',
+        price_cents: t === 'pickup' ? 0 : Math.max(parseInt(shipOptions[t]?.price_cents, 10) || 0, 0),
+        is_active: t === 'pickup' ? true : shipOptions[t]?.is_active === true,
+      }));
+
+      const res = await fetch(`${serverLabUrl}/api/market/partners/${encodeURIComponent(partner.id)}/shipping-options`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur enregistrement options');
+      toast({ title: 'Options de livraison enregistrées' });
+      await fetchShippingOptions();
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || 'Impossible d’enregistrer', variant: 'destructive' });
+    } finally {
+      setShipSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'shipping') return;
+    if (!partner?.id) return;
+    fetchShippingOptions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, partner?.id]);
 
   const handleConnectLoginLink = async () => {
     if (!partner?.id) return;
@@ -613,6 +697,14 @@ const MarketplaceMyShop = () => {
             </Button>
             <Button
               type="button"
+              variant={activeTab === 'shipping' ? 'default' : 'outline'}
+              onClick={() => setActiveTab('shipping')}
+              className="flex-1"
+            >
+              Livraison
+            </Button>
+            <Button
+              type="button"
               variant={activeTab === 'chat' ? 'default' : 'outline'}
               onClick={() => setActiveTab('chat')}
               className="flex-1"
@@ -1013,6 +1105,64 @@ const MarketplaceMyShop = () => {
           </Card>
         </form>
           </>
+        ) : null}
+
+        {activeTab === 'shipping' ? (
+          <Card>
+            <CardHeader className="p-4">
+              <CardTitle className="text-base font-semibold">Modes de livraison</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 space-y-4">
+              <div className="text-xs text-gray-600">Devise de base: {String(shipCurrency || '—')}</div>
+
+              {shipError ? <div className="text-sm text-red-600">{shipError}</div> : null}
+
+              <div className="space-y-3">
+                {(['pickup','standard','express','international']).map((t) => (
+                  <div key={t} className="border rounded-md p-3 bg-white">
+                    <div className="text-sm font-medium text-gray-800 capitalize">{t === 'pickup' ? 'Retrait sur place' : (t === 'standard' ? 'Livraison standard' : (t === 'express' ? 'Livraison express' : 'Livraison internationale'))}</div>
+                    <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                      <div className="space-y-1">
+                        <Label>Libellé</Label>
+                        <Input
+                          value={shipOptions[t]?.label || ''}
+                          onChange={(e) => setShipOptions((prev) => ({ ...prev, [t]: { ...prev[t], label: e.target.value } }))}
+                          disabled={t === 'pickup' || shipLoading || shipSaving}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Prix ({shipCurrency})</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={t === 'pickup' ? 0 : (shipOptions[t]?.price_cents || 0)}
+                          onChange={(e) => setShipOptions((prev) => ({ ...prev, [t]: { ...prev[t], price_cents: Math.max(parseInt(e.target.value, 10) || 0, 0) } }))}
+                          disabled={t === 'pickup' || shipLoading || shipSaving}
+                        />
+                        <div className="text-xs text-gray-500">Montant fixe en cents</div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Activer</Label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={t === 'pickup' ? true : shipOptions[t]?.is_active === true}
+                            onChange={(e) => setShipOptions((prev) => ({ ...prev, [t]: { ...prev[t], is_active: e.target.checked } }))}
+                            disabled={t === 'pickup' || shipLoading || shipSaving}
+                          />
+                          <span className="text-sm text-gray-700">{t === 'pickup' ? 'Toujours actif' : (shipOptions[t]?.is_active ? 'Activé' : 'Désactivé')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Button type="button" onClick={saveShippingOptions} disabled={shipSaving} className="w-full">
+                {shipSaving ? 'Enregistrement…' : 'Enregistrer'}
+              </Button>
+            </CardContent>
+          </Card>
         ) : null}
       </div>
     </>

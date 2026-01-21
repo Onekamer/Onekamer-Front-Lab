@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,12 +24,32 @@ const MarketplaceCart = () => {
   const [customerNote, setCustomerNote] = useState('');
   const serverLabUrl = import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com';
 
+  const [shipLoading, setShipLoading] = useState(false);
+  const [shipError, setShipError] = useState(null);
+  const [shipOptions, setShipOptions] = useState({
+    pickup: { label: 'Retrait sur place', price_cents: 0, is_active: true },
+    standard: null,
+    express: null,
+    international: null,
+  });
+  const [deliveryMode, setDeliveryMode] = useState('pickup');
+
   const cartCount = useMemo(() => getMarketplaceCartCount(cart), [cart]);
 
   const subtotal = useMemo(() => {
     const items = Array.isArray(cart?.items) ? cart.items : [];
     return items.reduce((sum, it) => sum + Number(it.base_price_amount || 0) * Number(it.quantity || 1), 0);
   }, [cart]);
+
+  const shippingFee = useMemo(() => {
+    const m = String(deliveryMode || 'pickup').toLowerCase();
+    if (m === 'pickup') return 0;
+    const opt = shipOptions[m];
+    if (!opt || opt.is_active !== true) return 0;
+    return Math.max(parseInt(opt.price_cents, 10) || 0, 0);
+  }, [deliveryMode, shipOptions]);
+
+  const totalWithShipping = useMemo(() => subtotal + shippingFee, [subtotal, shippingFee]);
 
   const syncCartToServer = async (nextCart) => {
     try {
@@ -53,6 +73,42 @@ const MarketplaceCart = () => {
       // ignore
     }
   };
+
+  useEffect(() => {
+    const fetchShipping = async () => {
+      try {
+        if (!cart?.partnerId) return;
+        setShipLoading(true);
+        setShipError(null);
+        const res = await fetch(`${serverLabUrl}/api/market/partners/${encodeURIComponent(cart.partnerId)}/shipping-options`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || 'Erreur chargement options de livraison');
+        const list = Array.isArray(data?.options) ? data.options : [];
+        const next = { ...shipOptions };
+        let defaultMode = 'pickup';
+        list.forEach((o) => {
+          const t = String(o?.shipping_type || '').toLowerCase();
+          if (!['pickup','standard','express','international'].includes(t)) return;
+          next[t] = {
+            label: o?.label || (t === 'pickup' ? 'Retrait sur place' : t),
+            price_cents: t === 'pickup' ? 0 : Math.max(parseInt(o?.price_cents, 10) || 0, 0),
+            is_active: t === 'pickup' ? true : o?.is_active === true,
+          };
+          if (t !== 'pickup' && next[t].is_active && defaultMode === 'pickup') {
+            // keep pickup as default unless you prefer auto-select first active non-pickup
+          }
+        });
+        setShipOptions(next);
+        setDeliveryMode(defaultMode);
+      } catch (e) {
+        setShipError(e?.message || 'Erreur chargement options de livraison');
+      } finally {
+        setShipLoading(false);
+      }
+    };
+    fetchShipping();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart?.partnerId, serverLabUrl]);
 
   const handlePay = async () => {
     if (!cart?.partnerId || !Array.isArray(cart?.items) || cart.items.length === 0) {
@@ -87,7 +143,7 @@ const MarketplaceCart = () => {
         body: JSON.stringify({
           partnerId: cart.partnerId,
           items: cart.items.map((it) => ({ itemId: it.itemId, quantity: it.quantity })),
-          delivery_mode: 'pickup',
+          delivery_mode: deliveryMode || 'pickup',
           customer_note: customerNote || undefined,
         }),
       });
@@ -188,6 +244,50 @@ const MarketplaceCart = () => {
               </div>
             )}
 
+            <div className="border-t pt-3 flex items-center justify-between">
+              <div className="text-sm text-gray-600">Sous-total</div>
+              <div className="font-semibold text-gray-800">{subtotal / 100} €</div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-sm text-gray-700 font-medium">Mode de livraison</div>
+              {shipError ? <div className="text-xs text-red-600">{shipError}</div> : null}
+              <div className="grid grid-cols-1 gap-2">
+                {(['pickup','standard','express','international']).map((t) => {
+                  const opt = shipOptions[t];
+                  const active = t === 'pickup' ? true : opt && opt.is_active;
+                  if (!active) return null;
+                  const label = opt?.label || (t === 'pickup' ? 'Retrait sur place' : t);
+                  const price = t === 'pickup' ? 0 : Math.max(parseInt(opt?.price_cents, 10) || 0, 0);
+                  return (
+                    <label key={t} className="flex items-center justify-between rounded-md border border-[#2BA84A]/30 bg-white px-3 py-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="delivery_mode"
+                          value={t}
+                          checked={deliveryMode === t}
+                          onChange={() => setDeliveryMode(t)}
+                        />
+                        <span className="text-gray-800">{label}</span>
+                      </div>
+                      <div className="text-gray-700">{price / 100} €</div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-600">Livraison</div>
+              <div className="font-semibold text-gray-800">{shippingFee / 100} €</div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-900 font-semibold">Total</div>
+              <div className="text-base font-bold text-gray-900">{totalWithShipping / 100} €</div>
+            </div>
+
             <div className="space-y-2">
               <div className="text-sm text-gray-700 font-medium">Note pour le vendeur</div>
               <textarea
@@ -196,11 +296,6 @@ const MarketplaceCart = () => {
                 placeholder="Ex: précisions de taille, remise en main propre, etc. (optionnel)"
                 className="w-full rounded-md border border-[#2BA84A]/30 bg-white px-3 py-2 text-sm min-h-[80px]"
               />
-            </div>
-
-            <div className="border-t pt-3 flex items-center justify-between">
-              <div className="text-sm text-gray-600">Sous-total</div>
-              <div className="font-semibold text-gray-800">{subtotal / 100} €</div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2">
