@@ -53,6 +53,26 @@ const MarketplaceAdmin = () => {
     return cur ? `${amount} ${cur}` : `${amount}`;
   };
 
+  const completeOrderAdmin = async (o) => {
+    if (!o?.id) return;
+    const token = session?.access_token;
+    if (!token) return toast({ title: 'Erreur', description: 'Session expirée', variant: 'destructive' });
+    const reason = window.prompt('Motif (optionnel) :', '') || '';
+    try {
+      const res = await fetch(`${API_PREFIX}/admin/market/orders/${encodeURIComponent(o.id)}/fulfillment`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ fulfillment_status: 'completed', reason: reason.trim() || undefined }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur mise à jour commande');
+      toast({ title: 'Commande terminée' });
+      await fetchAdminOrders();
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || 'Impossible de terminer la commande.', variant: 'destructive' });
+    }
+  };
+
   // ==========================
   // Admin - Commandes
   // ==========================
@@ -89,7 +109,7 @@ const MarketplaceAdmin = () => {
       if (ordStatus && ordStatus !== 'all') qs.set('status', ordStatus);
       if (ordFulfillment) qs.set('fulfillment', ordFulfillment);
       if (String(ordOrderNumber || '').trim()) qs.set('orderNumber', String(ordOrderNumber).trim());
-      qs.set('limit', '100');
+      qs.set('limit', '5');
       qs.set('offset', '0');
 
       const res = await fetch(`${API_PREFIX}/admin/market/orders?${qs.toString()}`, {
@@ -674,6 +694,7 @@ const MarketplaceAdmin = () => {
                     const money = formatMoney(o.charge_amount_total, o.charge_currency);
                     const sPay = String(o.status || '').toLowerCase();
                     const sFul = String(o.fulfillment_status || '').toLowerCase();
+                    const resolved = (sFul === 'completed') && (sPay === 'refunded' || sPay === 'disputed');
                     const expanded = ordersExpanded[String(o.id)] === true;
                     return (
                       <div key={o.id} className="p-3">
@@ -691,6 +712,9 @@ const MarketplaceAdmin = () => {
                           <div className="md:col-span-2">
                             <div className="text-sm text-gray-800">{sPay}</div>
                             <div className="text-xs text-gray-500">{sFul || '—'}</div>
+                            {resolved ? (
+                              <div className="mt-1 inline-flex items-center rounded px-2 py-0.5 text-[10px] bg-green-100 text-green-700 border border-green-200">Résolu</div>
+                            ) : null}
                           </div>
                           <div className="md:col-span-3 flex flex-wrap gap-2">
                             <Button type="button" variant="outline" onClick={async () => {
@@ -704,9 +728,6 @@ const MarketplaceAdmin = () => {
                             ) : null}
                             {sPay !== 'refunded' ? (
                               <Button type="button" variant="outline" onClick={() => patchOrderStatus(o.id, 'disputed', true)}>Disputed</Button>
-                            ) : null}
-                            {sPay !== 'failed' ? (
-                              <Button type="button" variant="outline" onClick={() => patchOrderStatus(o.id, 'failed', true)}>Failed</Button>
                             ) : null}
                           </div>
                         </div>
@@ -732,6 +753,11 @@ const MarketplaceAdmin = () => {
                                       <div className="text-gray-500 text-xs">Release prévu</div>
                                       <div>{ord.payout_release_at ? new Date(ord.payout_release_at).toLocaleString() : '—'}</div>
                                     </div>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {sFul !== 'completed' ? (
+                                      <Button type="button" variant="outline" onClick={() => completeOrderAdmin(o)}>Terminer (admin)</Button>
+                                    ) : null}
                                   </div>
                                   <div>
                                     <div className="text-gray-500 text-xs mb-1">Articles ({items.length})</div>
