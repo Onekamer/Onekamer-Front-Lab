@@ -62,11 +62,17 @@ const MarketplaceMyShop = () => {
     international: { label: 'Livraison internationale', price_cents: 0, is_active: false },
   });
   const [shipCurrency, setShipCurrency] = useState('EUR');
+  const [shipPriceUI, setShipPriceUI] = useState({
+    pickup: '0',
+    standard: '0',
+    express: '0',
+    international: '0',
+  });
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const t = params.get('tab');
-    if (t && ['shop', 'orders', 'chat', 'shipping'].includes(t) && t !== activeTab) {
+    if (t && ['shop', 'orders', 'chat'].includes(t) && t !== activeTab) {
       setActiveTab(t);
     }
   }, [location.search]);
@@ -75,6 +81,15 @@ const MarketplaceMyShop = () => {
     const v = Number(amountMinor);
     if (!Number.isFinite(v)) return '—';
     return `${(v / 100).toFixed(2)}€`;
+  };
+
+  const parsePriceToCents = (val) => {
+    if (val === null || val === undefined) return 0;
+    const str = String(val).trim().replace(/\s/g, '').replace(',', '.');
+    if (!str) return 0;
+    const num = Number(str);
+    if (!Number.isFinite(num) || num < 0) return 0;
+    return Math.round(num * 100);
   };
 
   const fetchShippingOptions = async () => {
@@ -97,10 +112,16 @@ const MarketplaceMyShop = () => {
         map[t] = {
           label: o?.label || map[t].label,
           price_cents: Math.max(parseInt(o?.price_cents, 10) || 0, 0),
-          is_active: o?.shipping_type === 'pickup' ? true : o?.is_active === true,
+          is_active: o?.is_active === true,
         };
       });
       setShipOptions(map);
+      setShipPriceUI({
+        pickup: ((map.pickup?.price_cents || 0) / 100).toFixed(2),
+        standard: ((map.standard?.price_cents || 0) / 100).toFixed(2),
+        express: ((map.express?.price_cents || 0) / 100).toFixed(2),
+        international: ((map.international?.price_cents || 0) / 100).toFixed(2),
+      });
       if (data?.base_currency) setShipCurrency(String(data.base_currency).toUpperCase());
     } catch (e) {
       const msg = e?.message || 'Erreur chargement des options de livraison';
@@ -121,9 +142,8 @@ const MarketplaceMyShop = () => {
     try {
       const payload = ['pickup', 'standard', 'express', 'international'].map((t) => ({
         shipping_type: t,
-        label: shipOptions[t]?.label || '',
-        price_cents: t === 'pickup' ? 0 : Math.max(parseInt(shipOptions[t]?.price_cents, 10) || 0, 0),
-        is_active: t === 'pickup' ? true : shipOptions[t]?.is_active === true,
+        price_cents: Math.max(parsePriceToCents(shipPriceUI[t]), 0),
+        is_active: shipOptions[t]?.is_active === true,
       }));
 
       const res = await fetch(`${serverLabUrl}/api/market/partners/${encodeURIComponent(partner.id)}/shipping-options`, {
@@ -143,7 +163,7 @@ const MarketplaceMyShop = () => {
   };
 
   useEffect(() => {
-    if (activeTab !== 'shipping') return;
+    if (activeTab !== 'shop') return;
     if (!partner?.id) return;
     fetchShippingOptions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -697,14 +717,6 @@ const MarketplaceMyShop = () => {
             </Button>
             <Button
               type="button"
-              variant={activeTab === 'shipping' ? 'default' : 'outline'}
-              onClick={() => setActiveTab('shipping')}
-              className="flex-1"
-            >
-              Livraison
-            </Button>
-            <Button
-              type="button"
               variant={activeTab === 'chat' ? 'default' : 'outline'}
               onClick={() => setActiveTab('chat')}
               className="flex-1"
@@ -1007,6 +1019,54 @@ const MarketplaceMyShop = () => {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader className="p-4">
+            <CardTitle className="text-base font-semibold">Gérer les modes de livraison</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0 space-y-4">
+            <div className="text-xs text-gray-600">Devise de base: {String(shipCurrency || '—')}</div>
+
+            {shipError ? <div className="text-sm text-red-600">{shipError}</div> : null}
+
+            <div className="space-y-3">
+              {(['pickup','standard','express','international']).map((t) => (
+                <div key={t} className="border rounded-md p-3 bg-white">
+                  <div className="text-sm font-medium text-gray-800">{t === 'pickup' ? 'Pickup' : (t === 'standard' ? 'Standard' : (t === 'express' ? 'Express' : 'International'))}</div>
+                  <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
+                    <div className="space-y-1">
+                      <Label>Prix ({shipCurrency})</Label>
+                      <Input
+                        type="text"
+                        value={shipPriceUI[t] ?? ''}
+                        onChange={(e) => setShipPriceUI((prev) => ({ ...prev, [t]: e.target.value }))}
+                        disabled={shipLoading || shipSaving}
+                        placeholder="ex: 5,00"
+                      />
+                      <div className="text-xs text-gray-500">Montant en devise (ex: 5,00)</div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Activer</Label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={shipOptions[t]?.is_active === true}
+                          onChange={(e) => setShipOptions((prev) => ({ ...prev, [t]: { ...prev[t], is_active: e.target.checked } }))}
+                          disabled={shipLoading || shipSaving}
+                        />
+                        <span className="text-sm text-gray-700">{shipOptions[t]?.is_active ? 'Activé' : 'Désactivé'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <Button type="button" onClick={saveShippingOptions} disabled={shipSaving} className="w-full">
+              {shipSaving ? 'Enregistrement…' : 'Enregistrer'}
+            </Button>
+          </CardContent>
+        </Card>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <Card>
             <CardHeader className="p-4">
@@ -1107,63 +1167,7 @@ const MarketplaceMyShop = () => {
           </>
         ) : null}
 
-        {activeTab === 'shipping' ? (
-          <Card>
-            <CardHeader className="p-4">
-              <CardTitle className="text-base font-semibold">Modes de livraison</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 pt-0 space-y-4">
-              <div className="text-xs text-gray-600">Devise de base: {String(shipCurrency || '—')}</div>
-
-              {shipError ? <div className="text-sm text-red-600">{shipError}</div> : null}
-
-              <div className="space-y-3">
-                {(['pickup','standard','express','international']).map((t) => (
-                  <div key={t} className="border rounded-md p-3 bg-white">
-                    <div className="text-sm font-medium text-gray-800 capitalize">{t === 'pickup' ? 'Retrait sur place' : (t === 'standard' ? 'Livraison standard' : (t === 'express' ? 'Livraison express' : 'Livraison internationale'))}</div>
-                    <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-                      <div className="space-y-1">
-                        <Label>Libellé</Label>
-                        <Input
-                          value={shipOptions[t]?.label || ''}
-                          onChange={(e) => setShipOptions((prev) => ({ ...prev, [t]: { ...prev[t], label: e.target.value } }))}
-                          disabled={t === 'pickup' || shipLoading || shipSaving}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label>Prix ({shipCurrency})</Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          value={t === 'pickup' ? 0 : (shipOptions[t]?.price_cents || 0)}
-                          onChange={(e) => setShipOptions((prev) => ({ ...prev, [t]: { ...prev[t], price_cents: Math.max(parseInt(e.target.value, 10) || 0, 0) } }))}
-                          disabled={t === 'pickup' || shipLoading || shipSaving}
-                        />
-                        <div className="text-xs text-gray-500">Montant fixe en cents</div>
-                      </div>
-                      <div className="space-y-1">
-                        <Label>Activer</Label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={t === 'pickup' ? true : shipOptions[t]?.is_active === true}
-                            onChange={(e) => setShipOptions((prev) => ({ ...prev, [t]: { ...prev[t], is_active: e.target.checked } }))}
-                            disabled={t === 'pickup' || shipLoading || shipSaving}
-                          />
-                          <span className="text-sm text-gray-700">{t === 'pickup' ? 'Toujours actif' : (shipOptions[t]?.is_active ? 'Activé' : 'Désactivé')}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <Button type="button" onClick={saveShippingOptions} disabled={shipSaving} className="w-full">
-                {shipSaving ? 'Enregistrement…' : 'Enregistrer'}
-              </Button>
-            </CardContent>
-          </Card>
-        ) : null}
+        
       </div>
     </>
   );
