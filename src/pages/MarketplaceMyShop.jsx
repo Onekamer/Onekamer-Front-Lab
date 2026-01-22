@@ -71,6 +71,15 @@ const MarketplaceMyShop = () => {
     express: '0',
     international: '0',
   });
+  const [ratingsSummary, setRatingsSummary] = useState({ avg: null, count: 0 });
+  const [ratingsSummaryLoading, setRatingsSummaryLoading] = useState(false);
+  const RATINGS_LIMIT = 20;
+  const [ratings, setRatings] = useState([]);
+  const [ratingsLoading, setRatingsLoading] = useState(false);
+  const [ratingsOffset, setRatingsOffset] = useState(0);
+  const [ratingsHasMore, setRatingsHasMore] = useState(true);
+  const [ratingsPreview, setRatingsPreview] = useState([]);
+  const [ratingsPreviewLoading, setRatingsPreviewLoading] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -84,6 +93,79 @@ const MarketplaceMyShop = () => {
     const v = Number(amountMinor);
     if (!Number.isFinite(v)) return '—';
     return `${(v / 100).toFixed(2)}€`;
+  };
+  const fetchRatingsSummary = async () => {
+    if (!session?.access_token) return;
+    if (!partner?.id) return;
+    if (ratingsSummaryLoading) return;
+    setRatingsSummaryLoading(true);
+    try {
+      const res = await fetch(`${serverLabUrl}/api/market/partners/${encodeURIComponent(partner.id)}/ratings/summary`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const avg = typeof data?.avg === 'number' ? data.avg : null;
+        const count = parseInt(data?.count, 10) || 0;
+        setRatingsSummary({ avg, count });
+      }
+    } catch {}
+    finally {
+      setRatingsSummaryLoading(false);
+    }
+  };
+
+  const fetchRatingsPage = async (offset = 0) => {
+    if (!session?.access_token) return;
+    if (!partner?.id) return;
+    if (ratingsLoading) return;
+    setRatingsLoading(true);
+    try {
+      const qs = new URLSearchParams();
+      qs.set('limit', String(RATINGS_LIMIT));
+      qs.set('offset', String(Math.max(offset, 0)));
+      const res = await fetch(`${serverLabUrl}/api/market/partners/${encodeURIComponent(partner.id)}/ratings?${qs.toString()}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur chargement avis');
+      const list = Array.isArray(data?.ratings) ? data.ratings : [];
+      setRatings((prev) => (offset === 0 ? list : [...prev, ...list]));
+      setRatingsOffset(offset + list.length);
+      setRatingsHasMore(list.length === RATINGS_LIMIT);
+    } catch (e) {
+      setRatingsHasMore(false);
+    } finally {
+      setRatingsLoading(false);
+    }
+  };
+
+  const openRatingsDialog = async () => {
+    setRatings([]);
+    setRatingsOffset(0);
+    setRatingsHasMore(true);
+    await fetchRatingsPage(0);
+  };
+
+  const fetchRatingsPreview = async () => {
+    if (!session?.access_token) return;
+    if (!partner?.id) return;
+    if (ratingsPreviewLoading) return;
+    setRatingsPreviewLoading(true);
+    try {
+      const qs = new URLSearchParams();
+      qs.set('limit', '3');
+      qs.set('offset', '0');
+      const res = await fetch(`${serverLabUrl}/api/market/partners/${encodeURIComponent(partner.id)}/ratings?${qs.toString()}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      const list = Array.isArray(data?.ratings) ? data.ratings : [];
+      setRatingsPreview(list);
+    } catch {}
+    finally {
+      setRatingsPreviewLoading(false);
+    }
   };
 
   const parsePriceToCents = (val) => {
@@ -177,6 +259,13 @@ const MarketplaceMyShop = () => {
     if (activeTab !== 'shop') return;
     if (!partner?.id) return;
     fetchShippingOptions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, partner?.id]);
+  useEffect(() => {
+    if (activeTab !== 'shop') return;
+    if (!partner?.id) return;
+    fetchRatingsSummary();
+    fetchRatingsPreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, partner?.id]);
 
@@ -1009,6 +1098,15 @@ const MarketplaceMyShop = () => {
                 <Button
                   type="button"
                   variant="outline"
+                  onClick={handleToggleOpen}
+                  disabled={togglingOpen}
+                  className="w-full"
+                >
+                  {togglingOpen ? 'Mise à jour…' : partner?.is_open ? 'Fermer la boutique' : 'Ouvrir la boutique'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={String(partner?.payout_status || '').toLowerCase() === 'complete' ? handleConnectLoginLink : handleConnectOnboarding}
                   disabled={String(partner?.payout_status || '').toLowerCase() === 'complete' ? managing : connecting}
                   className="w-full"
@@ -1026,17 +1124,50 @@ const MarketplaceMyShop = () => {
                 >
                   {syncing ? 'Vérification…' : 'Vérifier le statut'}
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleToggleOpen}
-                  disabled={togglingOpen}
-                  className="w-full"
-                >
-                  {togglingOpen ? 'Mise à jour…' : partner?.is_open ? 'Fermer la boutique' : 'Ouvrir la boutique'}
-                </Button>
+                
               </div>
             ) : null}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="p-4">
+            <CardTitle className="text-base font-semibold">Ratings</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button type="button" variant="outline" className="w-full" onClick={openRatingsDialog}>
+                  {ratingsSummaryLoading ? 'Chargement…' : (ratingsSummary?.avg != null ? `${ratingsSummary.avg.toFixed(1)} ★ (${ratingsSummary.count})` : 'Aucune note')}
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Avis</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3 max-h-[70vh] overflow-y-auto">
+                  {ratings.length === 0 ? (
+                    <div className="text-sm text-gray-600">Aucun avis pour le moment.</div>
+                  ) : ratings.map((r) => {
+                    const n = Math.max(Math.min(Number(r?.rating||0), 5), 0);
+                    const stars = '★'.repeat(n) + '☆'.repeat(5 - n);
+                    const when = r?.created_at ? new Date(r.created_at).toLocaleString() : '';
+                    return (
+                      <div key={r.id} className="border rounded-md p-3 bg-white">
+                        <div className="text-sm font-medium">{stars}</div>
+                        {r?.comment ? <div className="text-sm text-gray-800 whitespace-pre-wrap mt-1">{r.comment}</div> : null}
+                        <div className="text-xs text-gray-500 mt-1">{r?.buyer_alias ? `${r.buyer_alias} • ` : ''}{when}</div>
+                      </div>
+                    );
+                  })}
+                  {ratingsHasMore ? (
+                    <Button type="button" onClick={() => fetchRatingsPage(ratingsOffset)} disabled={ratingsLoading} className="w-full">
+                      {ratingsLoading ? 'Chargement…' : 'Charger plus'}
+                    </Button>
+                  ) : null}
+                </div>
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
 
@@ -1202,6 +1333,74 @@ const MarketplaceMyShop = () => {
             </CardContent>
           </Card>
         </form>
+
+        <Card>
+          <CardHeader className="p-4">
+            <CardTitle className="text-base font-semibold">Mes avis (aperçu)</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0 space-y-3">
+            {ratingsPreviewLoading ? (
+              <div className="text-sm text-gray-600">Chargement…</div>
+            ) : ratingsPreview.length === 0 ? (
+              <div className="text-sm text-gray-600">Aucun avis pour le moment.</div>
+            ) : (
+              <div className="space-y-3">
+                {ratingsPreview.map((r) => {
+                  const n = Math.max(Math.min(Number(r?.rating || 0), 5), 0);
+                  const stars = '★'.repeat(n) + '☆'.repeat(5 - n);
+                  const when = r?.created_at ? new Date(r.created_at).toLocaleString() : '';
+                  return (
+                    <div key={r.id} className="border rounded-md p-3 bg-white">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium">{stars}</div>
+                        {r?.order_number ? <div className="text-xs text-gray-600">Commande n°{r.order_number}</div> : null}
+                      </div>
+                      {r?.comment ? <div className="text-sm text-gray-800 whitespace-pre-wrap mt-1">{r.comment}</div> : null}
+                      <div className="text-xs text-gray-500 mt-1">{r?.buyer_alias ? `${r.buyer_alias} • ` : ''}{when}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button type="button" variant="outline" onClick={openRatingsDialog} className="w-full">
+                  Voir tous les avis
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Tous les avis</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3 max-h-[70vh] overflow-y-auto">
+                  {ratings.length === 0 ? (
+                    <div className="text-sm text-gray-600">Aucun avis pour le moment.</div>
+                  ) : ratings.map((r) => {
+                    const n = Math.max(Math.min(Number(r?.rating||0), 5), 0);
+                    const stars = '★'.repeat(n) + '☆'.repeat(5 - n);
+                    const when = r?.created_at ? new Date(r.created_at).toLocaleString() : '';
+                    return (
+                      <div key={r.id} className="border rounded-md p-3 bg-white">
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-medium">{stars}</div>
+                          {r?.order_number ? <div className="text-xs text-gray-600">Commande n°{r.order_number}</div> : null}
+                        </div>
+                        {r?.comment ? <div className="text-sm text-gray-800 whitespace-pre-wrap mt-1">{r.comment}</div> : null}
+                        <div className="text-xs text-gray-500 mt-1">{r?.buyer_alias ? `${r.buyer_alias} • ` : ''}{when}</div>
+                      </div>
+                    );
+                  })}
+                  {ratingsHasMore ? (
+                    <Button type="button" onClick={() => fetchRatingsPage(ratingsOffset)} disabled={ratingsLoading} className="w-full">
+                      {ratingsLoading ? 'Chargement…' : 'Charger plus'}
+                    </Button>
+                  ) : null}
+                </div>
+              </DialogContent>
+            </Dialog>
+          </CardContent>
+        </Card>
           </>
         ) : null}
 
