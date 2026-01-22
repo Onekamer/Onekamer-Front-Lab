@@ -82,7 +82,7 @@ const MarketplaceCart = () => {
         setShipError(null);
         const res = await fetch(
           `${serverLabUrl}/api/market/partners/${encodeURIComponent(cart.partnerId)}/shipping-options?t=${Date.now()}`,
-          { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } }
+          { cache: 'no-store' }
         );
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data?.error || 'Erreur chargement options de livraison');

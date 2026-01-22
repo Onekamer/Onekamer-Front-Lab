@@ -102,7 +102,7 @@ const MarketplaceMyShop = () => {
     try {
       const res = await fetch(
         `${serverLabUrl}/api/market/partners/${encodeURIComponent(partner.id)}/shipping-options?t=${Date.now()}`,
-        { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } }
+        { cache: 'no-store' }
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Erreur chargement des options de livraison');
