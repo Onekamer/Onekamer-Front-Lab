@@ -288,6 +288,8 @@ const MarketplaceCart = () => {
               <div className="font-semibold text-gray-800">{shippingFee / 100} €</div>
             </div>
 
+            <div className="text-xs text-gray-500">Frais de service OneKamer (10%)</div>
+
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-900 font-semibold">Total</div>
               <div className="text-base font-bold text-gray-900">{totalWithShipping / 100} €</div>

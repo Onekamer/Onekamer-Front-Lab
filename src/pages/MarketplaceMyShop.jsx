@@ -10,6 +10,9 @@ import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { canUserAccess } from '@/lib/accessControl';
 
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Info } from 'lucide-react';
+
 const CATEGORIES = ['Restauration', 'Mode', 'Beauté', 'Services', 'High-tech', 'Autre'];
 
 const MarketplaceMyShop = () => {
@@ -896,6 +899,7 @@ const MarketplaceMyShop = () => {
                       const createdLabel = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.toLocaleString() : '—';
                       const currency = String(o?.charge_currency || '').toUpperCase();
                       const totalLabel = currency === 'EUR' ? formatEur(o?.charge_amount_total) : currency ? `${o?.charge_amount_total} ${currency}` : '—';
+                      const netLabel = currency === 'EUR' ? formatEur(o?.partner_amount) : currency ? `${o?.partner_amount} ${currency}` : '—';
                       const isCompleted = fRaw === 'completed';
 
                       return (
@@ -912,6 +916,7 @@ const MarketplaceMyShop = () => {
 
                             <div className="md:col-span-2">
                               <div className="text-sm text-gray-800">{totalLabel}</div>
+                              <div className="text-xs text-gray-500">Montant net reçu: {netLabel}</div>
                             </div>
 
                             <div className="md:col-span-2">
@@ -1029,7 +1034,24 @@ const MarketplaceMyShop = () => {
 
         <Card>
           <CardHeader className="p-4">
-            <CardTitle className="text-base font-semibold">Gérer les modes de livraison</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-semibold">Gérer les modes de livraison</CardTitle>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <button type="button" aria-label="Informations frais" className="text-gray-500 hover:text-gray-700">
+                    <Info className="h-4 w-4" />
+                  </button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Information</DialogTitle>
+                    <DialogDescription>
+                      Frais de service OneKamer : 10 %. Ils s’appliquent sur le total du panier (article + livraison).
+                    </DialogDescription>
+                  </DialogHeader>
+                </DialogContent>
+              </Dialog>
+            </div>
           </CardHeader>
           <CardContent className="p-4 pt-0 space-y-4">
             <div className="text-xs text-gray-600">Devise de base: {String(shipCurrency || '—')}</div>
