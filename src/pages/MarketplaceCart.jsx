@@ -80,7 +80,10 @@ const MarketplaceCart = () => {
         if (!cart?.partnerId) return;
         setShipLoading(true);
         setShipError(null);
-        const res = await fetch(`${serverLabUrl}/api/market/partners/${encodeURIComponent(cart.partnerId)}/shipping-options`);
+        const res = await fetch(
+          `${serverLabUrl}/api/market/partners/${encodeURIComponent(cart.partnerId)}/shipping-options?t=${Date.now()}`,
+          { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } }
+        );
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data?.error || 'Erreur chargement options de livraison');
         const list = Array.isArray(data?.options) ? data.options : [];
