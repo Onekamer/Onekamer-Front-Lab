@@ -246,9 +246,17 @@ const MarketplaceMyShop = () => {
   const totalSalesEur = useMemo(() => {
     const totalMinor = (Array.isArray(ordersAll) ? ordersAll : [])
       .filter((o) => String(o?.status || '').toLowerCase() === 'paid')
+      .filter((o) => String(o?.fulfillment_status || '').toLowerCase() === 'completed')
       .filter((o) => String(o?.charge_currency || '').toUpperCase() === 'EUR')
       .reduce((sum, o) => sum + Number(o?.partner_amount || 0), 0);
     return totalMinor / 100;
+  }, [ordersAll]);
+
+  const totalOrdersCompletedCount = useMemo(() => {
+    return (Array.isArray(ordersAll) ? ordersAll : [])
+      .filter((o) => String(o?.status || '').toLowerCase() === 'paid')
+      .filter((o) => String(o?.fulfillment_status || '').toLowerCase() === 'completed')
+      .length;
   }, [ordersAll]);
 
   const filteredSalesEur = useMemo(() => {
@@ -826,11 +834,11 @@ const MarketplaceMyShop = () => {
                 <div className="border rounded-md p-3 bg-white">
                   <div className="text-xs text-gray-500">Total des ventes</div>
                   <div className="text-lg font-semibold text-gray-900">{totalSalesEur.toFixed(2)}€</div>
-                  <div className="text-xs text-gray-500 mt-1">net de la commission d'OneKamer sur les ventes hors taxes</div>
+                  <div className="text-xs text-gray-500 mt-1">net des frais de service OneKamer</div>
                 </div>
                 <div className="border rounded-md p-3 bg-white">
                   <div className="text-xs text-gray-500">Total des commandes</div>
-                  <div className="text-lg font-semibold text-gray-900">{Array.isArray(ordersAll) ? ordersAll.length : 0}</div>
+                  <div className="text-lg font-semibold text-gray-900">{totalOrdersCompletedCount}</div>
                 </div>
                 <div className="border rounded-md p-3 bg-white">
                   <div className="text-xs text-gray-500">Ventes (filtre actuel)</div>
@@ -916,7 +924,7 @@ const MarketplaceMyShop = () => {
 
                             <div className="md:col-span-2">
                               <div className="text-sm text-gray-800">{totalLabel}</div>
-                              <div className="text-xs text-gray-500">Montant net reçu: {netLabel}</div>
+                              <div className="text-xs text-gray-500">Montant net à recevoir: {netLabel}</div>
                             </div>
 
                             <div className="md:col-span-2">

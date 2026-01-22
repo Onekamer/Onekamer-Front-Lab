@@ -287,6 +287,12 @@ const MarketplaceOrderDetail = () => {
                 </div>
                 {effectiveRole === 'seller' ? (
                   <div className="flex items-center justify-between text-sm">
+                    <div className="text-gray-700 font-medium">Montant net à recevoir</div>
+                    <div>{renderAmount(order.partner_amount, order.charge_currency)}</div>
+                  </div>
+                ) : null}
+                {effectiveRole === 'seller' ? (
+                  <div className="flex items-center justify-between text-sm">
                     <div className="text-gray-700 font-medium">Client</div>
                     <div className="truncate max-w-[60%]">{order?.customer_alias || '—'}</div>
                   </div>
