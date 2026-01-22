@@ -9,7 +9,8 @@ const urlsToCache = [
 ];
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting();\n  event.waitUntil(
+  self.skipWaiting();
+  event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(urlsToCache))
   );
@@ -20,15 +21,15 @@ self.addEventListener('fetch', (event) => {
   // Cela évite que le SW bloque la lecture des fichiers audio/vidéo/images créés en mémoire
   if (event.request.url.startsWith('blob:')) {
     return; // Laisse passer directement sans interception
+  }
 
-  // Ignore API requests (bypass cache)
+  // ✅ Ignorer les appels API (laisser passer vers le réseau)
   try {
     const url = new URL(event.request.url);
     if (url.pathname.startsWith('/api/')) {
       return;
     }
   } catch {}
-  }
 
   event.respondWith(
     caches.match(event.request)
@@ -51,7 +52,7 @@ self.addEventListener('activate', (event) => {
           if (cacheName !== CACHE_NAME) {
             return caches.delete(cacheName);
           }
-        }).then(() => self.clients.claim())
+        })
       );
     }).then(() => self.clients.claim())
   );
