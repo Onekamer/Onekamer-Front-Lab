@@ -87,21 +87,23 @@ const MarketplaceCart = () => {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data?.error || 'Erreur chargement options de livraison');
         const list = Array.isArray(data?.options) ? data.options : [];
-        const next = { ...shipOptions };
+        const base = {
+          pickup: { label: 'Retrait sur place', price_cents: 0, is_active: true },
+          standard: { label: 'Livraison standard', price_cents: 0, is_active: false },
+          express: { label: 'Livraison express', price_cents: 0, is_active: false },
+          international: { label: 'Livraison internationale', price_cents: 0, is_active: false },
+        };
         let defaultMode = 'pickup';
         list.forEach((o) => {
-          const t = String(o?.shipping_type || '').toLowerCase();
+          const t = String(o?.shipping_type || '').toLowerCase().trim();
           if (!['pickup','standard','express','international'].includes(t)) return;
-          next[t] = {
-            label: o?.label || (t === 'pickup' ? 'Retrait sur place' : t),
+          base[t] = {
+            label: o?.label || base[t].label,
             price_cents: t === 'pickup' ? 0 : Math.max(parseInt(o?.price_cents, 10) || 0, 0),
             is_active: t === 'pickup' ? true : o?.is_active === true,
           };
-          if (t !== 'pickup' && next[t].is_active && defaultMode === 'pickup') {
-            // keep pickup as default unless you prefer auto-select first active non-pickup
-          }
         });
-        setShipOptions(next);
+        setShipOptions(base);
         setDeliveryMode(defaultMode);
       } catch (e) {
         setShipError(e?.message || 'Erreur chargement options de livraison');

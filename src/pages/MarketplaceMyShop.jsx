@@ -108,22 +108,27 @@ const MarketplaceMyShop = () => {
       if (!res.ok) throw new Error(data?.error || 'Erreur chargement des options de livraison');
 
       const opts = Array.isArray(data?.options) ? data.options : [];
-      const map = { ...shipOptions };
+      const base = {
+        pickup: { label: 'Retrait sur place', price_cents: 0, is_active: true },
+        standard: { label: 'Livraison standard', price_cents: 0, is_active: false },
+        express: { label: 'Livraison express', price_cents: 0, is_active: false },
+        international: { label: 'Livraison internationale', price_cents: 0, is_active: false },
+      };
       opts.forEach((o) => {
-        const t = String(o?.shipping_type || '').toLowerCase();
+        const t = String(o?.shipping_type || '').toLowerCase().trim();
         if (!['pickup', 'standard', 'express', 'international'].includes(t)) return;
-        map[t] = {
-          label: o?.label || map[t].label,
+        base[t] = {
+          label: o?.label || base[t].label,
           price_cents: Math.max(parseInt(o?.price_cents, 10) || 0, 0),
           is_active: o?.is_active === true,
         };
       });
-      setShipOptions(map);
+      setShipOptions(base);
       setShipPriceUI({
-        pickup: ((map.pickup?.price_cents || 0) / 100).toFixed(2),
-        standard: ((map.standard?.price_cents || 0) / 100).toFixed(2),
-        express: ((map.express?.price_cents || 0) / 100).toFixed(2),
-        international: ((map.international?.price_cents || 0) / 100).toFixed(2),
+        pickup: ((base.pickup?.price_cents || 0) / 100).toFixed(2),
+        standard: ((base.standard?.price_cents || 0) / 100).toFixed(2),
+        express: ((base.express?.price_cents || 0) / 100).toFixed(2),
+        international: ((base.international?.price_cents || 0) / 100).toFixed(2),
       });
       if (data?.base_currency) setShipCurrency(String(data.base_currency).toUpperCase());
     } catch (e) {
