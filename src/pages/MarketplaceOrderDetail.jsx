@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
 const MarketplaceOrderDetail = () => {
   const { orderId } = useParams();
@@ -25,6 +26,12 @@ const MarketplaceOrderDetail = () => {
   const [text, setText] = useState('');
   const [updatingFulfillment, setUpdatingFulfillment] = useState(false);
   const [actioning, setActioning] = useState(null);
+
+  const [ratingLoading, setRatingLoading] = useState(false);
+  const [ratingExisting, setRatingExisting] = useState(null);
+  const [ratingValue, setRatingValue] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [submittingRating, setSubmittingRating] = useState(false);
 
   const listRef = useRef(null);
 
@@ -87,6 +94,29 @@ const MarketplaceOrderDetail = () => {
     start();
     return () => { if (id) clearInterval(id); };
   }, [loadMessages]);
+
+  const loadRating = useCallback(async () => {
+    if (!orderId || !session?.access_token) return;
+    try {
+      setRatingLoading(true);
+      const res = await fetch(`${serverLabUrl}/api/market/orders/${encodeURIComponent(orderId)}/rating`, {
+        method: 'GET',
+        headers,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur chargement avis');
+      setRatingExisting(data?.rating || null);
+    } catch {
+      setRatingExisting(null);
+    } finally {
+      setRatingLoading(false);
+    }
+  }, [orderId, session?.access_token, serverLabUrl, headers]);
+
+  useEffect(() => {
+    if (!order) return;
+    loadRating();
+  }, [order, loadRating]);
 
   const autoCompleteDate = useMemo(() => {
     const s = String(order?.status || '').toLowerCase();
@@ -235,6 +265,31 @@ const MarketplaceOrderDetail = () => {
       toast({ title: 'Erreur', description: e?.message || "Impossible d'annuler la commande", variant: 'destructive' });
     } finally {
       setActioning(null);
+    }
+  };
+
+  const submitRating = async () => {
+    if (!orderId || !session?.access_token) return;
+    const r = Number(ratingValue);
+    if (!(r >= 1 && r <= 5)) {
+      toast({ title: 'Note invalide', description: 'Sélectionne une note entre 1 et 5.', variant: 'destructive' });
+      return;
+    }
+    setSubmittingRating(true);
+    try {
+      const res = await fetch(`${serverLabUrl}/api/market/orders/${encodeURIComponent(orderId)}/rating`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ rating: r, comment: String(ratingComment || '').slice(0, 1000) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Erreur envoi avis');
+      await loadRating();
+      toast({ title: 'Merci pour votre avis' });
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || "Impossible d'envoyer l'avis", variant: 'destructive' });
+    } finally {
+      setSubmittingRating(false);
     }
   };
 
@@ -404,6 +459,47 @@ const MarketplaceOrderDetail = () => {
                   {String(order?.status||'').toLowerCase() === 'paid' && autoCompleteDate ? (
                     <div className="text-xs text-gray-500 text-center">La commande sera considérée automatiquement terminée au bout de 14 jours — soit le {formatLongDate(autoCompleteDate)}.</div>
                   ) : null}
+                </CardContent>
+              </Card>
+            ) : null}
+
+            {effectiveRole === 'buyer' && String(order?.status || '').toLowerCase() === 'paid' && String(order?.fulfillment_status || '').toLowerCase() === 'completed' ? (
+              <Card>
+                <CardHeader className="p-4">
+                  <CardTitle className="text-base font-semibold">Noter la commande</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 space-y-3">
+                  {ratingLoading ? (
+                    <div className="text-sm text-gray-600">Chargement…</div>
+                  ) : ratingExisting ? (
+                    <div className="space-y-2 text-sm text-gray-700">
+                      <div>
+                        {(() => {
+                          const n = Number(ratingExisting?.rating || 0);
+                          const clamped = Math.max(Math.min(n, 5), 0);
+                          return '★'.repeat(clamped) + '☆'.repeat(5 - clamped);
+                        })()}
+                      </div>
+                      {ratingExisting?.comment ? (
+                        <div className="whitespace-pre-wrap">{ratingExisting.comment}</div>
+                      ) : null}
+                      <div className="text-xs text-gray-500">Avis enregistré le {ratingExisting?.created_at ? new Date(ratingExisting.created_at).toLocaleString() : ''}</div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        {[1,2,3,4,5].map((n) => (
+                          <Button key={n} type="button" variant={ratingValue >= n ? 'default' : 'outline'} size="sm" onClick={() => setRatingValue(n)}>
+                            {n}
+                          </Button>
+                        ))}
+                      </div>
+                      <Textarea value={ratingComment} onChange={(e) => setRatingComment(e.target.value)} placeholder="Votre avis (optionnel)" />
+                      <Button type="button" onClick={submitRating} disabled={submittingRating || !ratingValue} className="w-full">
+                        {submittingRating ? 'Envoi…' : 'Envoyer mon avis'}
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ) : null}
