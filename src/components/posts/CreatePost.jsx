@@ -12,7 +12,7 @@ import { uploadAudioFile } from '@/utils/audioStorage';
 import { notifyMentions } from '@/services/supabaseNotifications';
 import { extractUniqueMentions } from '@/utils/mentions';
 
-const AudioPlayer = ({ src, onCanPlay }) => {
+const AudioPlayer = ({ src, onCanPlay, initialDuration = 0 }) => {
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -78,6 +78,8 @@ const AudioPlayer = ({ src, onCanPlay }) => {
     return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
+  const displayDuration = duration > 0 ? duration : initialDuration;
+
   return (
     <div className="flex items-center gap-2 bg-gray-200 rounded-full p-2 mt-2">
       <audio ref={audioRef} src={src} preload="metadata" playsInline crossOrigin="anonymous"></audio>
@@ -87,10 +89,10 @@ const AudioPlayer = ({ src, onCanPlay }) => {
       <div className="w-full bg-gray-300 rounded-full h-1.5">
         <div
           className="bg-blue-500 h-1.5 rounded-full"
-          style={{ width: `${(currentTime / duration) * 100 || 0}%` }}
+          style={{ width: `${(currentTime / displayDuration) * 100 || 0}%` }}
         ></div>
       </div>
-      <span className="text-xs text-gray-600 w-20 text-center">{formatTime(currentTime)} / {formatTime(duration)}</span>
+      <span className="text-xs text-gray-600 w-20 text-center">{formatTime(currentTime)} / {formatTime(displayDuration)}</span>
       {hasError && <span className="text-xs text-red-600 ml-2">Audio non supporté</span>}
     </div>
   );
@@ -683,7 +685,7 @@ const CreatePost = ({ onPublished }) => {
 
         {audioBlob && !recording && (
           <div className="relative p-2 bg-gray-100 rounded-lg mb-3">
-            <AudioPlayer src={URL.createObjectURL(audioBlob)} onCanPlay={(d) => setAudioDuration(d)} />
+            <AudioPlayer src={URL.createObjectURL(audioBlob)} onCanPlay={(d) => setAudioDuration(d)} initialDuration={Math.max(1, recordingTime || audioDuration)} />
             <Button size="icon" variant="destructive" onClick={handleRemoveAudio} className="absolute -top-1 -right-1 h-5 w-5 rounded-full">
               <X className="h-3 w-3" />
             </Button>
