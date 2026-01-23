@@ -29,6 +29,7 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const reloadOnceRef = useRef(false);
 
   const togglePlayPause = () => {
     if (!audioRef.current) return;
@@ -45,7 +46,21 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
       setIsLoading(false);
     };
     const setAudioTime = () => setCurrentTime(audio.currentTime);
-    const onError = () => { setHasError(true); setIsLoading(false); };
+    const onError = () => {
+      setHasError(true);
+      setIsLoading(false);
+      const el = audioRef.current;
+      if (el && !reloadOnceRef.current) {
+        reloadOnceRef.current = true;
+        const srcUrl = typeof src === 'string' ? src : '';
+        const bust = srcUrl.includes('?') ? `${srcUrl}&t=${Date.now()}` : `${srcUrl}?t=${Date.now()}`;
+        try {
+          el.pause();
+          el.src = bust;
+          el.load();
+        } catch (_) {}
+      }
+    };
     audio.addEventListener('loadedmetadata', setAudioData);
     audio.addEventListener('loadeddata', setAudioData);
     audio.addEventListener('timeupdate', setAudioTime);
@@ -70,9 +85,21 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  const guessedType = useMemo(() => {
+    const u = (src || '').split('?')[0].toLowerCase();
+    if (u.endsWith('.m4a') || u.endsWith('.mp4')) return 'audio/mp4';
+    if (u.endsWith('.webm')) return 'audio/webm';
+    if (u.endsWith('.ogg') || u.endsWith('.oga')) return 'audio/ogg';
+    if (u.endsWith('.mp3')) return 'audio/mpeg';
+    return undefined;
+  }, [src]);
+
   return (
     <div className="flex items-center gap-2 bg-gray-200 rounded-full p-2 mt-2">
-      <audio ref={audioRef} src={src} preload="metadata" playsInline crossOrigin="anonymous"></audio>
+      <audio ref={audioRef} preload="metadata" playsInline>
+        <source src={src} type={guessedType} />
+        <source src={src} />
+      </audio>
       <Button onClick={togglePlayPause} size="icon" className="rounded-full w-8 h-8">
         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (isPlaying ? '❚❚' : '▶')}
       </Button>
