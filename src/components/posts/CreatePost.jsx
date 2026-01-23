@@ -95,6 +95,9 @@ const AudioPlayer = ({ src, onCanPlay, initialDuration = 0 }) => {
     <div className="flex items-center gap-2 bg-gray-200 rounded-full p-2 mt-2">
       <audio ref={audioRef} preload="metadata" playsInline>
         <source src={src} type={guessedType} />
+        <source src={src} type="audio/mp4; codecs=mp4a.40.2" />
+        <source src={src} type="audio/x-m4a" />
+        <source src={src} />
       </audio>
       <Button onClick={togglePlayPause} size="icon" className="rounded-full w-8 h-8">
         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />)}
