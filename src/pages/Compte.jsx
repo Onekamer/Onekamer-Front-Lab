@@ -488,6 +488,26 @@ const Compte = () => {
         {isAdmin && (
           <Card>
             <CardHeader>
+              <CardTitle>Retraits OK COINS (LAB)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p className="text-gray-600">
+                Validez/refusez les demandes de retrait et marquez comme traitées.
+              </p>
+              <Button
+                type="button"
+                className="w-full sm:w-auto"
+                onClick={() => navigate('/compte/okcoins-admin')}
+              >
+                Ouvrir la gestion retraits
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {isAdmin && (
+          <Card>
+            <CardHeader>
               <CardTitle>QR Codes événements (Admin)</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">

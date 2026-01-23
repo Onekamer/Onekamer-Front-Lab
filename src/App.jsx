@@ -32,6 +32,7 @@ import InfluenceursAdmin from '@/pages/InfluenceursAdmin';
 import InfluenceurStats from '@/pages/InfluenceurStats';
 import ModerationAdminLab from '@/pages/ModerationAdminLab';
 import OKCoinsAdminLab from '@/pages/OKCoinsAdminLab';
+import OKCoinsTransactions from '@/pages/OKCoinsTransactions';
 import AdminUsersLab from '@/pages/AdminUsersLab';
 import AdminInvitationsLab from '@/pages/AdminInvitationsLab';
 import Publier from '@/pages/Publier';
@@ -149,6 +150,7 @@ const AppContent = () => {
           <Route path="/compte/influenceurs-admin" element={<InfluenceursAdmin />} />
           <Route path="/compte/marketplace-admin" element={<MarketplaceAdmin />} />
           <Route path="/compte/okcoins-admin" element={<OKCoinsAdminLab />} />
+          <Route path="/compte/okcoins-transactions" element={<OKCoinsTransactions />} />
           <Route path="/compte/mes-stats-influenceur" element={<InfluenceurStats />} />
           <Route path="/compte/modifier" element={<ModifierProfil />} />
           <Route path="/compte/notifications" element={<Notifications />} />
