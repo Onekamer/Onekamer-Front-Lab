@@ -198,6 +198,7 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
   const [duration, setDuration] = useState(initialDuration);
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
   const togglePlayPause = () => {
     if (audioRef.current) {
@@ -221,11 +222,13 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
         setIsLoading(false);
       }
       const setAudioTime = () => setCurrentTime(audio.currentTime);
+      const onError = () => { setHasError(true); setIsLoading(false); };
 
       audio.addEventListener('loadeddata', setAudioData);
       audio.addEventListener('timeupdate', setAudioTime);
       audio.addEventListener('ended', () => setIsPlaying(false));
       audio.addEventListener('canplaythrough', () => setIsLoading(false));
+      audio.addEventListener('error', onError);
 
       if (audio.readyState >= 2) {
         setAudioData();
@@ -236,6 +239,7 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
         audio.removeEventListener('timeupdate', setAudioTime);
         audio.removeEventListener('ended', () => setIsPlaying(false));
         audio.removeEventListener('canplaythrough', () => setIsLoading(false));
+        audio.removeEventListener('error', onError);
       }
     }
   }, [src]);
@@ -251,7 +255,7 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
 
   return (
     <div className="flex items-center gap-2 bg-gray-200 rounded-full p-2 mt-2">
-      <audio ref={audioRef} src={src} preload="metadata"></audio>
+      <audio ref={audioRef} src={src} preload="metadata" playsInline crossOrigin="anonymous"></audio>
       <Button onClick={togglePlayPause} size="icon" className="rounded-full w-8 h-8" disabled={isLoading}>
         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />)}
       </Button>
@@ -262,6 +266,9 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
         ></div>
       </div>
       <span className="text-xs text-gray-600 w-20 text-center">{formatTime(currentTime)} / {formatTime(displayDuration)}</span>
+      {hasError && (
+        <span className="text-xs text-red-600 ml-2">Audio non supporté</span>
+      )}
     </div>
   );
 };
@@ -481,6 +488,20 @@ const CommentSection = ({ postId, highlightCommentId }) => {
 
       console.log("🎚️ Type MIME utilisé :", supportedMimeType);
 
+      // Warm-up AudioContext (iOS Safari stabilité)
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) {
+          const ctx = new Ctx();
+          const osc = ctx.createOscillator();
+          const dest = ctx.createMediaStreamDestination();
+          osc.connect(dest);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.05);
+          ctx.resume?.();
+        }
+      } catch (e) { console.warn("AudioContext warm-up échoué", e); }
+
       const recorder = new MediaRecorder(stream, { mimeType: supportedMimeType });
       audioChunksRef.current = [];
 
@@ -507,6 +528,7 @@ const CommentSection = ({ postId, highlightCommentId }) => {
         console.log("🛑 Enregistrement terminé, création du blob...");
         clearInterval(recordingIntervalRef.current);
         recordingIntervalRef.current = null;
+        if (recorder.manualPollingInterval) clearInterval(recorder.manualPollingInterval);
         stream.getTracks().forEach((t) => t.stop());
 
         await new Promise((resolve) => setTimeout(resolve, 300));
@@ -539,6 +561,14 @@ const CommentSection = ({ postId, highlightCommentId }) => {
       // ✅ IMPORTANT : timeslice=1000 force la génération de chunks toutes les secondes sur mobile
       // Sans ce paramètre, certains navigateurs mobiles ne déclenchent jamais ondataavailable = blob vide (0 octets)
       recorder.start(1000);
+      // Polling manuel supplémentaire (fiabilisation mobile)
+      try {
+        recorder.manualPollingInterval = setInterval(() => {
+          if (recorder.state === "recording" && typeof recorder.requestData === 'function') {
+            recorder.requestData();
+          }
+        }, 1000);
+      } catch (_) {}
       console.log("⏺️ Enregistrement démarré avec format :", supportedMimeType);
 
       mediaRecorderRef.current = recorder;

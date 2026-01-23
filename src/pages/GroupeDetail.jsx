@@ -28,6 +28,7 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
   const [duration, setDuration] = useState(initialDuration);
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
   const togglePlayPause = () => {
     if (!audioRef.current) return;
@@ -44,16 +45,19 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
       setIsLoading(false);
     };
     const setAudioTime = () => setCurrentTime(audio.currentTime);
+    const onError = () => { setHasError(true); setIsLoading(false); };
     audio.addEventListener('loadeddata', setAudioData);
     audio.addEventListener('timeupdate', setAudioTime);
     audio.addEventListener('ended', () => setIsPlaying(false));
     audio.addEventListener('canplaythrough', () => setIsLoading(false));
+    audio.addEventListener('error', onError);
     if (audio.readyState >= 2) setAudioData();
     return () => {
       audio.removeEventListener('loadeddata', setAudioData);
       audio.removeEventListener('timeupdate', setAudioTime);
       audio.removeEventListener('ended', () => setIsPlaying(false));
       audio.removeEventListener('canplaythrough', () => setIsLoading(false));
+      audio.removeEventListener('error', onError);
     };
   }, [src]);
 
@@ -66,7 +70,7 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
 
   return (
     <div className="flex items-center gap-2 bg-gray-200 rounded-full p-2 mt-2">
-      <audio ref={audioRef} src={src} preload="metadata"></audio>
+      <audio ref={audioRef} src={src} preload="metadata" playsInline crossOrigin="anonymous"></audio>
       <Button onClick={togglePlayPause} size="icon" className="rounded-full w-8 h-8" disabled={isLoading}>
         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (isPlaying ? '❚❚' : '▶')}
       </Button>
@@ -74,6 +78,7 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
         <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${(currentTime / duration) * 100 || 0}%` }}></div>
       </div>
       <span className="text-xs text-gray-600 w-20 text-center">{formatTime(currentTime)} / {formatTime(duration)}</span>
+      {hasError && <span className="text-xs text-red-600 ml-2">Audio non supporté</span>}
     </div>
   );
 };
@@ -407,12 +412,27 @@ const GroupeDetail = () => {
       const recordingDone = new Promise((resolve) => (resolveRecording = resolve));
       recorderPromiseRef.current = recordingDone;
       const supportedMimeType = window.MediaRecorder?.isTypeSupported?.(chosenMime.type) ? chosenMime.type : undefined;
+      // Warm-up AudioContext pour Safari iOS
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) {
+          const ctx = new Ctx();
+          const osc = ctx.createOscillator();
+          const dest = ctx.createMediaStreamDestination();
+          osc.connect(dest);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.05);
+          ctx.resume?.();
+        }
+      } catch (e) { console.warn('AudioContext warm-up échec', e); }
+
       const recorder = supportedMimeType ? new MediaRecorder(stream, { mimeType: supportedMimeType }) : new MediaRecorder(stream);
       audioChunksRef.current = [];
       recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data); };
       recorder.onerror = (e) => { console.error('MediaRecorder error', e); resolveRecording(null); };
       recorder.onstop = async () => {
         clearInterval(recordingIntervalRef.current);
+        if (recorder.manualPollingInterval) clearInterval(recorder.manualPollingInterval);
         stream.getTracks().forEach((t) => t.stop());
         await new Promise((r) => setTimeout(r, 300));
         const finalType = (mimeRef.current?.type || 'audio/webm').split(';')[0];
@@ -424,6 +444,14 @@ const GroupeDetail = () => {
       };
       await new Promise((r) => setTimeout(r, 300));
       recorder.start(1000); // timeslice=1000 force chunks toutes les secondes (fix mobile 0 octets)
+      // Polling manuel supplémentaire (iOS)
+      try {
+        recorder.manualPollingInterval = setInterval(() => {
+          if (recorder.state === 'recording' && typeof recorder.requestData === 'function') {
+            recorder.requestData();
+          }
+        }, 1000);
+      } catch (_) {}
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
       recordingIntervalRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000);

@@ -18,6 +18,7 @@ const AudioPlayer = ({ src, onCanPlay }) => {
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
   const togglePlayPause = () => {
     if (audioRef.current) {
@@ -50,6 +51,8 @@ const AudioPlayer = ({ src, onCanPlay }) => {
         setIsLoading(false);
         setAudioData();
       });
+      const onError = () => { setIsLoading(false); setHasError(true); };
+      audio.addEventListener('error', onError);
 
       if (audio.readyState >= 2) {
         setAudioData();
@@ -63,6 +66,7 @@ const AudioPlayer = ({ src, onCanPlay }) => {
           setIsLoading(false);
           setAudioData();
         });
+        audio.removeEventListener('error', onError);
       }
     }
   }, [src, onCanPlay]);
@@ -76,7 +80,7 @@ const AudioPlayer = ({ src, onCanPlay }) => {
 
   return (
     <div className="flex items-center gap-2 bg-gray-200 rounded-full p-2 mt-2">
-      <audio ref={audioRef} src={src} preload="metadata"></audio>
+      <audio ref={audioRef} src={src} preload="metadata" playsInline crossOrigin="anonymous"></audio>
       <Button onClick={togglePlayPause} size="icon" className="rounded-full w-8 h-8" disabled={isLoading}>
         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />)}
       </Button>
@@ -87,6 +91,7 @@ const AudioPlayer = ({ src, onCanPlay }) => {
         ></div>
       </div>
       <span className="text-xs text-gray-600 w-20 text-center">{formatTime(currentTime)} / {formatTime(duration)}</span>
+      {hasError && <span className="text-xs text-red-600 ml-2">Audio non supporté</span>}
     </div>
   );
 };
