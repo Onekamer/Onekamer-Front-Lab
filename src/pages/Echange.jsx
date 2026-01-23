@@ -224,6 +224,7 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
       const setAudioTime = () => setCurrentTime(audio.currentTime);
       const onError = () => { setHasError(true); setIsLoading(false); };
 
+      audio.addEventListener('loadedmetadata', setAudioData);
       audio.addEventListener('loadeddata', setAudioData);
       audio.addEventListener('timeupdate', setAudioTime);
       audio.addEventListener('ended', () => setIsPlaying(false));
@@ -235,6 +236,7 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
       }
 
       return () => {
+        audio.removeEventListener('loadedmetadata', setAudioData);
         audio.removeEventListener('loadeddata', setAudioData);
         audio.removeEventListener('timeupdate', setAudioTime);
         audio.removeEventListener('ended', () => setIsPlaying(false));
@@ -256,7 +258,7 @@ const AudioPlayer = ({ src, initialDuration = 0 }) => {
   return (
     <div className="flex items-center gap-2 bg-gray-200 rounded-full p-2 mt-2">
       <audio ref={audioRef} src={src} preload="metadata" playsInline crossOrigin="anonymous"></audio>
-      <Button onClick={togglePlayPause} size="icon" className="rounded-full w-8 h-8" disabled={isLoading}>
+      <Button onClick={togglePlayPause} size="icon" className="rounded-full w-8 h-8">
         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />)}
       </Button>
       <div className="w-full bg-gray-300 rounded-full h-1.5">
