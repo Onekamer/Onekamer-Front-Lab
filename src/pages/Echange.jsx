@@ -1451,7 +1451,18 @@ const Echange = () => {
           </TabsContent>
           <TabsContent value="trending" className="space-y-4 mt-4">
             {loadingPosts ? <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-[#2BA84A]" /></div> :
-              [...feedItems].sort((a, b) => ((b.likes_count || 0) + (b.comments_count || 0)) - ((a.likes_count || 0) + (a.comments_count || 0))).map((item, index) => (
+              [...feedItems]
+                .filter((it) => {
+                  try {
+                    const created = new Date(it.created_at);
+                    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+                    return created >= sevenDaysAgo;
+                  } catch (_) {
+                    return true;
+                  }
+                })
+                .sort((a, b) => (Number(b.likes_count || 0) - Number(a.likes_count || 0)) || (new Date(b.created_at) - new Date(a.created_at)))
+                .map((item, index) => (
                 <motion.div key={`${item.feed_type}-${item.id}-trending`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}>
                   {item.feed_type === 'post' ? (
                     <PostCard
