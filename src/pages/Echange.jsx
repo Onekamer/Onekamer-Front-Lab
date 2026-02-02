@@ -26,6 +26,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { getInitials } from '@/lib/utils';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { uploadAudioFile, ensurePublicAudioUrl } from '@/utils/audioStorage';
 import { notifyDonationReceived, notifyMentions } from '@/services/supabaseNotifications';
 import { extractUniqueMentions } from '@/utils/mentions';
@@ -37,7 +38,7 @@ const normalizeAudioEntry = (entry) => {
 
 const parseMentions = (text) => {
   if (!text) return '';
-  const mentionRegex = /@(\w+)/g;
+  const mentionRegex = /@([A-Za-z0-9][A-Za-z0-9._-]{0,30})/g;
   const parts = text.split(mentionRegex);
 
   return parts.map((part, index) => {
@@ -151,6 +152,65 @@ const DonationDialog = ({ post, user, profile, refreshBalance, children }) => {
       toast({ title: "Erreur de don", description: error.message, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCommentChange = (e) => {
+    const value = e.target.value;
+    setNewComment(value);
+    const caret = e.target.selectionStart || value.length;
+    const before = value.slice(0, caret);
+    const m = before.match(/(?:^|\s)@([A-Za-z0-9][A-Za-z0-9._-]{0,30})$/);
+    if (m) {
+      setMentionQuery(m[1]);
+      setShowSuggestions(true);
+    } else {
+      setShowSuggestions(false);
+      setMentionQuery('');
+    }
+  };
+
+  const handleCommentKeyDown = (e) => {
+    if (e.key === 'Enter' && showSuggestions && suggestions.length > 0) {
+      e.preventDefault();
+      handleMentionSelect(suggestions[0]);
+    }
+  };
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!showSuggestions || !mentionQuery) return;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .ilike('username', `${mentionQuery}%`)
+        .limit(5);
+      if (!error) setSuggestions(data || []);
+    };
+    const t = setTimeout(fetchUsers, 300);
+    return () => clearTimeout(t);
+  }, [mentionQuery, showSuggestions]);
+
+  const handleMentionSelect = (userItem) => {
+    const value = newComment || '';
+    const input = inputRef.current;
+    const caret = input && typeof input.selectionStart === 'number' ? input.selectionStart : value.length;
+    const before = value.slice(0, caret);
+    const after = value.slice(caret);
+    const atIndex = before.lastIndexOf('@');
+    if (atIndex === -1) return;
+    if (atIndex > 0 && !/\s/.test(before[atIndex - 1])) return;
+    const prefix = before.slice(0, atIndex);
+    const inserted = `@${userItem.username}`;
+    const nextValue = `${prefix}${inserted}${after.startsWith(' ') || after === '' ? '' : ' '}${after}`;
+    setNewComment(nextValue);
+    setShowSuggestions(false);
+    setMentionQuery('');
+    if (input) {
+      const nextPos = (prefix + inserted).length + (after.startsWith(' ') || after === '' ? 0 : 1);
+      setTimeout(() => {
+        try { input.focus(); input.setSelectionRange(nextPos, nextPos); } catch (_) {}
+      }, 0);
     }
   };
 
@@ -344,6 +404,10 @@ const CommentSection = ({ postId, highlightCommentId }) => {
   const [comments, setComments] = useState([]);
   const [loadingComments, setLoadingComments] = useState(true);
   const [newComment, setNewComment] = useState('');
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const inputRef = useRef(null);
   const [isPostingComment, setIsPostingComment] = useState(false);
   const [mediaFile, setMediaFile] = useState(null);
   const [mediaPreviewUrl, setMediaPreviewUrl] = useState(null);
@@ -739,23 +803,49 @@ const CommentSection = ({ postId, highlightCommentId }) => {
         type = 'audio';
       }
 
-      const { error: insertError } = await supabase.from('comments').insert([{
-        content_id: postId,
-        content_type: 'post',
-        user_id: user.id,
-        content: newComment,
-        media_url,
-        media_type,
-        audio_url,
-        audio_duration,
-        type,
-      }]);
+      const { data: insertedComment, error: insertError } = await supabase
+        .from('comments')
+        .insert({
+          content_id: postId,
+          content_type: 'post',
+          user_id: user.id,
+          content: newComment,
+          media_url,
+          media_type,
+          audio_url,
+          audio_duration,
+          type,
+        })
+        .select('id')
+        .single();
 
       if (insertError) throw insertError;
 
       setNewComment('');
+      setShowSuggestions(false);
+      setMentionQuery('');
       handleRemoveMedia();
       handleRemoveAudio();
+
+      try {
+        const usernames = extractUniqueMentions(newComment);
+        if (usernames.length) {
+          const { data: profs } = await supabase
+            .from('profiles')
+            .select('id, username')
+            .in('username', usernames);
+          const ids = (profs || []).map((p) => p.id).filter((id) => id && id !== user.id);
+          if (ids.length) {
+            await notifyMentions({
+              mentionedUserIds: ids,
+              authorName: user?.email || 'Un membre OneKamer',
+              excerpt: newComment,
+              postId,
+              commentId: insertedComment?.id,
+            });
+          }
+        }
+      } catch (_) {}
 
     } catch (error) {
       console.error('Error posting comment:', error);
@@ -809,12 +899,29 @@ const CommentSection = ({ postId, highlightCommentId }) => {
                 <span className="text-sm text-red-500 font-mono">{formatRecordingTime(recordingTime)}</span>
               </div>
             ) : (
-              <Input
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Écrire un commentaire..."
-                disabled={isPostingComment || !!audioBlob}
-              />
+              <div className="relative w-full">
+                <Input
+                  ref={inputRef}
+                  value={newComment}
+                  onChange={handleCommentChange}
+                  onKeyDown={handleCommentKeyDown}
+                  placeholder="Écrire un commentaire..."
+                  disabled={isPostingComment || !!audioBlob}
+                />
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="absolute bottom-full left-0 z-10 w-full bg-white border border-gray-200 rounded-md shadow mb-1 max-h-48 overflow-y-auto">
+                    {suggestions.map((s) => (
+                      <div key={s.id} className="mention-suggestion" onClick={() => handleMentionSelect(s)}>
+                        <Avatar className="w-6 h-6">
+                          <AvatarImage src={s.avatar_url} alt={s.username} />
+                          <AvatarFallback>{getInitials(s.username)}</AvatarFallback>
+                        </Avatar>
+                        <span>{s.username}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
             <Button type="submit" size="icon" disabled={isPostingComment || (!newComment.trim() && !mediaFile && !audioBlob)}>
               {isPostingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

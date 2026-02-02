@@ -1,5 +1,6 @@
 export const extractUniqueMentions = (text = '') => {
-  const mentionRegex = /@([a-zA-Z0-9_]+)/g;
+  // Mention valide si '@' en début de chaîne ou précédé d'un espace, puis [a-z0-9._-] (max ~30)
+  const mentionRegex = /(?:^|\s)@([A-Za-z0-9][A-Za-z0-9._-]{0,30})/g;
   const matches = new Set();
   if (!text) return [];
 
