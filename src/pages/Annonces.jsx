@@ -74,6 +74,31 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
         return () => { mounted = false };
       }, [user, session, apiPrefix, annonce?.id]);
 
+      const toggleDirect = async () => {
+        try {
+          const { data: row } = await supabase
+            .from('annonces_interests')
+            .select('id')
+            .eq('annonce_id', annonce.id)
+            .eq('user_id', user.id)
+            .maybeSingle();
+          if (row) {
+            await supabase.from('annonces_interests').delete().eq('id', row.id);
+            setInterested(false);
+          } else {
+            await supabase.from('annonces_interests').insert({ annonce_id: annonce.id, user_id: user.id });
+            setInterested(true);
+          }
+          const { count } = await supabase
+            .from('annonces_interests')
+            .select('id', { count: 'exact', head: true })
+            .eq('annonce_id', annonce.id);
+          setInterestCount(Number(count || 0));
+        } catch (err) {
+          throw err;
+        }
+      };
+
       const handleToggleInterest = async (e) => {
         e.stopPropagation();
         try {
@@ -82,16 +107,24 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
             return;
           }
           const token = session?.access_token;
-          if (!token) throw new Error('Session expirée');
+          if (!token) {
+            await toggleDirect();
+            return;
+          }
           const res = await fetch(`${apiPrefix}/annonces/${encodeURIComponent(String(annonce.id))}/interest`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
           });
           const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data?.error || 'Erreur serveur');
-          setInterested(!!data?.interested);
-          setInterestCount(Number(data?.interests_count || 0));
+          if (!res.ok) {
+            await toggleDirect();
+          } else {
+            setInterested(!!data?.interested);
+            setInterestCount(Number(data?.interests_count || 0));
+          }
         } catch (err) {
+          // Fallback réseau: tenter direct avant d'alerter
+          try { await toggleDirect(); return; } catch (_e) {}
           toast({ title: 'Erreur', description: err?.message || 'Impossible de mettre à jour.', variant: 'destructive' });
         }
       };
@@ -224,8 +257,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
       );
     };
 
-    const AnnonceCard = ({ annonce, onSelect }) => {
+    const AnnonceCard = ({ annonce, onSelect, apiPrefix, session }) => {
         const { toast } = useToast();
+        const { user } = useAuth();
+        const [interestLoading, setInterestLoading] = useState(true);
+        const [interested, setInterested] = useState(false);
+        const [interestCount, setInterestCount] = useState(0);
         const handleShare = async (e) => {
             e.stopPropagation();
             const shareData = { title: annonce.titre, text: annonce.description, url: window.location.href };
@@ -242,6 +279,82 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
             }
         };
 
+        useEffect(() => {
+          let mounted = true;
+          (async () => {
+            try {
+              if (!user || !apiPrefix) { setInterestLoading(false); return; }
+              const token = session?.access_token;
+              if (token) {
+                const res = await fetch(`${apiPrefix}/annonces/${encodeURIComponent(String(annonce.id))}/interest/status`, { headers: { Authorization: `Bearer ${token}` } });
+                const data = await res.json().catch(() => ({}));
+                if (mounted && res.ok) {
+                  setInterested(!!data?.interested);
+                  setInterestCount(Number(data?.interests_count || 0));
+                } else if (mounted) {
+                  const { data: row } = await supabase
+                    .from('annonces_interests')
+                    .select('id')
+                    .eq('annonce_id', annonce.id)
+                    .eq('user_id', user.id)
+                    .maybeSingle();
+                  setInterested(!!row);
+                  const { count } = await supabase
+                    .from('annonces_interests')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('annonce_id', annonce.id);
+                  setInterestCount(Number(count || 0));
+                }
+              } else {
+                setInterestLoading(false);
+              }
+            } catch {}
+            if (mounted) setInterestLoading(false);
+          })();
+          return () => { mounted = false };
+        }, [user, session, apiPrefix, annonce?.id]);
+
+        const toggleDirect = async () => {
+          try {
+            const { data: row } = await supabase
+              .from('annonces_interests')
+              .select('id')
+              .eq('annonce_id', annonce.id)
+              .eq('user_id', user.id)
+              .maybeSingle();
+            if (row) {
+              await supabase.from('annonces_interests').delete().eq('id', row.id);
+              setInterested(false);
+            } else {
+              await supabase.from('annonces_interests').insert({ annonce_id: annonce.id, user_id: user.id });
+              setInterested(true);
+            }
+            const { count } = await supabase
+              .from('annonces_interests')
+              .select('id', { count: 'exact', head: true })
+              .eq('annonce_id', annonce.id);
+            setInterestCount(Number(count || 0));
+          } catch (err) {
+            toast({ title: 'Erreur', description: err?.message || 'Action impossible.', variant: 'destructive' });
+          }
+        };
+
+        const handleToggleInterest = async (e) => {
+          e.stopPropagation();
+          try {
+            if (!user) { toast({ title: 'Connexion requise', description: 'Connectez-vous pour indiquer votre intérêt.', variant: 'destructive' }); return; }
+            const token = session?.access_token;
+            if (!token) { await toggleDirect(); return; }
+            const res = await fetch(`${apiPrefix}/annonces/${encodeURIComponent(String(annonce.id))}/interest`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) { await toggleDirect(); } else { setInterested(!!data?.interested); setInterestCount(Number(data?.interests_count || 0)); }
+          } catch (err) {
+            // Fallback réseau
+            try { await toggleDirect(); return; } catch (_e) {}
+            toast({ title: 'Erreur', description: err?.message || 'Action impossible.', variant: 'destructive' });
+          }
+        };
+
         return (
             <Card onClick={() => onSelect(annonce)} className="cursor-pointer group overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300 h-full flex flex-col rounded-lg">
                 <div className="relative h-48 bg-gray-200">
@@ -254,6 +367,14 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
                                 <FavoriteButton contentType="annonce" contentId={annonce.id} />
                                 <Button variant="ghost" size="icon" onClick={handleShare} className="text-white bg-black/20 hover:bg-black/40 rounded-full h-8 w-8">
                                     <Share2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleToggleInterest}
+                                  className="text-white bg-black/20 hover:bg-black/40 rounded-full px-2 h-8"
+                                >
+                                  {interested ? "Intéressé" : "Intéressé ?"}{!interestLoading ? ` (${interestCount})` : ''}
                                 </Button>
                         </div>
                     </div>
@@ -508,7 +629,7 @@ const Annonces = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredAnnonces.map((annonce, index) => (
                   <motion.div key={annonce.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}>
-                     <AnnonceCard annonce={annonce} onSelect={setSelectedAnnonce} />
+                     <AnnonceCard annonce={annonce} onSelect={setSelectedAnnonce} apiPrefix={API_PREFIX} session={session} />
                   </motion.div>
                 ))}
               </div>

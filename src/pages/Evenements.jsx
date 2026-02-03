@@ -45,6 +45,82 @@ import React, { useState, useEffect, useCallback } from 'react';
         });
       };
 
+      useEffect(() => {
+        let mounted = true;
+        (async () => {
+          try {
+            if (!user || !apiPrefix) { setInterestLoading(false); return; }
+            const token = session?.access_token;
+            if (token) {
+              const res = await fetch(`${apiPrefix}/evenements/${encodeURIComponent(String(event.id))}/interest/status`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              const data = await res.json().catch(() => ({}));
+              if (mounted && res.ok) {
+                setInterested(!!data?.interested);
+                setInterestCount(Number(data?.interests_count || 0));
+              } else if (mounted) {
+                const { data: row } = await supabase
+                  .from('evenements_interests')
+                  .select('id')
+                  .eq('event_id', event.id)
+                  .eq('user_id', user.id)
+                  .maybeSingle();
+                setInterested(!!row);
+                const { count } = await supabase
+                  .from('evenements_interests')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('event_id', event.id);
+                setInterestCount(Number(count || 0));
+              }
+            } else {
+              setInterestLoading(false);
+            }
+          } catch {}
+          if (mounted) setInterestLoading(false);
+        })();
+        return () => { mounted = false };
+      }, [user, session, apiPrefix, event?.id]);
+
+      const toggleDirect = async () => {
+        try {
+          const { data: row } = await supabase
+            .from('evenements_interests')
+            .select('id')
+            .eq('event_id', event.id)
+            .eq('user_id', user.id)
+            .maybeSingle();
+          if (row) {
+            await supabase.from('evenements_interests').delete().eq('id', row.id);
+            setInterested(false);
+          } else {
+            await supabase.from('evenements_interests').insert({ event_id: event.id, user_id: user.id });
+            setInterested(true);
+          }
+          const { count } = await supabase
+            .from('evenements_interests')
+            .select('id', { count: 'exact', head: true })
+            .eq('event_id', event.id);
+          setInterestCount(Number(count || 0));
+        } catch (err) {
+          toast({ title: 'Erreur', description: err?.message || 'Action impossible.', variant: 'destructive' });
+        }
+      };
+
+      const handleToggleInterest = async (e) => {
+        e.stopPropagation();
+        try {
+          if (!user) { toast({ title: 'Connexion requise', description: 'Connectez-vous pour indiquer votre intérêt.', variant: 'destructive' }); return; }
+          const token = session?.access_token;
+          if (!token) { await toggleDirect(); return; }
+          const res = await fetch(`${apiPrefix}/evenements/${encodeURIComponent(String(event.id))}/interest`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) { await toggleDirect(); } else { setInterested(!!data?.interested); setInterestCount(Number(data?.interests_count || 0)); }
+        } catch (err) {
+          toast({ title: 'Erreur', description: err?.message || 'Action impossible.', variant: 'destructive' });
+        }
+      };
+
       return (
         <button
           onClick={handleOpenMaps}
@@ -106,6 +182,32 @@ import React, { useState, useEffect, useCallback } from 'react';
         return () => { mounted = false };
       }, [user, session, apiPrefix, event?.id]);
 
+      const toggleDirect = async () => {
+        // Fallback direct: insert/delete dans evenements_interests puis recompute via count exact
+        try {
+          const { data: row } = await supabase
+            .from('evenements_interests')
+            .select('id')
+            .eq('event_id', event.id)
+            .eq('user_id', user.id)
+            .maybeSingle();
+          if (row) {
+            await supabase.from('evenements_interests').delete().eq('id', row.id);
+            setInterested(false);
+          } else {
+            await supabase.from('evenements_interests').insert({ event_id: event.id, user_id: user.id });
+            setInterested(true);
+          }
+          const { count } = await supabase
+            .from('evenements_interests')
+            .select('id', { count: 'exact', head: true })
+            .eq('event_id', event.id);
+          setInterestCount(Number(count || 0));
+        } catch (err) {
+          throw err;
+        }
+      };
+
       const handleToggleInterest = async (e) => {
         e.stopPropagation();
         try {
@@ -114,15 +216,23 @@ import React, { useState, useEffect, useCallback } from 'react';
             return;
           }
           const token = session?.access_token;
-          if (!token) throw new Error('Session expirée');
+          if (!token) {
+            // Pas de token → fallback direct
+            await toggleDirect();
+            return;
+          }
           const res = await fetch(`${apiPrefix}/evenements/${encodeURIComponent(String(event.id))}/interest`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
           });
           const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data?.error || 'Erreur serveur');
-          setInterested(!!data?.interested);
-          setInterestCount(Number(data?.interests_count || 0));
+          if (!res.ok) {
+            // Fallback direct si le serveur renvoie une erreur (ex: RPC manquant)
+            await toggleDirect();
+          } else {
+            setInterested(!!data?.interested);
+            setInterestCount(Number(data?.interests_count || 0));
+          }
         } catch (err) {
           toast({ title: 'Erreur', description: err?.message || 'Impossible de mettre à jour.', variant: 'destructive' });
         }
@@ -263,8 +373,12 @@ import React, { useState, useEffect, useCallback } from 'react';
       );
     };
 
-    const EvenementCard = ({ event, onSelect }) => {
+    const EvenementCard = ({ event, onSelect, apiPrefix, session }) => {
       const { toast } = useToast();
+      const { user } = useAuth();
+      const [interestLoading, setInterestLoading] = useState(true);
+      const [interested, setInterested] = useState(false);
+      const [interestCount, setInterestCount] = useState(0);
 
       const handleShare = async (e) => {
         e.stopPropagation();
@@ -337,6 +451,14 @@ import React, { useState, useEffect, useCallback } from 'react';
                     className="text-white bg-black/20 hover:bg-black/40 rounded-full h-8 w-8"
                   >
                     <Share2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleToggleInterest}
+                    className="text-white bg-black/20 hover:bg-black/40 rounded-full px-2 h-8"
+                  >
+                    {interested ? "Intéressé" : "Intéressé ?"}{!interestLoading ? ` (${interestCount})` : ''}
                   </Button>
                 </div>
               </div>
@@ -538,7 +660,7 @@ import React, { useState, useEffect, useCallback } from 'react';
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
                   >
-                    <EvenementCard event={event} onSelect={setSelectedEvent} />
+                    <EvenementCard event={event} onSelect={setSelectedEvent} apiPrefix={API_PREFIX} session={session} />
                   </motion.div>
                 ))}
               </div>
