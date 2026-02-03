@@ -56,12 +56,77 @@ import React, { useState, useEffect, useCallback } from 'react';
     };
 
 
-    const EvenementDetail = ({ event, onBack, onDelete, onEdit }) => {
+    const EvenementDetail = ({ event, onBack, onDelete, onEdit, apiPrefix, session }) => {
       const { user, profile } = useAuth();
       const { toast } = useToast();
       const navigate = useNavigate();
       const isOwner = user?.id === event.user_id;
       const isAdmin = profile?.is_admin === true || profile?.is_admin === 1 || profile?.is_admin === 'true' || String(profile?.role || '').toLowerCase() === 'admin';
+      const [interestLoading, setInterestLoading] = useState(true);
+      const [interested, setInterested] = useState(false);
+      const [interestCount, setInterestCount] = useState(0);
+
+      useEffect(() => {
+        let mounted = true;
+        (async () => {
+          try {
+            if (!user || !event?.id || !apiPrefix) { setInterestLoading(false); return; }
+            const token = session?.access_token;
+            if (!token) { setInterestLoading(false); return; }
+            const res = await fetch(`${apiPrefix}/evenements/${encodeURIComponent(String(event.id))}/interest/status`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json().catch(() => ({}));
+            if (mounted && res.ok) {
+              setInterested(!!data?.interested);
+              setInterestCount(Number(data?.interests_count || 0));
+            } else if (mounted) {
+              // Fallback: lecture directe Supabase si la route n'est pas dispo
+              try {
+                const { data: evt } = await supabase
+                  .from('evenements')
+                  .select('id, interests_count')
+                  .eq('id', event.id)
+                  .maybeSingle();
+                setInterestCount(Number(evt?.interests_count || 0));
+              } catch {}
+              try {
+                const { data: row } = await supabase
+                  .from('evenements_interests')
+                  .select('id')
+                  .eq('event_id', event.id)
+                  .eq('user_id', user.id)
+                  .maybeSingle();
+                setInterested(!!row);
+              } catch {}
+            }
+          } catch {}
+          if (mounted) setInterestLoading(false);
+        })();
+        return () => { mounted = false };
+      }, [user, session, apiPrefix, event?.id]);
+
+      const handleToggleInterest = async (e) => {
+        e.stopPropagation();
+        try {
+          if (!user) {
+            toast({ title: 'Connexion requise', description: "Connectez-vous pour indiquer votre intérêt.", variant: 'destructive' });
+            return;
+          }
+          const token = session?.access_token;
+          if (!token) throw new Error('Session expirée');
+          const res = await fetch(`${apiPrefix}/evenements/${encodeURIComponent(String(event.id))}/interest`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data?.error || 'Erreur serveur');
+          setInterested(!!data?.interested);
+          setInterestCount(Number(data?.interests_count || 0));
+        } catch (err) {
+          toast({ title: 'Erreur', description: err?.message || 'Impossible de mettre à jour.', variant: 'destructive' });
+        }
+      };
       
       const handleShare = async () => {
         const shareData = { title: event.title, text: event.description, url: window.location.href };
@@ -125,6 +190,9 @@ import React, { useState, useEffect, useCallback } from 'react';
             </div>
             <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
                 <FavoriteButton contentType="evenement" contentId={event.id} />
+                <Button variant="outline" size="sm" onClick={handleToggleInterest} disabled={interestLoading} className="bg-white/80 backdrop-blur-sm">
+                  {interested ? 'Je ne suis plus intéressé(e)' : 'Je suis intéressé(e)'}{!interestLoading ? ` (${interestCount})` : ''}
+                </Button>
                 {(isOwner || isAdmin) && (
                     <Button
                       variant="ghost"
@@ -438,6 +506,8 @@ import React, { useState, useEffect, useCallback } from 'react';
                 onBack={() => setSelectedEvent(null)}
                 onDelete={handleDelete}
                 onEdit={handleEdit}
+                apiPrefix={API_PREFIX}
+                session={session}
               />
             )}
           </AnimatePresence>

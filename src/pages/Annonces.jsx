@@ -23,12 +23,78 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
         return `${priceNumber.toFixed(2).replace('.', ',')} ${symbol}`;
     };
 
-    const AnnonceDetail = ({ annonce, onBack, onDelete, onEdit }) => {
+    const AnnonceDetail = ({ annonce, onBack, onDelete, onEdit, apiPrefix, session }) => {
       const { user, profile } = useAuth();
       const { toast } = useToast();
       const navigate = useNavigate();
       const isOwner = user?.id === annonce.user_id;
       const isAdmin = profile?.is_admin === true || profile?.is_admin === 1 || profile?.is_admin === 'true' || String(profile?.role || '').toLowerCase() === 'admin';
+
+      const [interestLoading, setInterestLoading] = useState(true);
+      const [interested, setInterested] = useState(false);
+      const [interestCount, setInterestCount] = useState(0);
+
+      useEffect(() => {
+        let mounted = true;
+        (async () => {
+          try {
+            if (!user || !annonce?.id || !apiPrefix) { setInterestLoading(false); return; }
+            const token = session?.access_token;
+            if (!token) { setInterestLoading(false); return; }
+            const res = await fetch(`${apiPrefix}/annonces/${encodeURIComponent(String(annonce.id))}/interest/status`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json().catch(() => ({}));
+            if (mounted && res.ok) {
+              setInterested(!!data?.interested);
+              setInterestCount(Number(data?.interests_count || 0));
+            } else if (mounted) {
+              // Fallback: lecture directe Supabase si la route n'est pas dispo
+              try {
+                const { data: ann } = await supabase
+                  .from('annonces')
+                  .select('id, interests_count')
+                  .eq('id', annonce.id)
+                  .maybeSingle();
+                setInterestCount(Number(ann?.interests_count || 0));
+              } catch {}
+              try {
+                const { data: row } = await supabase
+                  .from('annonces_interests')
+                  .select('id')
+                  .eq('annonce_id', annonce.id)
+                  .eq('user_id', user.id)
+                  .maybeSingle();
+                setInterested(!!row);
+              } catch {}
+            }
+          } catch {}
+          if (mounted) setInterestLoading(false);
+        })();
+        return () => { mounted = false };
+      }, [user, session, apiPrefix, annonce?.id]);
+
+      const handleToggleInterest = async (e) => {
+        e.stopPropagation();
+        try {
+          if (!user) {
+            toast({ title: 'Connexion requise', description: 'Connectez-vous pour indiquer votre intérêt.', variant: 'destructive' });
+            return;
+          }
+          const token = session?.access_token;
+          if (!token) throw new Error('Session expirée');
+          const res = await fetch(`${apiPrefix}/annonces/${encodeURIComponent(String(annonce.id))}/interest`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data?.error || 'Erreur serveur');
+          setInterested(!!data?.interested);
+          setInterestCount(Number(data?.interests_count || 0));
+        } catch (err) {
+          toast({ title: 'Erreur', description: err?.message || 'Impossible de mettre à jour.', variant: 'destructive' });
+        }
+      };
 
       const handleShare = async () => {
         const shareData = {
@@ -72,6 +138,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
             </div>
              <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
                 <FavoriteButton contentType="annonce" contentId={annonce.id} />
+                <Button variant="outline" size="sm" onClick={handleToggleInterest} disabled={interestLoading} className="bg-white/80 backdrop-blur-sm">
+                  {interested ? 'Je ne suis plus intéressé(e)' : 'Je suis intéressé(e)'}{!interestLoading ? ` (${interestCount})` : ''}
+                </Button>
                 {(isOwner || isAdmin) && (
                   <Button
                     variant="ghost"
@@ -389,6 +458,8 @@ const Annonces = () => {
           onBack={() => setSelectedAnnonce(null)} 
           onDelete={handleDelete}
           onEdit={handleEdit}
+          apiPrefix={API_PREFIX}
+          session={session}
         />
       )}
     </AnimatePresence>
