@@ -45,82 +45,6 @@ import React, { useState, useEffect, useCallback } from 'react';
         });
       };
 
-      useEffect(() => {
-        let mounted = true;
-        (async () => {
-          try {
-            if (!user || !apiPrefix) { setInterestLoading(false); return; }
-            const token = session?.access_token;
-            if (token) {
-              const res = await fetch(`${apiPrefix}/evenements/${encodeURIComponent(String(event.id))}/interest/status`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              const data = await res.json().catch(() => ({}));
-              if (mounted && res.ok) {
-                setInterested(!!data?.interested);
-                setInterestCount(Number(data?.interests_count || 0));
-              } else if (mounted) {
-                const { data: row } = await supabase
-                  .from('evenements_interests')
-                  .select('id')
-                  .eq('event_id', event.id)
-                  .eq('user_id', user.id)
-                  .maybeSingle();
-                setInterested(!!row);
-                const { count } = await supabase
-                  .from('evenements_interests')
-                  .select('id', { count: 'exact', head: true })
-                  .eq('event_id', event.id);
-                setInterestCount(Number(count || 0));
-              }
-            } else {
-              setInterestLoading(false);
-            }
-          } catch {}
-          if (mounted) setInterestLoading(false);
-        })();
-        return () => { mounted = false };
-      }, [user, session, apiPrefix, event?.id]);
-
-      const toggleDirect = async () => {
-        try {
-          const { data: row } = await supabase
-            .from('evenements_interests')
-            .select('id')
-            .eq('event_id', event.id)
-            .eq('user_id', user.id)
-            .maybeSingle();
-          if (row) {
-            await supabase.from('evenements_interests').delete().eq('id', row.id);
-            setInterested(false);
-          } else {
-            await supabase.from('evenements_interests').insert({ event_id: event.id, user_id: user.id });
-            setInterested(true);
-          }
-          const { count } = await supabase
-            .from('evenements_interests')
-            .select('id', { count: 'exact', head: true })
-            .eq('event_id', event.id);
-          setInterestCount(Number(count || 0));
-        } catch (err) {
-          toast({ title: 'Erreur', description: err?.message || 'Action impossible.', variant: 'destructive' });
-        }
-      };
-
-      const handleToggleInterest = async (e) => {
-        e.stopPropagation();
-        try {
-          if (!user) { toast({ title: 'Connexion requise', description: 'Connectez-vous pour indiquer votre intérêt.', variant: 'destructive' }); return; }
-          const token = session?.access_token;
-          if (!token) { await toggleDirect(); return; }
-          const res = await fetch(`${apiPrefix}/evenements/${encodeURIComponent(String(event.id))}/interest`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) { await toggleDirect(); } else { setInterested(!!data?.interested); setInterestCount(Number(data?.interests_count || 0)); }
-        } catch (err) {
-          toast({ title: 'Erreur', description: err?.message || 'Action impossible.', variant: 'destructive' });
-        }
-      };
-
       return (
         <button
           onClick={handleOpenMaps}
@@ -379,6 +303,80 @@ import React, { useState, useEffect, useCallback } from 'react';
       const [interestLoading, setInterestLoading] = useState(true);
       const [interested, setInterested] = useState(false);
       const [interestCount, setInterestCount] = useState(0);
+      useEffect(() => {
+        let mounted = true;
+        (async () => {
+          try {
+            if (!user || !apiPrefix) { setInterestLoading(false); return; }
+            const token = session?.access_token;
+            if (token) {
+              const res = await fetch(`${apiPrefix}/evenements/${encodeURIComponent(String(event.id))}/interest/status`, { headers: { Authorization: `Bearer ${token}` } });
+              const data = await res.json().catch(() => ({}));
+              if (mounted && res.ok) {
+                setInterested(!!data?.interested);
+                setInterestCount(Number(data?.interests_count || 0));
+              } else if (mounted) {
+                const { data: row } = await supabase
+                  .from('evenements_interests')
+                  .select('id')
+                  .eq('event_id', event.id)
+                  .eq('user_id', user.id)
+                  .maybeSingle();
+                setInterested(!!row);
+                const { count } = await supabase
+                  .from('evenements_interests')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('event_id', event.id);
+                setInterestCount(Number(count || 0));
+              }
+            } else {
+              setInterestLoading(false);
+            }
+          } catch {}
+          if (mounted) setInterestLoading(false);
+        })();
+        return () => { mounted = false };
+      }, [user, session, apiPrefix, event?.id]);
+
+      const toggleDirect = async () => {
+        try {
+          const { data: row } = await supabase
+            .from('evenements_interests')
+            .select('id')
+            .eq('event_id', event.id)
+            .eq('user_id', user.id)
+            .maybeSingle();
+          if (row) {
+            await supabase.from('evenements_interests').delete().eq('id', row.id);
+            setInterested(false);
+          } else {
+            await supabase.from('evenements_interests').insert({ event_id: event.id, user_id: user.id });
+            setInterested(true);
+          }
+          const { count } = await supabase
+            .from('evenements_interests')
+            .select('id', { count: 'exact', head: true })
+            .eq('event_id', event.id);
+          setInterestCount(Number(count || 0));
+        } catch (err) {
+          toast({ title: 'Erreur', description: err?.message || 'Action impossible.', variant: 'destructive' });
+        }
+      };
+
+      const handleToggleInterest = async (e) => {
+        e.stopPropagation();
+        try {
+          if (!user) { toast({ title: 'Connexion requise', description: 'Connectez-vous pour indiquer votre intérêt.', variant: 'destructive' }); return; }
+          const token = session?.access_token;
+          if (!token) { await toggleDirect(); return; }
+          const res = await fetch(`${apiPrefix}/evenements/${encodeURIComponent(String(event.id))}/interest`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) { await toggleDirect(); } else { setInterested(!!data?.interested); setInterestCount(Number(data?.interests_count || 0)); }
+        } catch (err) {
+          try { await toggleDirect(); return; } catch (_e) {}
+          toast({ title: 'Erreur', description: err?.message || 'Action impossible.', variant: 'destructive' });
+        }
+      };
 
       const handleShare = async (e) => {
         e.stopPropagation();
