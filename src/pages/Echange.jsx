@@ -30,11 +30,31 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { uploadAudioFile, ensurePublicAudioUrl } from '@/utils/audioStorage';
 import { notifyDonationReceived, notifyMentions } from '@/services/supabaseNotifications';
 import { extractUniqueMentions } from '@/utils/mentions';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const normalizeAudioEntry = (entry) => {
   if (!entry || !entry.audio_url) return entry;
   return { ...entry, audio_url: ensurePublicAudioUrl(entry.audio_url) };
 };
+
+// Icône de badge minimaliste avec info au clic
+const BadgeIcon = ({ emoji, label }) => (
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <button
+        type="button"
+        className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 border border-gray-200 text-[11px]"
+        aria-label={label}
+        title={label}
+      >
+        <span>{emoji}</span>
+      </button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent sideOffset={4}>
+      <DropdownMenuItem disabled>{label}</DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+);
 
 const parseMentions = (text) => {
   if (!text) return '';
@@ -972,7 +992,7 @@ const CommentSection = ({ postId, highlightCommentId }) => {
 };
 
 
-const PostCard = ({ post, user, profile, onLike, onDelete, onWarn, showComments, onToggleComments, refreshBalance }) => {
+const PostCard = ({ post, user, profile, onLike, onDelete, onWarn, showComments, onToggleComments, refreshBalance, badgeMap }) => {
   const navigate = useNavigate();
   const { onlineUserIds } = useAuth();
   const isOnline = Boolean(post?.user_id && onlineUserIds instanceof Set && onlineUserIds.has(String(post.user_id)));
@@ -1054,8 +1074,34 @@ const PostCard = ({ post, user, profile, onLike, onDelete, onWarn, showComments,
           <div className="flex-1">
             <div className="flex justify-between items-start">
               <div>
-                <div className="font-semibold cursor-pointer hover:underline" onClick={() => navigate(`/profil/${post.user_id}`)}>
-                  {post.profiles?.username || 'Anonyme'}
+                <div className="flex items-center gap-1">
+                  <div className="font-semibold cursor-pointer hover:underline" onClick={() => navigate(`/profil/${post.user_id}`)}>
+                    {post.profiles?.username || 'Anonyme'}
+                  </div>
+                  <div className="ml-1 flex items-center gap-1">
+                    {(() => {
+                      const icons = [];
+                      try {
+                        const ms = post?.profiles?.member_since_date || post?.profiles?.created_at;
+                        if (ms) {
+                          const days = Math.floor((Date.now() - new Date(ms).getTime()) / 86400000);
+                          const showNew = days < 14 && post?.profiles?.is_new_member_badge_visible !== false;
+                          if (showNew) icons.push({ emoji: '👋🏾', name: 'Nouveau membre' });
+                        }
+                      } catch (_) {}
+                      const arr = (badgeMap?.[post.user_id] || []);
+                      return (
+                        <>
+                          {icons.map((b, i) => (
+                            <BadgeIcon key={`new-${i}`} emoji={b.emoji} label={b.name} />
+                          ))}
+                          {arr.map((b) => (
+                            <BadgeIcon key={b.code} emoji={b.icon} label={b.name} />
+                          ))}
+                        </>
+                      );
+                    })()}
+                  </div>
                 </div>
                 <div className="text-sm text-[#6B6B6B]">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: fr })}</div>
               </div>
@@ -1199,7 +1245,7 @@ const PostCard = ({ post, user, profile, onLike, onDelete, onWarn, showComments,
   )
 }
 
-const AudioPostCard = ({ post, user, profile, onDelete, onWarn }) => {
+const AudioPostCard = ({ post, user, profile, onDelete, onWarn, badgeMap }) => {
   const navigate = useNavigate();
   const { onlineUserIds } = useAuth();
   const isOnline = Boolean(post?.user_id && onlineUserIds instanceof Set && onlineUserIds.has(String(post.user_id)));
@@ -1226,8 +1272,26 @@ const AudioPostCard = ({ post, user, profile, onDelete, onWarn }) => {
           <div className="flex-1">
             <div className="flex justify-between items-start">
               <div>
-                <div className="font-semibold cursor-pointer hover:underline" onClick={() => navigate(`/profil/${post.user_id}`)}>
-                  {post.author?.username || 'Anonyme'}
+                <div className="flex items-center gap-1">
+                  <div className="font-semibold cursor-pointer hover:underline" onClick={() => navigate(`/profil/${post.user_id}`)}>
+                    {post.author?.username || 'Anonyme'}
+                  </div>
+                  <div className="ml-1 flex items-center gap-1">
+                    {(() => {
+                      const elems = [];
+                      try {
+                        const ms = post?.author?.member_since_date || post?.author?.created_at;
+                        if (ms) {
+                          const days = Math.floor((Date.now() - new Date(ms).getTime()) / 86400000);
+                          const showNew = days < 14 && post?.author?.is_new_member_badge_visible !== false;
+                          if (showNew) elems.push(<BadgeIcon key="new" emoji="👋🏾" label="Nouveau membre" />);
+                        }
+                      } catch (_) {}
+                      const list = badgeMap?.[String(post.user_id)] || [];
+                      list.forEach((b) => elems.push(<BadgeIcon key={b.code} emoji={b.icon} label={b.name} />));
+                      return elems;
+                    })()}
+                  </div>
                 </div>
                 <div className="text-sm text-[#6B6B6B]">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: fr })}</div>
               </div>
@@ -1326,6 +1390,7 @@ const AudioPostCard = ({ post, user, profile, onDelete, onWarn }) => {
 const Echange = () => {
   const { user, profile, session, refreshBalance } = useAuth();
   const [feedItems, setFeedItems] = useState([]);
+  const [badgeMap, setBadgeMap] = useState({});
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [openComments, setOpenComments] = useState({});
   const [searchParams] = useSearchParams();
@@ -1375,7 +1440,7 @@ const Echange = () => {
 
     const { data: postsData, error: postsError } = await supabase
       .from('posts')
-      .select('*, profiles(id, username, avatar_url)')
+      .select('*, profiles(id, username, avatar_url, member_since_date, is_new_member_badge_visible, created_at)')
       .order('created_at', { ascending: false });
 
     if (postsError) {
@@ -1385,7 +1450,7 @@ const Echange = () => {
 
     const { data: audioData, error: audioError } = await supabase
       .from('comments')
-      .select(`*, author:profiles (id, username, avatar_url)`)
+      .select(`*, author:profiles (id, username, avatar_url, member_since_date, is_new_member_badge_visible, created_at) `)
       .eq('content_type', 'echange')
       .order('created_at', { ascending: false });
 
@@ -1399,6 +1464,30 @@ const Echange = () => {
     ];
 
     combinedFeed.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    // Charger les badges des auteurs
+    try {
+      const ids = Array.from(new Set([
+        ...((postsData || []).map((p) => p.user_id).filter(Boolean)),
+        ...((audioData || []).map((a) => a.user_id).filter(Boolean)),
+      ].map(String)));
+
+      let byUser = {};
+      if (ids.length) {
+        const { data: ub } = await supabase
+          .from('user_badges')
+          .select('user_id, badges_communaute ( code, name, icon )')
+          .in('user_id', ids);
+        (ub || []).forEach((row) => {
+          const u = String(row.user_id);
+          const b = row?.badges_communaute;
+          if (!b?.code) return;
+          if (!byUser[u]) byUser[u] = [];
+          byUser[u].push({ code: b.code, name: b.name, icon: b.icon });
+        });
+      }
+      setBadgeMap(byUser);
+    } catch (_) {}
 
     setFeedItems(combinedFeed);
     setLoadingPosts(false);
@@ -1548,9 +1637,10 @@ const Echange = () => {
                       showComments={!!openComments[item.id]}
                       onToggleComments={() => handleToggleComments(item.id)}
                       refreshBalance={refreshBalance}
+                      badgeMap={badgeMap}
                     />
                   ) : (
-                    <AudioPostCard post={item} user={user} profile={profile} onDelete={handleDeleteAudioPost} onWarn={handleWarnUser} />
+                    <AudioPostCard post={item} user={user} profile={profile} onDelete={handleDeleteAudioPost} onWarn={handleWarnUser} badgeMap={badgeMap} />
                   )}
                 </motion.div>
               ))
@@ -1582,9 +1672,10 @@ const Echange = () => {
                       showComments={!!openComments[item.id]}
                       onToggleComments={() => handleToggleComments(item.id)}
                       refreshBalance={refreshBalance}
+                      badgeMap={badgeMap}
                     />
                   ) : (
-                    <AudioPostCard post={item} user={user} profile={profile} onDelete={handleDeleteAudioPost} onWarn={handleWarnUser} />
+                    <AudioPostCard post={item} user={user} profile={profile} onDelete={handleDeleteAudioPost} onWarn={handleWarnUser} badgeMap={badgeMap} />
                   )}
                 </motion.div>
               ))
