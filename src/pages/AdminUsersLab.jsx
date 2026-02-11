@@ -65,6 +65,9 @@ const AdminUsersLab = () => {
   const [limit, setLimit] = useState(20);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(null);
+  const [communityBadges, setCommunityBadges] = useState([]);
+  const [userBadgesMap, setUserBadgesMap] = useState({}); // { userId: [{ badge_id, code, name, icon }] }
+  const [selectedBadgeByUser, setSelectedBadgeByUser] = useState({}); // { userId: badgeId }
 
   const canPrev = offset > 0;
   const canNext = total == null ? items.length === limit : offset + limit < total;
@@ -111,6 +114,39 @@ const AdminUsersLab = () => {
       );
       setTotal(typeof data?.total === 'number' ? data.total : null);
       if (typeof opts.offset === 'number') setOffset(opts.offset);
+
+      // Charger la liste des badges communauté (une seule fois)
+      try {
+        if (!communityBadges || communityBadges.length === 0) {
+          const { data: allBadges } = await supabase
+            .from('badges_communaute')
+            .select('id, code, name, icon')
+            .order('name', { ascending: true });
+          setCommunityBadges(Array.isArray(allBadges) ? allBadges : []);
+        }
+      } catch (_) {}
+
+      // Charger les badges des utilisateurs affichés
+      try {
+        const ids = rows.map((r) => r.id).filter(Boolean);
+        if (ids.length) {
+          const { data: ub } = await supabase
+            .from('user_badges')
+            .select('user_id, badge_id, badges_communaute ( id, code, name, icon )')
+            .in('user_id', ids);
+          const map = {};
+          (ub || []).forEach((row) => {
+            const u = String(row.user_id);
+            const b = row?.badges_communaute;
+            if (!b?.id) return;
+            if (!map[u]) map[u] = [];
+            map[u].push({ badge_id: b.id, code: b.code, name: b.name, icon: b.icon });
+          });
+          setUserBadgesMap(map);
+        } else {
+          setUserBadgesMap({});
+        }
+      } catch (_) {}
     } catch (e) {
       toast({ title: 'Erreur', description: e?.message || 'Erreur interne', variant: 'destructive' });
       setItems([]);
@@ -193,6 +229,54 @@ const AdminUsersLab = () => {
     if (typeof total === 'number') return `${total} utilisateur(s)`;
     return `${items.length} utilisateur(s)`;
   }, [total, items.length]);
+
+  const allowedBadgeCodes = useMemo(() => ['accueillant', 'guide', 'contributor', 'pilier'], []);
+
+  const refreshUserBadges = async (userId) => {
+    try {
+      const { data: ub } = await supabase
+        .from('user_badges')
+        .select('user_id, badge_id, badges_communaute ( id, code, name, icon )')
+        .eq('user_id', userId);
+      const list = (ub || []).map((row) => ({
+        badge_id: row?.badges_communaute?.id,
+        code: row?.badges_communaute?.code,
+        name: row?.badges_communaute?.name,
+        icon: row?.badges_communaute?.icon,
+      })).filter((v) => v.badge_id);
+      setUserBadgesMap((prev) => ({ ...prev, [String(userId)]: list }));
+    } catch (_) {}
+  };
+
+  const handleAddBadge = async (targetUserId, badgeId) => {
+    try {
+      if (!badgeId) return;
+      const bid = Number(badgeId);
+      const { error } = await supabase
+        .from('user_badges')
+        .insert({ user_id: targetUserId, badge_id: bid, awarded_by: user.id });
+      if (error) throw error;
+      toast({ title: 'Ajouté', description: 'Badge attribué.' });
+      await refreshUserBadges(targetUserId);
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || "Impossible d'attribuer le badge.", variant: 'destructive' });
+    }
+  };
+
+  const handleRemoveBadge = async (targetUserId, badgeId) => {
+    try {
+      const bid = Number(badgeId);
+      const { error } = await supabase
+        .from('user_badges')
+        .delete()
+        .match({ user_id: targetUserId, badge_id: bid });
+      if (error) throw error;
+      toast({ title: 'Retiré', description: 'Badge retiré.' });
+      await refreshUserBadges(targetUserId);
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || "Impossible de retirer le badge.", variant: 'destructive' });
+    }
+  };
 
   const getStatusLabel = (row) => {
     const visible = row?.show_online_status !== false;
@@ -371,6 +455,53 @@ const AdminUsersLab = () => {
                             ))}
                           </SelectContent>
                         </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="text-xs text-gray-600">Badges communauté</div>
+                      <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                        <Select
+                          value={String(selectedBadgeByUser[row.id] || '')}
+                          onValueChange={(v) => setSelectedBadgeByUser((prev) => ({ ...prev, [row.id]: v }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner un badge" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {communityBadges
+                              .filter((b) => allowedBadgeCodes.includes(String(b.code || '').toLowerCase()))
+                              .map((b) => (
+                                <SelectItem key={b.id} value={String(b.id)}>
+                                  {b.icon ? `${b.icon} ` : ''}{b.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={!selectedBadgeByUser[row.id]}
+                          onClick={() => handleAddBadge(row.id, selectedBadgeByUser[row.id])}
+                        >
+                          Attribuer
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {(userBadgesMap[String(row.id)] || []).map((b) => (
+                          <span key={b.badge_id} className="inline-flex items-center gap-1 text-xs bg-gray-100 rounded-full px-2 py-1">
+                            <span>{b.icon}</span>
+                            <span>{b.name}</span>
+                            <button
+                              type="button"
+                              className="ml-1 text-red-500 hover:text-red-600"
+                              title="Retirer"
+                              onClick={() => handleRemoveBadge(row.id, b.badge_id)}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
                       </div>
                     </div>
 

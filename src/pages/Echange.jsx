@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, MessageCircle, Share2, Send, Loader2, Trash2, Image as ImageIcon, X, Coins, Mic, Square, Play, Pause } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Send, Loader2, Trash2, Image as ImageIcon, X, Coins, Mic, Square, Play, Pause, HelpingHand } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
@@ -416,6 +416,74 @@ const CommentAvatar = ({ avatarPath, username, userId }) => {
         <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-white" />
       )}
     </div>
+  );
+};
+
+// Bouton "a aidé" générique pour commentaires (ou autre contenu)
+const HelpVoteButton = ({ contentId, contentType = 'comment' }) => {
+  const { user } = useAuth();
+  const [count, setCount] = useState(0);
+  const [voted, setVoted] = useState(false);
+
+  const refresh = useCallback(async () => {
+    try {
+      const { count: c } = await supabase
+        .from('helper_votes')
+        .select('id', { count: 'exact', head: true })
+        .eq('content_type', contentType)
+        .eq('content_id', contentId);
+      setCount(c || 0);
+      if (user) {
+        const { data: hv } = await supabase
+          .from('helper_votes')
+          .select('id')
+          .eq('content_type', contentType)
+          .eq('content_id', contentId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        setVoted(!!hv);
+      } else {
+        setVoted(false);
+      }
+    } catch (_) {}
+  }, [contentId, contentType, user]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const toggle = async () => {
+    if (!user) {
+      toast({ title: 'Connectez-vous pour voter "a aidé".', variant: 'destructive' });
+      return;
+    }
+    try {
+      if (voted) {
+        await supabase
+          .from('helper_votes')
+          .delete()
+          .match({ user_id: user.id, content_id: contentId, content_type: contentType });
+        setVoted(false);
+        setCount((c) => Math.max(0, c - 1));
+      } else {
+        await supabase
+          .from('helper_votes')
+          .insert({ user_id: user.id, content_id: contentId, content_type: contentType });
+        setVoted(true);
+        setCount((c) => c + 1);
+      }
+    } catch (e) {
+      toast({ title: 'Erreur', description: e?.message || 'Action impossible', variant: 'destructive' });
+    }
+  };
+
+  return (
+    <button
+      className={`flex items-center gap-1 text-xs hover:text-[#2BA84A] transition-colors ${voted ? 'text-[#2BA84A]' : ''}`}
+      onClick={toggle}
+      type="button"
+    >
+      <HelpingHand className={`h-4 w-4 ${voted ? 'fill-current' : ''}`} />
+      <span>{count || 0}</span>
+    </button>
   );
 };
 
@@ -902,6 +970,9 @@ const CommentSection = ({ postId, highlightCommentId }) => {
                     <p className="text-sm font-semibold cursor-pointer" onClick={() => navigate(`/profil/${comment.author?.id}`)}>{comment.author?.username}</p>
                     {comment.type === 'audio' ? <AudioPlayer src={comment.audio_url} initialDuration={comment.audio_duration} /> : <p className="text-sm text-gray-700">{parseMentions(comment.content)}</p>}
                     {comment.media_url && <CommentMedia url={comment.media_url} type={comment.media_type} />}
+                    <div className="mt-1">
+                      <HelpVoteButton contentId={comment.id} contentType="comment" />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1211,6 +1282,7 @@ const PostCard = ({ post, user, profile, onLike, onDelete, onWarn, showComments,
             <Heart className={`h-5 w-5 ${isLiked ? 'fill-current' : ''}`} />
             <span>{post.likes_count || 0}</span>
           </button>
+          <HelpVoteButton contentId={post.id} contentType="post" />
           <button className="flex items-center gap-2 hover:text-[#2BA84A] transition-colors" onClick={onToggleComments}>
             <MessageCircle className="h-5 w-5" />
             <span>{post.comments_count || 0}</span>
