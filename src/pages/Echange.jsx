@@ -175,64 +175,6 @@ const DonationDialog = ({ post, user, profile, refreshBalance, children }) => {
     }
   };
 
-  const handleCommentChange = (e) => {
-    const value = e.target.value;
-    setNewComment(value);
-    const caret = e.target.selectionStart || value.length;
-    const before = value.slice(0, caret);
-    const m = before.match(/(?:^|\s)@([A-Za-z0-9][A-Za-z0-9._-]{0,30})$/);
-    if (m) {
-      setMentionQuery(m[1]);
-      setShowSuggestions(true);
-    } else {
-      setShowSuggestions(false);
-      setMentionQuery('');
-    }
-  };
-
-  const handleCommentKeyDown = (e) => {
-    if (e.key === 'Enter' && showSuggestions && suggestions.length > 0) {
-      e.preventDefault();
-      handleMentionSelect(suggestions[0]);
-    }
-  };
-
-  useEffect(() => {
-    const fetchUsers = async () => {
-      if (!showSuggestions || !mentionQuery) return;
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, username, avatar_url')
-        .ilike('username', `${mentionQuery}%`)
-        .limit(5);
-      if (!error) setSuggestions(data || []);
-    };
-    const t = setTimeout(fetchUsers, 300);
-    return () => clearTimeout(t);
-  }, [mentionQuery, showSuggestions]);
-
-  const handleMentionSelect = (userItem) => {
-    const value = newComment || '';
-    const input = inputRef.current;
-    const caret = input && typeof input.selectionStart === 'number' ? input.selectionStart : value.length;
-    const before = value.slice(0, caret);
-    const after = value.slice(caret);
-    const atIndex = before.lastIndexOf('@');
-    if (atIndex === -1) return;
-    if (atIndex > 0 && !/\s/.test(before[atIndex - 1])) return;
-    const prefix = before.slice(0, atIndex);
-    const inserted = `@${userItem.username}`;
-    const nextValue = `${prefix}${inserted}${after.startsWith(' ') || after === '' ? '' : ' '}${after}`;
-    setNewComment(nextValue);
-    setShowSuggestions(false);
-    setMentionQuery('');
-    if (input) {
-      const nextPos = (prefix + inserted).length + (after.startsWith(' ') || after === '' ? 0 : 1);
-      setTimeout(() => {
-        try { input.focus(); input.setSelectionRange(nextPos, nextPos); } catch (_) {}
-      }, 0);
-    }
-  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -1065,6 +1007,7 @@ const CommentSection = ({ postId, highlightCommentId }) => {
 
 const PostCard = ({ post, user, profile, onLike, onDelete, onWarn, showComments, onToggleComments, refreshBalance, badgeMap }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { onlineUserIds } = useAuth();
   const isOnline = Boolean(post?.user_id && onlineUserIds instanceof Set && onlineUserIds.has(String(post.user_id)));
   const [isLiked, setIsLiked] = useState(false);
