@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, MessageCircle, Share2, Send, Loader2, Trash2, Image as ImageIcon, X, Coins, Mic, Square, Play, Pause, HelpingHand } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Send, Loader2, Trash2, Image as ImageIcon, X, Coins, Mic, Square, Play, Pause, HandHelping } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
@@ -481,7 +481,7 @@ const HelpVoteButton = ({ contentId, contentType = 'comment' }) => {
       onClick={toggle}
       type="button"
     >
-      <HelpingHand className={`h-4 w-4 ${voted ? 'fill-current' : ''}`} />
+      <HandHelping className={`h-4 w-4 ${voted ? 'fill-current' : ''}`} />
       <span>{count || 0}</span>
     </button>
   );
