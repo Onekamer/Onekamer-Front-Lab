@@ -1467,7 +1467,8 @@ const Echange = () => {
   const [openComments, setOpenComments] = useState({});
   const [searchParams] = useSearchParams();
 
-  const API_PREFIX = import.meta.env.VITE_API_URL || '/api';
+  const serverLabUrl = (import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com').replace(/\/$/, '');
+  const API_PREFIX = `${serverLabUrl}/api`;
 
   const handleWarnUser = async ({ targetUserId, contentType, contentId, reason, message }) => {
     try {
@@ -1509,10 +1510,29 @@ const Echange = () => {
 
   const fetchFeed = useCallback(async () => {
     setLoadingPosts(true);
+    try {
+      const token = session?.access_token;
+      if (token) {
+        const res = await fetch(`${API_PREFIX}/echange/feed`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          if (payload?.items) {
+            setBadgeMap(payload.badgeMap || {});
+            setFeedItems((payload.items || []).map(normalizeAudioEntry));
+            setLoadingPosts(false);
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Echange] fallback to Supabase:', e?.message || e);
+    }
 
     const { data: postsData, error: postsError } = await supabase
       .from('posts')
-      .select('*, profiles(id, username, avatar_url, member_since_date, is_new_member_badge_visible, created_at)')
+      .select('*, profiles(id, username, avatar_url, created_at)')
       .order('created_at', { ascending: false });
 
     if (postsError) {
@@ -1522,7 +1542,7 @@ const Echange = () => {
 
     const { data: audioData, error: audioError } = await supabase
       .from('comments')
-      .select(`*, author:profiles (id, username, avatar_url, member_since_date, is_new_member_badge_visible, created_at) `)
+      .select(`*, author:profiles (id, username, avatar_url, created_at) `)
       .eq('content_type', 'echange')
       .order('created_at', { ascending: false });
 
