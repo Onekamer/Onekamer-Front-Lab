@@ -101,6 +101,27 @@ const AppContent = () => {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
+  const { switchToAccount } = useAuth();
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      const switchTo = url.searchParams.get('switch_to');
+      const redirect = url.searchParams.get('redirect');
+      if (switchTo) {
+        switchToAccount(String(switchTo)).then(() => {
+          try {
+            if (redirect) window.location.replace(redirect);
+            else {
+              url.searchParams.delete('switch_to');
+              url.searchParams.delete('redirect');
+              window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+            }
+          } catch {}
+        });
+      }
+    } catch {}
+  }, [location.search, switchToAccount]);
+
   return (
     <>
       {!isPublic ? <Header deferredPrompt={deferredPrompt} /> : <PublicHeader />}

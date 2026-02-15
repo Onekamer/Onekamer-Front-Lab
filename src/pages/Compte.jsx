@@ -11,9 +11,10 @@ import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/customSupabaseClient';
 import MediaDisplay from '@/components/MediaDisplay';
 import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
 
 const Compte = () => {
-  const { user, session, profile, signOut, balance, loading, refreshProfile } = useAuth();
+  const { user, session, profile, signOut, balance, loading, refreshProfile, linkedAccounts, linkExistingAccount, unlinkAccount, switchToAccount, createEnterpriseAccount } = useAuth();
   const navigate = useNavigate();
   const [adminSubject, setAdminSubject] = useState('');
   const [adminMessage, setAdminMessage] = useState('');
@@ -27,6 +28,13 @@ const Compte = () => {
   const [inviteStats, setInviteStats] = useState(null);
   const [inviteRecent, setInviteRecent] = useState([]);
   const [invitePeriod, setInvitePeriod] = useState('30d');
+  const [linkEmail, setLinkEmail] = useState('');
+  const [linkPassword, setLinkPassword] = useState('');
+  const [createEmail, setCreateEmail] = useState('');
+  const [createPassword, setCreatePassword] = useState('');
+  const [createUsername, setCreateUsername] = useState('');
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
 
   useEffect(() => {
     setOnlineVisible(profile?.show_online_status !== false);
@@ -230,6 +238,93 @@ const Compte = () => {
             <MenuItem onClick={() => navigate('/compte/confidentialite')} title="Confidentialité" />
             <MenuItem onClick={() => navigate('/compte/mon-qrcode')} title="Mon QR Code" />
             <MenuItem onClick={() => navigate('/forfaits')} title="Changer de forfait" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Comptes liés</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="text-sm text-gray-600">Compte actuel</div>
+              <div className="flex items-center gap-3">
+                <Avatar className="w-8 h-8">
+                  {profile.avatar_url ? (
+                    <MediaDisplay bucket="avatars" path={profile.avatar_url} alt={profile.username} className="rounded-full w-full h-full object-cover" />
+                  ) : (
+                    <AvatarFallback className="bg-gray-200">{profile.username?.charAt(0).toUpperCase()}</AvatarFallback>
+                  )}
+                </Avatar>
+                <div className="text-sm">
+                  <div className="font-medium">{profile.username}</div>
+                  <div className="text-gray-500">{user.email}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-sm text-gray-600">Autres comptes</div>
+              <div className="space-y-2">
+                {(linkedAccounts || []).length === 0 ? (
+                  <div className="text-gray-500 text-sm">Aucun compte lié.</div>
+                ) : (
+                  (linkedAccounts || []).map((acc) => (
+                    <div key={acc.userId} className="flex items-center justify-between gap-3 border rounded-md p-2">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="w-8 h-8">
+                          {acc.avatar_url ? (
+                            <MediaDisplay bucket="avatars" path={acc.avatar_url} alt={acc.username || acc.email} className="rounded-full w-full h-full object-cover" />
+                          ) : (
+                            <AvatarFallback className="bg-gray-200">{(acc.username || acc.email || '?').charAt(0).toUpperCase()}</AvatarFallback>
+                          )}
+                        </Avatar>
+                        <div className="text-sm">
+                          <div className="font-medium">{acc.username || 'Compte'}</div>
+                          <div className="text-gray-500">{acc.email}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button type="button" variant="outline" onClick={() => switchToAccount(acc.userId)}>Basculer</Button>
+                        <Button type="button" variant="destructive" onClick={() => unlinkAccount(acc.userId)}>Retirer</Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="font-medium">Lier un compte existant</div>
+                <Input type="email" placeholder="Email" value={linkEmail} onChange={(e) => setLinkEmail(e.target.value)} />
+                <Input type="password" placeholder="Mot de passe" value={linkPassword} onChange={(e) => setLinkPassword(e.target.value)} />
+                <Button type="button" className="w-full sm:w-auto" disabled={linkLoading || !linkEmail || !linkPassword} onClick={async () => {
+                  try {
+                    setLinkLoading(true);
+                    const { error } = await linkExistingAccount(linkEmail, linkPassword);
+                    if (!error) { setLinkEmail(''); setLinkPassword(''); }
+                  } finally {
+                    setLinkLoading(false);
+                  }
+                }}>Ajouter un compte</Button>
+              </div>
+              <div className="space-y-2">
+                <div className="font-medium">Créer un compte entreprise</div>
+                <Input type="text" placeholder="Nom d’affichage" value={createUsername} onChange={(e) => setCreateUsername(e.target.value)} />
+                <Input type="email" placeholder="Email" value={createEmail} onChange={(e) => setCreateEmail(e.target.value)} />
+                <Input type="password" placeholder="Mot de passe" value={createPassword} onChange={(e) => setCreatePassword(e.target.value)} />
+                <Button type="button" className="w-full sm:w-auto" disabled={createLoading || !createEmail || !createPassword} onClick={async () => {
+                  try {
+                    setCreateLoading(true);
+                    await createEnterpriseAccount({ email: createEmail, password: createPassword, username: createUsername });
+                    setCreateEmail(''); setCreatePassword(''); setCreateUsername('');
+                  } finally {
+                    setCreateLoading(false);
+                  }
+                }}>Créer et lier</Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

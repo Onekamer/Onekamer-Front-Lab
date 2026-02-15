@@ -57,3 +57,42 @@ self.addEventListener('activate', (event) => {
     }).then(() => self.clients.claim())
   );
 });
+
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  let payload = {};
+  try { payload = event.data.json(); } catch { return; }
+  const title = payload.title || payload.data?.title || 'OneKamer';
+  const body = payload.body || payload.data?.message || '';
+  const icon = payload.icon || payload.data?.icon || '/ok_logo.png';
+  const url = payload.url || payload.data?.url || '/';
+  const options = { body, icon, data: { url, userId: payload?.data?.userId } };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification?.data?.url || '/';
+  const targetUserId = event.notification?.data?.userId || null;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      const postSwitch = (client) => { try { client.postMessage({ type: 'ok_switch_to', userId: targetUserId, url }); } catch {} };
+      for (const client of clientList) {
+        if ('focus' in client) client.focus();
+        if (targetUserId) postSwitch(client);
+        if ('navigate' in client) client.navigate(url);
+        return true;
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
+      return false;
+    })
+  );
+});
+
+self.addEventListener('pushsubscriptionchange', () => {
+  self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+    for (const client of clientList) {
+      try { client.postMessage({ type: 'ok_push_subscription_changed' }); } catch {}
+    }
+  });
+});

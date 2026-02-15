@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useToast } from '@/components/ui/use-toast';
+import subscribeForPushMulti from '@/lib/push/subscribeForPush';
+import { loadLinkedAccounts, saveLinkedAccounts } from '@/lib/linkedAccounts';
+import { createEphemeralClient } from '@/lib/supabaseEphemeral';
 
 const AuthContext = createContext(undefined);
 
@@ -13,6 +16,11 @@ export const AuthProvider = ({ children }) => {
   const [balance, setBalance] = useState(null);
   const [permissions, setPermissions] = useState({});
   const [onlineUserIds, setOnlineUserIds] = useState(() => new Set());
+  const [linkedAccounts, setLinkedAccounts] = useState(() => []);
+
+  useEffect(() => {
+    setLinkedAccounts(loadLinkedAccounts());
+  }, []);
 
   const fetchProfile = useCallback(async (userId) => {
     if (!userId) return null;
@@ -152,6 +160,50 @@ export const AuthProvider = ({ children }) => {
     })();
   }, [session?.access_token]);
 
+  const allIds = useMemo(() => {
+    const ids = new Set();
+    if (user?.id) ids.add(user.id);
+    (linkedAccounts || []).forEach((a) => {
+      if (a?.userId) ids.add(String(a.userId));
+    });
+    return Array.from(ids);
+  }, [user?.id, linkedAccounts]);
+
+  useEffect(() => {
+    const provider = import.meta.env.VITE_NOTIFICATIONS_PROVIDER || 'onesignal';
+    if (provider !== 'supabase_light') return;
+    if (!allIds.length) return;
+    (async () => {
+      try {
+        await subscribeForPushMulti(allIds);
+      } catch {}
+    })();
+  }, [allIds]);
+
+  useEffect(() => {
+    const onMessage = (e) => {
+      try {
+        const msg = e?.data || {};
+        if (msg?.type === 'ok_push_subscription_changed') {
+          const ids = new Set();
+          if (user?.id) ids.add(user.id);
+          (linkedAccounts || []).forEach((a) => a?.userId && ids.add(String(a.userId)));
+          subscribeForPushMulti(Array.from(ids));
+        }
+        if (msg?.type === 'ok_switch_to' && msg?.userId) {
+          const url = msg?.url || '/';
+          switchToAccount(String(msg.userId)).then(() => {
+            try { window.location.href = url; } catch {}
+          });
+        }
+      } catch {}
+    };
+    if (navigator?.serviceWorker) navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => {
+      if (navigator?.serviceWorker) navigator.serviceWorker.removeEventListener('message', onMessage);
+    };
+  }, [user?.id, linkedAccounts]);
+
   const refreshBalance = useCallback(async () => {
     if (user) {
       const userBalance = await fetchBalance(user.id);
@@ -166,6 +218,120 @@ export const AuthProvider = ({ children }) => {
       await fetchAllPermissions(user.id);
     }
   }, [user, fetchProfile, fetchAllPermissions]);
+
+  const linkExistingAccount = useCallback(async (email, password) => {
+    try {
+      const eph = createEphemeralClient(false);
+      const { data, error } = await eph.auth.signInWithPassword({ email, password });
+      if (error) {
+        toast({ variant: 'destructive', title: 'Connexion échouée', description: error.message || 'Impossible de lier ce compte.' });
+        return { error };
+      }
+      const s = data?.session;
+      const u = data?.user;
+      if (!s || !u) {
+        toast({ variant: 'destructive', title: 'Erreur', description: 'Session indisponible.' });
+        return { error: 'no_session' };
+      }
+      let p = null;
+      try {
+        const { data: prof } = await eph.from('profiles').select('*').eq('id', u.id).single();
+        p = prof || null;
+      } catch {}
+      const acc = {
+        userId: u.id,
+        email: u.email,
+        username: p?.username || null,
+        avatar_url: p?.avatar_url || null,
+        access_token: s.access_token,
+        refresh_token: s.refresh_token,
+      };
+      setLinkedAccounts((prev) => {
+        const exists = prev.some((x) => String(x.userId) === String(acc.userId));
+        const next = exists ? prev.map((x) => (String(x.userId) === String(acc.userId) ? acc : x)) : [...prev, acc];
+        saveLinkedAccounts(next);
+        return next;
+      });
+      try { await eph.auth.signOut(); } catch {}
+      toast({ title: 'Compte lié', description: 'Le compte a été ajouté.' });
+      return { error: null };
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Erreur', description: e?.message || 'Impossible de lier ce compte.' });
+      return { error: e };
+    }
+  }, [toast]);
+
+  const unlinkAccount = useCallback(async (targetUserId) => {
+    setLinkedAccounts((prev) => {
+      const next = prev.filter((x) => String(x.userId) !== String(targetUserId));
+      saveLinkedAccounts(next);
+      return next;
+    });
+    toast({ title: 'Compte retiré', description: 'Ce compte ne sera plus lié à cet appareil.' });
+    return { error: null };
+  }, [toast]);
+
+  const switchToAccount = useCallback(async (targetUserId) => {
+    if (!targetUserId) return { error: 'missing_user_id' };
+    if (user?.id && String(user.id) === String(targetUserId)) return { error: null };
+    const acc = (linkedAccounts || []).find((a) => String(a.userId) === String(targetUserId));
+    if (!acc?.refresh_token) {
+      toast({ variant: 'destructive', title: 'Introuvable', description: 'Jeton manquant pour ce compte.' });
+      return { error: 'not_found' };
+    }
+    try {
+      const at = acc.access_token || '';
+      const rt = acc.refresh_token;
+      const { error } = await supabase.auth.setSession({ access_token: at, refresh_token: rt });
+      if (error) throw error;
+      return { error: null };
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Échec du switch', description: e?.message || 'Impossible de basculer.' });
+      return { error: e };
+    }
+  }, [linkedAccounts, user?.id, toast]);
+
+  const createEnterpriseAccount = useCallback(async ({ email, password, username }) => {
+    try {
+      const eph = createEphemeralClient(false);
+      const { data, error } = await eph.auth.signUp({ email, password, options: { data: { username, account_type: 'enterprise' } } });
+      if (error) {
+        toast({ variant: 'destructive', title: 'Création échouée', description: error.message || 'Impossible de créer.' });
+        return { error };
+      }
+      const hasSession = Boolean(data?.session?.refresh_token);
+      if (hasSession) {
+        const s = data.session;
+        const u = data.user;
+        let p = null;
+        try {
+          const { data: prof } = await eph.from('profiles').select('*').eq('id', u.id).single();
+          p = prof || null;
+        } catch {}
+        const acc = {
+          userId: u.id,
+          email: u.email,
+          username: p?.username || username || null,
+          avatar_url: p?.avatar_url || null,
+          access_token: s.access_token,
+          refresh_token: s.refresh_token,
+        };
+        setLinkedAccounts((prev) => {
+          const next = [...prev, acc];
+          saveLinkedAccounts(next);
+          return next;
+        });
+        toast({ title: 'Compte entreprise créé', description: 'Le compte a été lié.' });
+      } else {
+        toast({ title: 'Vérification requise', description: 'Vérifiez votre email puis liez le compte via “Ajouter un compte”.' });
+      }
+      try { await eph.auth.signOut(); } catch {}
+      return { error: null };
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Erreur', description: e?.message || 'Impossible de créer.' });
+      return { error: e };
+    }
+  }, [toast]);
 
   useEffect(() => {
     if (!user) return;
@@ -331,6 +497,11 @@ export const AuthProvider = ({ children }) => {
     refreshProfile,
     refreshBalance,
     checkFeaturePermission,
+    linkedAccounts,
+    linkExistingAccount,
+    unlinkAccount,
+    switchToAccount,
+    createEnterpriseAccount,
   }), [
     user,
     session,
@@ -346,6 +517,11 @@ export const AuthProvider = ({ children }) => {
     refreshProfile,
     refreshBalance,
     checkFeaturePermission,
+    linkedAccounts,
+    linkExistingAccount,
+    unlinkAccount,
+    switchToAccount,
+    createEnterpriseAccount,
   ]);
 
   return (
