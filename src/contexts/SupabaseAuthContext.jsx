@@ -252,7 +252,6 @@ export const AuthProvider = ({ children }) => {
         saveLinkedAccounts(next);
         return next;
       });
-      try { await eph.auth.signOut(); } catch {}
       toast({ title: 'Compte lié', description: 'Le compte a été ajouté.' });
       return { error: null };
     } catch (e) {
