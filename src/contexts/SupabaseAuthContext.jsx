@@ -273,22 +273,55 @@ export const AuthProvider = ({ children }) => {
   const switchToAccount = useCallback(async (targetUserId) => {
     if (!targetUserId) return { error: 'missing_user_id' };
     if (user?.id && String(user.id) === String(targetUserId)) return { error: null };
-    const acc = (linkedAccounts || []).find((a) => String(a.userId) === String(targetUserId));
-    if (!acc?.refresh_token) {
+
+    const target = (linkedAccounts || []).find((a) => String(a.userId) === String(targetUserId));
+    if (!target?.refresh_token) {
       toast({ variant: 'destructive', title: 'Introuvable', description: 'Jeton manquant pour ce compte.' });
       return { error: 'not_found' };
     }
+
+    // Capturer la session et le profil courants pour pouvoir revenir en arrière
+    let sourceAcc = null;
     try {
-      const at = acc.access_token || '';
-      const rt = acc.refresh_token;
+      const { data } = await supabase.auth.getSession();
+      const currentAccess = data?.session?.access_token || '';
+      const currentRefresh = data?.session?.refresh_token || '';
+      const currentUserId = user?.id || data?.session?.user?.id;
+      if (currentUserId && String(currentUserId) !== String(targetUserId) && currentRefresh) {
+        sourceAcc = {
+          userId: currentUserId,
+          email: user?.email || null,
+          username: profile?.username || null,
+          avatar_url: profile?.avatar_url || null,
+          access_token: currentAccess,
+          refresh_token: currentRefresh,
+        };
+      }
+    } catch {}
+
+    try {
+      const at = target.access_token || '';
+      const rt = target.refresh_token;
       const { error } = await supabase.auth.setSession({ access_token: at, refresh_token: rt });
       if (error) throw error;
+
+      // Mettre à jour la liste des comptes liés: retirer la cible (devenue courante), ajouter/mettre à jour la source
+      setLinkedAccounts((prev) => {
+        let next = prev.filter((x) => String(x.userId) !== String(targetUserId));
+        if (sourceAcc) {
+          const exists = next.some((x) => String(x.userId) === String(sourceAcc.userId));
+          next = exists ? next.map((x) => (String(x.userId) === String(sourceAcc.userId) ? sourceAcc : x)) : [...next, sourceAcc];
+        }
+        saveLinkedAccounts(next);
+        return next;
+      });
+
       return { error: null };
     } catch (e) {
       toast({ variant: 'destructive', title: 'Échec du switch', description: e?.message || 'Impossible de basculer.' });
       return { error: e };
     }
-  }, [linkedAccounts, user?.id, toast]);
+  }, [linkedAccounts, user?.id, user?.email, profile, toast]);
 
   useEffect(() => {
     if (!user) return;
