@@ -187,6 +187,7 @@ const AppContent = () => {
           <Route path="/messages" element={<Messages />} />
           <Route path="/profil/:userId" element={<UserProfile />} />
           <Route path="/auth" element={<AuthPage />} />
+          <Route path="/auth-entreprise" element={<AuthPage />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/auth-callback" element={<AuthCallback />} />
           <Route path="/merci-verification" element={<MerciVerification />} />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Helmet } from 'react-helmet';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/customSupabaseClient';
 
@@ -69,6 +69,7 @@ const AuthPage = () => {
   const { signIn, signUp } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
 
@@ -81,6 +82,18 @@ const AuthPage = () => {
 
   const serverLabUrl = (import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com').replace(/\/$/, '');
   const API_PREFIX = `${serverLabUrl}/api`;
+
+  const defaultTab = useMemo(() => {
+    try {
+      const pathname = String(location?.pathname || '');
+      const params = new URLSearchParams(String(location?.search || ''));
+      if (pathname.includes('/auth-entreprise')) return 'register';
+      const tab = params.get('tab');
+      if (tab === 'register') return 'register';
+      if (params.get('enterprise') === '1' || params.get('register') === '1') return 'register';
+    } catch {}
+    return 'login';
+  }, [location]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -146,7 +159,7 @@ const AuthPage = () => {
         />
       </Helmet>
       <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
-        <Tabs defaultValue="login" className="w-full max-w-md">
+        <Tabs defaultValue={defaultTab} className="w-full max-w-md">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Connexion</TabsTrigger>
             <TabsTrigger value="register">Inscription</TabsTrigger>

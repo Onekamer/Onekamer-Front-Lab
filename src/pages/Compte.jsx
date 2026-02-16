@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 
 const Compte = () => {
-  const { user, session, profile, signOut, balance, loading, refreshProfile, linkedAccounts, linkExistingAccount, unlinkAccount, switchToAccount, createEnterpriseAccount } = useAuth();
+  const { user, session, profile, signOut, balance, loading, refreshProfile, linkedAccounts, linkExistingAccount, unlinkAccount, switchToAccount } = useAuth();
   const navigate = useNavigate();
   const [adminSubject, setAdminSubject] = useState('');
   const [adminMessage, setAdminMessage] = useState('');
@@ -30,11 +30,9 @@ const Compte = () => {
   const [invitePeriod, setInvitePeriod] = useState('30d');
   const [linkEmail, setLinkEmail] = useState('');
   const [linkPassword, setLinkPassword] = useState('');
-  const [createEmail, setCreateEmail] = useState('');
-  const [createPassword, setCreatePassword] = useState('');
-  const [createUsername, setCreateUsername] = useState('');
+  
   const [linkLoading, setLinkLoading] = useState(false);
-  const [createLoading, setCreateLoading] = useState(false);
+  
 
   useEffect(() => {
     setOnlineVisible(profile?.show_online_status !== false);
@@ -308,21 +306,6 @@ const Compte = () => {
                     setLinkLoading(false);
                   }
                 }}>Ajouter un compte</Button>
-              </div>
-              <div className="space-y-2">
-                <div className="font-medium">Créer un compte entreprise</div>
-                <Input type="text" placeholder="Nom d’affichage" value={createUsername} onChange={(e) => setCreateUsername(e.target.value)} />
-                <Input type="email" placeholder="Email" value={createEmail} onChange={(e) => setCreateEmail(e.target.value)} />
-                <Input type="password" placeholder="Mot de passe" value={createPassword} onChange={(e) => setCreatePassword(e.target.value)} />
-                <Button type="button" className="w-full sm:w-auto" disabled={createLoading || !createEmail || !createPassword} onClick={async () => {
-                  try {
-                    setCreateLoading(true);
-                    await createEnterpriseAccount({ email: createEmail, password: createPassword, username: createUsername });
-                    setCreateEmail(''); setCreatePassword(''); setCreateUsername('');
-                  } finally {
-                    setCreateLoading(false);
-                  }
-                }}>Créer et lier</Button>
               </div>
             </div>
           </CardContent>

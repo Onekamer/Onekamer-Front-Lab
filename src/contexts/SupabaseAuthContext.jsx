@@ -291,48 +291,6 @@ export const AuthProvider = ({ children }) => {
     }
   }, [linkedAccounts, user?.id, toast]);
 
-  const createEnterpriseAccount = useCallback(async ({ email, password, username }) => {
-    try {
-      const eph = createEphemeralClient(false);
-      const { data, error } = await eph.auth.signUp({ email, password, options: { data: { username, account_type: 'enterprise' } } });
-      if (error) {
-        toast({ variant: 'destructive', title: 'Création échouée', description: error.message || 'Impossible de créer.' });
-        return { error };
-      }
-      const hasSession = Boolean(data?.session?.refresh_token);
-      if (hasSession) {
-        const s = data.session;
-        const u = data.user;
-        let p = null;
-        try {
-          const { data: prof } = await eph.from('profiles').select('*').eq('id', u.id).single();
-          p = prof || null;
-        } catch {}
-        const acc = {
-          userId: u.id,
-          email: u.email,
-          username: p?.username || username || null,
-          avatar_url: p?.avatar_url || null,
-          access_token: s.access_token,
-          refresh_token: s.refresh_token,
-        };
-        setLinkedAccounts((prev) => {
-          const next = [...prev, acc];
-          saveLinkedAccounts(next);
-          return next;
-        });
-        toast({ title: 'Compte entreprise créé', description: 'Le compte a été lié.' });
-      } else {
-        toast({ title: 'Vérification requise', description: 'Vérifiez votre email puis liez le compte via “Ajouter un compte”.' });
-      }
-      try { await eph.auth.signOut(); } catch {}
-      return { error: null };
-    } catch (e) {
-      toast({ variant: 'destructive', title: 'Erreur', description: e?.message || 'Impossible de créer.' });
-      return { error: e };
-    }
-  }, [toast]);
-
   useEffect(() => {
     if (!user) return;
     const balanceChannel = supabase
@@ -501,7 +459,6 @@ export const AuthProvider = ({ children }) => {
     linkExistingAccount,
     unlinkAccount,
     switchToAccount,
-    createEnterpriseAccount,
   }), [
     user,
     session,
@@ -521,7 +478,6 @@ export const AuthProvider = ({ children }) => {
     linkExistingAccount,
     unlinkAccount,
     switchToAccount,
-    createEnterpriseAccount,
   ]);
 
   return (
