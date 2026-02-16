@@ -45,6 +45,7 @@ import Notifications from '@/pages/compte/Notifications';
 import Confidentialite from '@/pages/compte/Confidentialite';
 import Favoris from '@/pages/compte/Favoris';
 import MonQRCode from '@/pages/compte/MonQRCode';
+import Trophees from '@/pages/compte/Trophees';
 import CreateAnnonce from '@/pages/publier/CreateAnnonce';
 import CreateEvenement from '@/pages/publier/CreateEvenement';
 import ProposerPartenaire from '@/pages/publier/ProposerPartenaire';
@@ -178,6 +179,7 @@ const AppContent = () => {
           <Route path="/compte/confidentialite" element={<Confidentialite />} />
           <Route path="/compte/favoris" element={<Favoris />} />
           <Route path="/compte/mon-qrcode" element={<MonQRCode />} />
+          <Route path="/compte/trophees" element={<Trophees />} />
           <Route path="/scan" element={<Scan />} />
           <Route path="/publier" element={<Publier />} />
           <Route path="/publier/annonce" element={<CreateAnnonce />} />

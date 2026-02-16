@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { LogOut, ChevronRight, Coins, ShieldCheck, Loader2 } from 'lucide-react';
+import { LogOut, ChevronRight, Coins, ShieldCheck, Loader2, Trophy } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/customSupabaseClient';
 import MediaDisplay from '@/components/MediaDisplay';
@@ -32,6 +32,9 @@ const Compte = () => {
   const [linkPassword, setLinkPassword] = useState('');
   
   const [linkLoading, setLinkLoading] = useState(false);
+  const [trophiesLoading, setTrophiesLoading] = useState(false);
+  const [trophiesTotal, setTrophiesTotal] = useState(3);
+  const [trophiesUnlocked, setTrophiesUnlocked] = useState(0);
   
 
   useEffect(() => {
@@ -110,6 +113,33 @@ const Compte = () => {
     run();
   }, [session?.access_token, API_PREFIX, invitePeriod]);
 
+  // Charger le résumé des trophées (X/3)
+  useEffect(() => {
+    let mounted = true;
+    const loadTrophies = async () => {
+      if (!session?.access_token) return;
+      setTrophiesLoading(true);
+      try {
+        const res = await fetch(`${API_PREFIX}/trophies/my`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!mounted) return;
+        const items = Array.isArray(data?.items) ? data.items : [];
+        setTrophiesTotal(items.length || 3);
+        setTrophiesUnlocked(items.filter((it) => it.unlocked).length);
+      } catch {
+        if (!mounted) return;
+        setTrophiesTotal(3);
+        setTrophiesUnlocked(0);
+      } finally {
+        if (mounted) setTrophiesLoading(false);
+      }
+    };
+    loadTrophies();
+    return () => { mounted = false; };
+  }, [session?.access_token, API_PREFIX]);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-full">
@@ -172,6 +202,16 @@ const Compte = () => {
             <div className="bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
               <ShieldCheck className="w-3 h-3"/> {profile.plan || 'Free'}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-pointer" onClick={() => navigate('/compte/trophees')}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Trophy className="w-5 h-5 text-yellow-500"/> Mes trophées</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm text-gray-700">{trophiesLoading ? 'Chargement...' : `${trophiesUnlocked}/${trophiesTotal}`} débloqués</div>
+            <div className="text-xs text-gray-500 mt-1">Touchez pour voir le détail</div>
           </CardContent>
         </Card>
 
