@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Lock } from 'lucide-react';
+import { CheckCircle, Lock, Info } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 
 export default function Trophees() {
   const { session } = useAuth();
@@ -14,6 +15,52 @@ export default function Trophees() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const getStepsForKey = (key) => {
+    const k = String(key || '').toLowerCase();
+    switch (k) {
+      case 'profile_complete':
+        return [
+          "Ajouter une photo de profil",
+          "Renseigner une bio",
+          "Avoir un pseudo (username)",
+        ];
+      case 'first_post':
+        return [
+          "Publier au moins un contenu",
+          "Annonce, Événement ou Fait Divers comptent",
+        ];
+      case 'first_referral':
+        return [
+          "Récupérer votre lien d'invitation depuis Mon Compte",
+          "Un contact s'inscrit via ce lien",
+        ];
+      case 'first_comment':
+        return [
+          "Publier votre premier commentaire",
+        ];
+      case 'first_mention':
+        return [
+          "Écrire un commentaire avec une mention",
+          "Utiliser @pseudo dans votre message",
+        ];
+      case 'first_group':
+        return [
+          "Créer un premier groupe",
+          "Ajouter au moins 2 autres membres",
+        ];
+      case 'first_annonce':
+        return [
+          "Publier votre première annonce",
+        ];
+      case 'first_event':
+        return [
+          "Créer/organiser votre premier événement",
+        ];
+      default:
+        return ["Gagner ce trophée en réalisant l'action associée."]; 
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -77,7 +124,32 @@ export default function Trophees() {
             {(items || []).map((t) => (
               <Card key={t.key}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-lg font-semibold">{t.name}</CardTitle>
+                  <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                    {t.name}
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <button type="button" aria-label="Infos" className="text-gray-500 hover:text-gray-700">
+                          <Info className="w-4 h-4" />
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>{t.name}</DialogTitle>
+                          <DialogDescription>
+                            <div className="mt-2 text-gray-700 text-sm">{t.description}</div>
+                            <div className="mt-4">
+                              <div className="font-semibold text-sm mb-2">Comment l'obtenir</div>
+                              <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+                                {getStepsForKey(t.key).map((s, idx) => (
+                                  <li key={idx}>{s}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </DialogDescription>
+                        </DialogHeader>
+                      </DialogContent>
+                    </Dialog>
+                  </CardTitle>
                   {t.unlocked ? (
                     <span className="inline-flex items-center gap-1 text-green-700 bg-green-100 text-xs px-2 py-0.5 rounded-full">
                       <CheckCircle className="w-3 h-3" /> Débloqué

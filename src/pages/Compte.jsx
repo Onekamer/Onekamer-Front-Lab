@@ -191,6 +191,27 @@ const Compte = () => {
           <p className="text-center text-gray-600 max-w-md">{profile.bio || "Aucune biographie pour le moment."}</p>
         </div>
 
+        <div className="grid grid-cols-2 gap-4">
+          <Card className="text-center">
+            <CardHeader>
+              <CardTitle className="text-lg">Forfait</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-[#2BA84A] capitalize">{profile.plan || 'Free'}</p>
+            </CardContent>
+          </Card>
+          <Card className="text-center cursor-pointer" onClick={() => navigate('/ok-coins')}>
+            <CardHeader>
+              <CardTitle className="text-lg">OK Coins</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-[#F5C300] flex items-center justify-center gap-2">
+                <Coins className="w-6 h-6"/> {balance ? balance.coins_balance.toLocaleString() : 0}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle>Mes Badges</CardTitle>
@@ -214,27 +235,6 @@ const Compte = () => {
             <div className="text-xs text-gray-500 mt-1">Touchez pour voir le détail</div>
           </CardContent>
         </Card>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Card className="text-center">
-            <CardHeader>
-              <CardTitle className="text-lg">Forfait</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-[#2BA84A] capitalize">{profile.plan || 'Free'}</p>
-            </CardContent>
-          </Card>
-          <Card className="text-center cursor-pointer" onClick={() => navigate('/ok-coins')}>
-            <CardHeader>
-              <CardTitle className="text-lg">OK Coins</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-[#F5C300] flex items-center justify-center gap-2">
-                <Coins className="w-6 h-6"/> {balance ? balance.coins_balance.toLocaleString() : 0}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
 
         <Card>
           <CardHeader>
