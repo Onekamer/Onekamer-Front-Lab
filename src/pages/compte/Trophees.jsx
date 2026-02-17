@@ -27,8 +27,7 @@ export default function Trophees() {
         ];
       case 'first_post':
         return [
-          "Publier au moins un contenu",
-          "Annonce, Événement ou Fait Divers comptent",
+          "Publier au moins un post",
         ];
       case 'first_referral':
         return [
