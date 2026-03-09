@@ -330,16 +330,44 @@ const CommentMedia = ({ url, type }) => {
   if (!url) return null;
 
   if (type && type.startsWith('image')) {
+    const [open, setOpen] = React.useState(false);
     return (
-      <img
-        src={url}
-        alt="Comment media"
-        className="rounded-lg max-h-40 mt-2"
-        onError={(e) => {
-          e.currentTarget.onerror = null;
-          e.currentTarget.src = "https://onekamer-media-cdn.b-cdn.net/posts/default_post_image.png";
-        }}
-      />
+      <>
+        <button
+          type="button"
+          className="rounded-lg mt-2 p-0 m-0 bg-transparent border-0 cursor-zoom-in"
+          style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
+          draggable={false}
+          onClick={() => setOpen(true)}
+          onContextMenu={(e) => { e.preventDefault(); return false; }}
+        >
+          <img
+            src={url}
+            alt="Comment media"
+            className="rounded-lg max-h-40"
+            draggable={false}
+            style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
+            onContextMenu={(e) => { e.preventDefault(); return false; }}
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = "https://onekamer-media-cdn.b-cdn.net/posts/default_post_image.png";
+            }}
+          />
+        </button>
+        {open && (
+          <div
+            className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+            onClick={() => setOpen(false)}
+          >
+            <img
+              src={url}
+              alt="Aperçu"
+              className="max-w-[95vw] max-h-[95vh] object-contain select-none"
+              draggable={false}
+            />
+          </div>
+        )}
+      </>
     );
   }
   if (type && type.startsWith('video')) {
@@ -762,10 +790,18 @@ const CommentSection = ({ postId, highlightCommentId }) => {
     formData.append("file", file);
     formData.append("folder", folder);
 
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 600000);
     const response = await fetch(`${import.meta.env.VITE_API_URL}/upload`, {
       method: "POST",
       body: formData,
-    });
+      signal: controller.signal,
+    }).catch((e) => {
+      if (e.name === 'AbortError') {
+        throw new Error("Délai dépassé lors de l’upload (timeout)");
+      }
+      throw e;
+    }).finally(() => clearTimeout(timer));
 
     const text = await response.text();
     let data = null;

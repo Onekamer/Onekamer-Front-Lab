@@ -20,6 +20,7 @@ const MediaDisplay = ({ bucket, path, alt, className }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [backupUrl, setBackupUrl] = useState(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   useEffect(() => {
     const loadMedia = async () => {
@@ -184,22 +185,50 @@ const MediaDisplay = ({ bucket, path, alt, className }) => {
   }
 
   return (
-    <img
-      src={mediaUrl}
-      alt={alt || "Image"}
-      className={className}
-      onError={(e) => {
-        console.warn("⚠️ Erreur de chargement image → tentative backup ou fallback");
-        if (backupUrl) {
-          const next = backupUrl;
-          setBackupUrl(null);
-          e.target.src = next;
-          return;
-        }
-        e.target.onerror = null;
-        e.target.src = defaultImages[bucket] || defaultImages.annonces;
-      }}
-    />
+    <>
+      <button
+        type="button"
+        className="p-0 m-0 bg-transparent border-0 cursor-zoom-in"
+        style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
+        draggable={false}
+        onClick={() => setLightboxOpen(true)}
+        onContextMenu={(e) => { e.preventDefault(); return false; }}
+      >
+        <img
+          src={mediaUrl}
+          alt={alt || "Image"}
+          className={className}
+          draggable={false}
+          style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
+          onContextMenu={(e) => { e.preventDefault(); return false; }}
+          onError={(e) => {
+            console.warn("⚠️ Erreur de chargement image → tentative backup ou fallback");
+            if (backupUrl) {
+              const next = backupUrl;
+              setBackupUrl(null);
+              e.target.src = next;
+              return;
+            }
+            e.target.onerror = null;
+            e.target.src = defaultImages[bucket] || defaultImages.annonces;
+          }}
+        />
+      </button>
+
+      {lightboxOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+          onClick={() => setLightboxOpen(false)}
+        >
+          <img
+            src={mediaUrl}
+            alt={alt || 'Aperçu'}
+            className="max-w-[95vw] max-h-[95vh] object-contain select-none"
+            draggable={false}
+          />
+        </div>
+      )}
+    </>
   );
 };
 

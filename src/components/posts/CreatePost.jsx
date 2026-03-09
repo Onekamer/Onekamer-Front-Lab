@@ -476,10 +476,18 @@ const CreatePost = ({ onPublished }) => {
     formData.append("file", file);
     formData.append("folder", folder);
 
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 600000);
     const response = await fetch(`${import.meta.env.VITE_API_URL}/upload`, {
       method: "POST",
       body: formData,
-    });
+      signal: controller.signal,
+    }).catch((e) => {
+      if (e.name === 'AbortError') {
+        throw new Error("Délai dépassé lors de l’upload (timeout)");
+      }
+      throw e;
+    }).finally(() => clearTimeout(timer));
 
     const data = await response.json();
     if (!data.success) {
