@@ -199,7 +199,7 @@ const MediaDisplay = ({ bucket, path, alt, className }) => {
           alt={alt || "Image"}
           className={className}
           draggable={false}
-          style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
+          style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none', pointerEvents: 'none', WebkitUserDrag: 'none' }}
           onContextMenu={(e) => { e.preventDefault(); return false; }}
           onError={(e) => {
             console.warn("⚠️ Erreur de chargement image → tentative backup ou fallback");
