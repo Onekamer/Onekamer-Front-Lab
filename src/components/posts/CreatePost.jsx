@@ -119,6 +119,8 @@ const CreatePost = ({ onPublished }) => {
   const [postText, setPostText] = useState('');
   const [mediaFile, setMediaFile] = useState(null);
   const [mediaPreviewUrl, setMediaPreviewUrl] = useState(null);
+  const [mediaFiles, setMediaFiles] = useState([]);
+  const [mediaPreviews, setMediaPreviews] = useState([]);
   const [loading, setLoading] = useState(false);
   const mediaInputRef = useRef(null);
 
@@ -448,17 +450,37 @@ const CreatePost = ({ onPublished }) => {
   };
 
   const handleFileChange = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      setMediaFile(file);
-      setMediaPreviewUrl(URL.createObjectURL(file));
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    // Si vidéo présente, on force un seul média vidéo
+    const firstVideo = files.find((f) => String(f.type || '').startsWith('video/'));
+    if (firstVideo) {
+      setMediaFile(firstVideo);
+      setMediaPreviewUrl(URL.createObjectURL(firstVideo));
+      setMediaFiles([]);
+      setMediaPreviews([]);
       setAudioBlob(null);
       setAudioDuration(0);
+      return;
+    }
+    // Sinon, images multiples (max 5)
+    const images = files.filter((f) => String(f.type || '').startsWith('image/')).slice(0, 5);
+    if (images.length) {
+      setMediaFile(null);
+      setMediaFiles(images);
+      const previews = images.map((f) => URL.createObjectURL(f));
+      setMediaPreviews(previews);
+      setMediaPreviewUrl(previews[0] || null);
+      setAudioBlob(null);
+      setAudioDuration(0);
+      return;
     }
   };
 
   const handleRemoveMedia = () => {
     setMediaFile(null);
+    setMediaFiles([]);
+    setMediaPreviews([]);
     setMediaPreviewUrl(null);
     if (mediaInputRef.current) {
       mediaInputRef.current.value = '';
@@ -588,7 +610,15 @@ const CreatePost = ({ onPublished }) => {
           comments_count: 0,
         };
 
-        if (mediaFile) {
+        if (mediaFiles && mediaFiles.length > 0) {
+          const urls = [];
+          for (const img of mediaFiles) {
+            const url = await uploadToBunny(img, 'posts');
+            urls.push(url);
+          }
+          postData.image_url = urls[0];
+          postData.image_urls = urls;
+        } else if (mediaFile) {
           const mediaUrl = await uploadToBunny(mediaFile, 'posts');
           const mediaType = mediaFile.type.startsWith('image') ? 'image' : 'video';
           if (mediaType === 'image') {
@@ -735,6 +765,7 @@ const CreatePost = ({ onPublished }) => {
               accept="image/*,video/*"
               className="hidden"
               onChange={handleFileChange}
+              multiple
               disabled={recording || !!audioBlob}
             />
 

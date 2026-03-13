@@ -31,6 +31,7 @@ import { uploadAudioFile, ensurePublicAudioUrl } from '@/utils/audioStorage';
 import { notifyDonationReceived, notifyMentions } from '@/services/supabaseNotifications';
 import { extractUniqueMentions } from '@/utils/mentions';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import SwipeCarousel from '@/components/SwipeCarousel';
 
 const normalizeAudioEntry = (entry) => {
   if (!entry || !entry.audio_url) return entry;
@@ -1241,17 +1242,21 @@ const PostCard = ({ post, user, profile, onLike, onDelete, onWarn, showComments,
           </div>
         </div>
         <p className="mb-4 whitespace-pre-wrap">{parseMentions(post.content)}</p>
-        {imageUrl && (
-          <img
-            src={imageUrl}
-            alt="Post media"
+        {Array.isArray(post.image_urls) && post.image_urls.length > 0 ? (
+          <SwipeCarousel
+            images={post.image_urls}
+            zoomable={true}
             className="rounded-lg w-full mb-4"
-            onError={(e) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = "https://onekamer-media-cdn.b-cdn.net/posts/default_post_image.png";
-            }}
+            imgClassName="max-h-64 md:max-h-80"
           />
-        )}
+        ) : (imageUrl ? (
+          <SwipeCarousel
+            images={[imageUrl]}
+            zoomable={true}
+            className="rounded-lg w-full mb-4"
+            imgClassName="max-h-64 md:max-h-80"
+          />
+        ) : null)}
         {videoUrl && <video src={videoUrl} controls className="rounded-lg w-full mb-4" />}
         <div className="flex items-center gap-4 text-[#6B6B6B]">
           <button
