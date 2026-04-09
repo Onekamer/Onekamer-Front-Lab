@@ -124,6 +124,9 @@ const RencontreProfil = () => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxPath, setLightboxPath] = useState(null);
 
+  const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
+  const API_PREFIX = API_BASE_URL ? (API_BASE_URL.endsWith('/api') ? API_BASE_URL : `${API_BASE_URL}/api`) : '/api';
+
   const fetchProfile = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -377,10 +380,18 @@ const RencontreProfil = () => {
         formData.append("type", "rencontres");
         formData.append("user_id", user.id); // ✅ sous-dossier utilisateur
 
-        const res = await fetch("https://onekamer-server-lab.onrender.com/api/upload", {
+        let res = await fetch(`${API_PREFIX}/upload-media`, {
           method: "POST",
           body: formData,
         });
+
+        if (!res.ok) {
+          // Fallback legacy endpoint
+          res = await fetch(`${API_PREFIX}/upload`, {
+            method: "POST",
+            body: formData,
+          });
+        }
 
         if (!res.ok) {
           console.error("Erreur d'upload principale :", await res.text());
@@ -416,10 +427,18 @@ const RencontreProfil = () => {
         formData.append("type", "rencontres");
         formData.append("user_id", user.id);
 
-        const res = await fetch("https://onekamer-server-lab.onrender.com/api/upload", {
+        let res = await fetch(`${API_PREFIX}/upload-media`, {
           method: "POST",
           body: formData,
         });
+
+        if (!res.ok) {
+          // Fallback legacy endpoint
+          res = await fetch(`${API_PREFIX}/upload`, {
+            method: "POST",
+            body: formData,
+          });
+        }
 
         if (!res.ok) {
           console.error("Erreur d’upload galerie :", await res.text());

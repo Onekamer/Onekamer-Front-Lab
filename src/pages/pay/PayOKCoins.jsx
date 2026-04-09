@@ -10,8 +10,8 @@ import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/customSupabaseClient';
 import { ArrowLeft } from 'lucide-react';
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
-const API_PREFIX = API_BASE_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
+const API_PREFIX = API_BASE_URL ? (API_BASE_URL.endsWith('/api') ? API_BASE_URL : `${API_BASE_URL}/api`) : '/api';
 
 function PayForm() {
   const stripe = useStripe();

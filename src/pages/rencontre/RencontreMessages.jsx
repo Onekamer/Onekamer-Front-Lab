@@ -47,23 +47,21 @@ const MessagesPrives = () => {
       .order("created_at", { ascending: false });
 
     if (!error) {
-      setMatches(data);
-      const users = {};
-      const otherUserIds = [];
-      data.forEach(match => {
-        const otherUser = match.user1_id === myRencontreId ? match.user2 : match.user1;
-        users[otherUser.id] = otherUser;
-        if (otherUser?.user_id) otherUserIds.push(String(otherUser.user_id));
+      // Collecter tous les autres user_id pour enrichir avec is_deleted et présence
+      const otherUserIdsAll = [];
+      (data || []).forEach(match => {
+        const other = match.user1_id === myRencontreId ? match.user2 : match.user1;
+        if (other?.user_id) otherUserIdsAll.push(String(other.user_id));
       });
-      setOtherUsers(users);
+      const uniqueIds = Array.from(new Set(otherUserIdsAll));
 
-      const uniqueIds = Array.from(new Set(otherUserIds));
+      let byId = {};
       if (uniqueIds.length > 0) {
         const { data: profs } = await supabase
           .from('profiles')
-          .select('id, show_online_status, last_seen_at')
+          .select('id, show_online_status, last_seen_at, is_deleted')
           .in('id', uniqueIds);
-        const byId = (profs || []).reduce((acc, p) => {
+        byId = (profs || []).reduce((acc, p) => {
           acc[String(p.id)] = p;
           return acc;
         }, {});
@@ -71,6 +69,22 @@ const MessagesPrives = () => {
       } else {
         setPresenceByUserId({});
       }
+
+      // Filtrer les matchs dont l'autre profil est supprimé
+      const filtered = (data || []).filter((m) => {
+        const other = m.user1_id === myRencontreId ? m.user2 : m.user1;
+        const uid = other?.user_id ? String(other.user_id) : null;
+        return uid && !(byId[uid]?.is_deleted === true);
+      });
+      setMatches(filtered);
+
+      // Construire le mapping des autres utilisateurs pour affichage liste
+      const users = {};
+      filtered.forEach(match => {
+        const otherUser = match.user1_id === myRencontreId ? match.user2 : match.user1;
+        users[otherUser.id] = otherUser;
+      });
+      setOtherUsers(users);
     }
     setLoading(false);
   }, [user, myRencontreId]);
@@ -119,6 +133,7 @@ const MessagesPrives = () => {
 
     const currentMatch = matches.find(m => m.id === selectedMatch);
     if (!currentMatch) return;
+    if (currentMatch.ended_at) return;
     
     const receiver_id = currentMatch.user1_id === myRencontreId ? currentMatch.user2_id : currentMatch.user1_id;
 
@@ -190,6 +205,9 @@ const MessagesPrives = () => {
     return absolute || candidates[0] || null;
   };
 
+  const activeMatch = matches.find(m => m.id === selectedMatch) || null;
+  const isEnded = !!activeMatch?.ended_at;
+
   return (
     <>
       <Helmet>
@@ -235,6 +253,9 @@ const MessagesPrives = () => {
                     {getStatusLabel(otherUser) && (
                       <p className="text-xs text-gray-500">{getStatusLabel(otherUser)}</p>
                     )}
+                    {m.ended_at ? (
+                      <p className="text-xs text-gray-500">Match archivé</p>
+                    ) : null}
                 </div>
               </div>
           )})}
@@ -271,14 +292,19 @@ const MessagesPrives = () => {
                 ))}
               </div>
 
+              {isEnded && (
+                <div className="text-xs text-gray-500 mb-2">Match archivé — la conversation est en lecture seule.</div>
+              )}
+
               <div className="mt-auto flex gap-2">
                 <Input
-                  placeholder="Votre message..."
+                  placeholder={isEnded ? "Match archivé — vous ne pouvez plus envoyer de message" : "Votre message..."}
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                  onKeyPress={(e) => e.key === 'Enter' && !isEnded && sendMessage()}
+                  disabled={isEnded}
                 />
-                <Button onClick={sendMessage} className="bg-gradient-to-r from-green-500 to-emerald-500 text-white">
+                <Button onClick={sendMessage} disabled={isEnded || !newMessage.trim()} className="bg-gradient-to-r from-green-500 to-emerald-500 text-white">
                   <Send className="h-5 w-5" />
                 </Button>
               </div>

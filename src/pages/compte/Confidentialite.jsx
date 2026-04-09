@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -9,15 +8,38 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import ChartePopup from '@/components/ChartePopup';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogOverlay } from '@/components/ui/dialog';
+import { MARKET_BUYER_CHARTER, MARKET_VENDOR_CHARTER } from '@/content/marketplaceCharters.jsx';
 import { Link } from 'react-router-dom';
 import DeleteAccountSection from '@/pages/DeleteAccountSection';
 
 
 const Confidentialite = () => {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
   const { toast } = useToast();
   const [showCharte, setShowCharte] = useState(false);
+  const [showVendorCharte, setShowVendorCharte] = useState(false);
+  const [showBuyerCharte, setShowBuyerCharte] = useState(false);
+  const [vendorCompliant, setVendorCompliant] = useState(null);
+
+  const isIOS = typeof window !== 'undefined' && window?.Capacitor?.getPlatform?.() === 'ios';
+  const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
+  const API_PREFIX = API_BASE_URL ? (API_BASE_URL.endsWith('/api') ? API_BASE_URL : `${API_BASE_URL}/api`) : '';
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        if (!session?.access_token || !API_PREFIX) return;
+        const res = await fetch(`${API_PREFIX}/market/partners/me`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) setVendorCompliant(Boolean(data?.partner?.vendor_terms_compliant));
+      } catch {}
+    };
+    run();
+  }, [API_PREFIX, session?.access_token]);
 
   return (
     <>
@@ -66,6 +88,93 @@ const Confidentialite = () => {
               </div>
             </CardContent>
           </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Charte Marketplace — Vendeur</CardTitle>
+              <CardDescription>Obligatoire pour gérer les commandes et les ventes.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <p
+                  className="text-gray-600 underline cursor-pointer hover:text-[#2BA84A] transition-colors"
+                  onClick={() => setShowVendorCharte(true)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setShowVendorCharte(true)}
+                >
+                  Charte vendeur
+                </p>
+                <div className="flex items-center space-x-2 font-semibold">
+                  {vendorCompliant ? (
+                    <>
+                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      <span>Oui</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-5 w-5 text-red-500" />
+                      <span>Non</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Charte Marketplace — Acheteur</CardTitle>
+              <CardDescription>À accepter au moment du paiement d’une commande.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <p
+                  className="text-gray-600 underline cursor-pointer hover:text-[#2BA84A] transition-colors"
+                  onClick={() => setShowBuyerCharte(true)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setShowBuyerCharte(true)}
+                >
+                  Charte acheteur
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {isIOS && (
+            <Card>
+              <CardHeader>
+                <CardTitle>EULA (iOS)</CardTitle>
+                <CardDescription>Contrat de licence utilisateur final d’Apple.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <a
+                    href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[#2BA84A] font-semibold hover:underline flex items-center"
+                  >
+                    <FileSignature className="h-4 w-4 mr-2" />
+                    Ouvrir l’EULA Apple
+                  </a>
+                  <div className="flex items-center space-x-2 font-semibold">
+                    {profile?.apple_eula_accepted_at ? (
+                      <>
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        <span>Oui</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-5 w-5 text-red-500" />
+                        <span>Non</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           
           <Card>
             <CardHeader>
@@ -111,6 +220,30 @@ const Confidentialite = () => {
         </motion.div>
       </div>
       <ChartePopup show={showCharte} onClose={() => setShowCharte(false)} readOnly={true} />
+      <Dialog open={showVendorCharte} onOpenChange={() => setShowVendorCharte(false)}>
+        <DialogOverlay className="bg-white/80 backdrop-blur-sm fixed inset-0 z-50" />
+        <DialogContent className="max-w-lg z-50">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-center text-[#2BA84A]">Charte Marketplace — Vendeur</DialogTitle>
+          </DialogHeader>
+          <div className="h-[60vh] p-4 border rounded-md overflow-y-auto space-y-4 text-sm text-gray-700">
+            {MARKET_VENDOR_CHARTER}
+          </div>
+          <Button onClick={() => setShowVendorCharte(false)} className="w-full mt-4">Fermer</Button>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showBuyerCharte} onOpenChange={() => setShowBuyerCharte(false)}>
+        <DialogOverlay className="bg-white/80 backdrop-blur-sm fixed inset-0 z-50" />
+        <DialogContent className="max-w-lg z-50">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-center text-[#2BA84A]">Charte Marketplace — Acheteur</DialogTitle>
+          </DialogHeader>
+          <div className="h-[60vh] p-4 border rounded-md overflow-y-auto space-y-4 text-sm text-gray-700">
+            {MARKET_BUYER_CHARTER}
+          </div>
+          <Button onClick={() => setShowBuyerCharte(false)} className="w-full mt-4">Fermer</Button>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

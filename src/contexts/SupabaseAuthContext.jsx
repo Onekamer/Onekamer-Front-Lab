@@ -472,6 +472,53 @@ export const AuthProvider = ({ children }) => {
     return { data, error };
   }, [toast]);
 
+  const blockUser = useCallback(async (targetUserId) => {
+    try {
+      if (!user?.id || !targetUserId || String(targetUserId) === String(user.id)) {
+        return { error: 'invalid' };
+      }
+      const current = Array.isArray(profile?.blocked_user_ids) ? profile.blocked_user_ids.map(String) : [];
+      if (current.includes(String(targetUserId))) return { error: null };
+      const next = [...current, String(targetUserId)];
+      const { error } = await supabase
+        .from('profiles')
+        .update({ blocked_user_ids: next, updated_at: new Date().toISOString() })
+        .eq('id', user.id);
+      if (error) {
+        toast({ variant: 'destructive', title: 'Blocage impossible', description: error.message || '' });
+        return { error };
+      }
+      setProfile((prev) => ({ ...(prev || {}), blocked_user_ids: next }));
+      toast({ title: 'Compte bloqué' });
+      return { error: null };
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Blocage impossible', description: e?.message || '' });
+      return { error: e };
+    }
+  }, [user?.id, profile?.blocked_user_ids, toast]);
+
+  const unblockUser = useCallback(async (targetUserId) => {
+    try {
+      if (!user?.id || !targetUserId) return { error: 'invalid' };
+      const current = Array.isArray(profile?.blocked_user_ids) ? profile.blocked_user_ids.map(String) : [];
+      const next = current.filter((id) => String(id) !== String(targetUserId));
+      const { error } = await supabase
+        .from('profiles')
+        .update({ blocked_user_ids: next, updated_at: new Date().toISOString() })
+        .eq('id', user.id);
+      if (error) {
+        toast({ variant: 'destructive', title: 'Déblocage impossible', description: error.message || '' });
+        return { error };
+      }
+      setProfile((prev) => ({ ...(prev || {}), blocked_user_ids: next }));
+      toast({ title: 'Compte débloqué' });
+      return { error: null };
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Déblocage impossible', description: e?.message || '' });
+      return { error: e };
+    }
+  }, [user?.id, profile?.blocked_user_ids, toast]);
+
   const value = useMemo(() => ({
     user,
     session,
@@ -491,6 +538,8 @@ export const AuthProvider = ({ children }) => {
     linkExistingAccount,
     unlinkAccount,
     switchToAccount,
+    blockUser,
+    unblockUser,
   }), [
     user,
     session,
@@ -510,6 +559,8 @@ export const AuthProvider = ({ children }) => {
     linkExistingAccount,
     unlinkAccount,
     switchToAccount,
+    blockUser,
+    unblockUser,
   ]);
 
   return (

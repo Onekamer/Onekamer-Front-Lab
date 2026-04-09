@@ -30,6 +30,9 @@ const ModifierProfil = () => {
 
   const fileInputRef = useRef(null);
 
+  const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
+  const API_PREFIX = API_BASE_URL ? (API_BASE_URL.endsWith('/api') ? API_BASE_URL : `${API_BASE_URL}/api`) : '/api';
+
   useEffect(() => {
     if (profile) {
       setFullName(profile.full_name || '');
@@ -70,14 +73,20 @@ const ModifierProfil = () => {
       formData.append("type", "avatars");
       formData.append("recordId", user.id);
 
-      const res = await fetch("https://onekamer-server-lab.onrender.com/api/upload", {
-        method: "POST",
+      let res = await fetch(`${API_PREFIX}/upload-media`, {
+        method: 'POST',
         body: formData,
       });
 
       if (!res.ok) {
-        throw new Error('La mise à jour du fichier a échoué');
+        // Fallback legacy endpoint
+        res = await fetch(`${API_PREFIX}/upload`, {
+          method: 'POST',
+          body: formData,
+        });
       }
+
+      if (!res.ok) throw new Error('La mise à jour du fichier a échoué');
 
       const data = await res.json();
       const avatarUrl = data.url;

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Filter, Loader2, MapPin, Calendar, FileText, Users, TrendingUp, Newspaper, Heart } from 'lucide-react';
+import { Search, Filter, Loader2, MapPin, Calendar, FileText, Users, TrendingUp, Newspaper, ShoppingBag } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useNavigate } from 'react-router-dom';
@@ -12,14 +12,7 @@ import MediaDisplay from '@/components/MediaDisplay';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-const getRencontrePhoto = (record) => {
-  if (!record) return null;
-  const photosArray = Array.isArray(record.photos) ? record.photos.filter(Boolean) : [];
-  const firstPhoto = photosArray.length > 0 ? photosArray[0] : null;
-  const candidates = [record.image_url, firstPhoto].filter(Boolean);
-  const absolute = candidates.find((c) => typeof c === 'string' && /^https?:\/\//i.test(c));
-  return absolute || candidates[0] || null;
-};
+
 
 const ResultCard = ({ item, type }) => {
     const navigate = useNavigate();
@@ -48,6 +41,80 @@ const ResultCard = ({ item, type }) => {
                 </div>
             );
             break;
+        case 'groupes':
+            content = (
+                <div className="flex gap-4" onClick={() => navigate(`/groupes/${item.id}`)}>
+                    <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 bg-gray-200">
+                        <MediaDisplay bucket="groupes" path={item.image_url} alt={item.nom} className="w-full h-full object-cover" />
+                    </div>
+                    <div>
+                        <p className="text-xs text-gray-500">Groupe</p>
+                        <h3 className="font-bold truncate">{item.nom}</h3>
+                        {item.description ? <p className="text-sm text-gray-600 truncate">{item.description}</p> : null}
+                    </div>
+                </div>
+            );
+            break;
+        case 'market_boutiques':
+            content = (
+                <div className="flex gap-4" onClick={() => navigate(`/marketplace/partner/${encodeURIComponent(item.id)}`)}>
+                    <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200">
+                        {item.logo_url ? (
+                          <img src={item.logo_url} alt={item.display_name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-gray-200" />
+                        )}
+                    </div>
+                    <div>
+                        <p className="text-xs text-gray-500">Boutique</p>
+                        <h3 className="font-bold truncate">{item.display_name || 'Boutique partenaire'}</h3>
+                        <p className="text-sm text-gray-600 truncate">{item.category || ''}</p>
+                    </div>
+                </div>
+            );
+            break;
+        case 'market_produits': {
+            const priceEur = Number(item?.base_price_amount || 0) / 100;
+            content = (
+                <div className="flex gap-4" onClick={() => navigate(`/marketplace/partner/${encodeURIComponent(item.partnerId)}`)}>
+                    <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200">
+                        {item?.media?.image_url ? (
+                          <img src={item.media.image_url} alt={item.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-gray-200" />
+                        )}
+                    </div>
+                    <div>
+                        <p className="text-xs text-gray-500">Produit</p>
+                        <h3 className="font-bold truncate">{item.title || 'Article'}</h3>
+                        {item.description ? <p className="text-sm text-gray-600 truncate">{item.description}</p> : null}
+                        <p className="text-sm font-semibold text-[#2BA84A]">{Number.isFinite(priceEur) ? `${priceEur.toFixed(2)} €` : ''}</p>
+                    </div>
+                </div>
+            );
+            break;
+        }
+        case 'market_avis': {
+            const n = Math.max(Math.min(Number(item?.rating || 0), 5), 0);
+            const stars = '★'.repeat(n) + '☆'.repeat(5 - n);
+            content = (
+                <div className="flex gap-4" onClick={() => navigate(`/marketplace/partner/${encodeURIComponent(item.partnerId)}`)}>
+                    <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200">
+                        {item.partnerLogo ? (
+                          <img src={item.partnerLogo} alt={item.partnerName} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-gray-200" />
+                        )}
+                    </div>
+                    <div>
+                        <p className="text-xs text-gray-500">Avis • {item.partnerName || 'Boutique'}</p>
+                        <h3 className="font-bold truncate">{stars}</h3>
+                        {item.comment ? <p className="text-sm text-gray-600 line-clamp-2">{item.comment}</p> : null}
+                    </div>
+                </div>
+            );
+            break;
+        }
         case 'partenaires':
             content = (
                 <div className="flex gap-4" onClick={() => navigate('/partenaires')}>
@@ -98,31 +165,12 @@ const ResultCard = ({ item, type }) => {
                         <MediaDisplay bucket="faits_divers" path={item.image_url} alt={item.title} className="w-full h-full object-cover" />
                     </div>
                     <div>
-                        <p className="text-xs text-gray-500">Fait Divers</p>
+                        <p className="text-xs text-gray-500">Actualité</p>
                         <h3 className="font-bold truncate">{item.title}</h3>
                         <p className="text-sm text-gray-600 line-clamp-2">{item.excerpt}</p>
                     </div>
                 </div>
             );
-            break;
-        case 'rencontres': {
-            const rencontrePhoto = getRencontrePhoto(item);
-            const bucket = rencontrePhoto ? 'rencontres' : 'avatars';
-            const path = rencontrePhoto || item.profiles?.avatar_url;
-            content = (
-                <div className="flex gap-4" onClick={() => navigate(`/rencontre?rid=${item.id}`)}>
-                    <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 bg-gray-200">
-                        <MediaDisplay bucket={bucket} path={path} alt={item.profiles?.username || item.name} className="w-full h-full object-cover" />
-                    </div>
-                    <div>
-                        <p className="text-xs text-gray-500 flex items-center gap-1"><Heart className="h-3 w-3" /> Profil Rencontre</p>
-                        <h3 className="font-bold truncate">{item.profiles?.username || item.name}</h3>
-                        <p className="text-sm text-gray-600 truncate">{item.name}</p>
-                    </div>
-                </div>
-            );
-            break;
-        }
             break;
         default:
             content = null;
@@ -148,6 +196,8 @@ const Rechercher = () => {
   const [suggestions, setSuggestions] = useState([]); // [{type, data}]
   const [suggestLoading, setSuggestLoading] = useState(false);
   const debounceRef = useRef(null);
+  const serverUrl = import.meta.env.VITE_SERVER_URL || 'https://onekamer-server.onrender.com';
+  const apiBaseUrl = import.meta.env.DEV ? '' : serverUrl;
 
   const filters = [
     { value: 'all', label: 'Tout', icon: Search },
@@ -155,8 +205,9 @@ const Rechercher = () => {
     { value: 'partenaires', label: 'Partenaires', icon: Users },
     { value: 'evenements', label: 'Événements', icon: Calendar },
     { value: 'posts', label: 'Posts', icon: TrendingUp },
-    { value: 'faits_divers', label: 'Faits Divers', icon: Newspaper },
-    { value: 'rencontres', label: 'Rencontres', icon: Heart },
+    { value: 'faits_divers', label: 'Actualités', icon: Newspaper },
+    { value: 'groupes', label: 'Groupes', icon: Users },
+    { value: 'marketplace', label: 'Marketplace', icon: ShoppingBag },
   ];
 
   const handleSearch = useCallback(async () => {
@@ -196,7 +247,7 @@ const Rechercher = () => {
     }
     if (filter === 'all' || filter === 'posts') {
         searchPromises.push(
-            supabase.from('posts').select('*, profiles(username, avatar_url)').ilike('content', query).limit(10)
+            supabase.from('posts').select('*, profiles(username, avatar_url, is_deleted)').ilike('content', query).limit(10)
             .then(res => ({ type: 'posts', ...res }))
         );
     }
@@ -206,12 +257,13 @@ const Rechercher = () => {
             .then(res => ({ type: 'faits_divers', ...res }))
         );
     }
-    if (filter === 'all' || filter === 'rencontres') {
+    if (filter === 'all' || filter === 'groupes') {
         searchPromises.push(
-            supabase.from('rencontres').select('id, user_id, name, image_url, photos, profiles(username, avatar_url)').ilike('name', query).limit(10)
-            .then(res => ({ type: 'rencontres', ...res }))
+            supabase.from('view_groupes_accessible').select('id, nom, image_url, description').ilike('nom', query).limit(10)
+            .then(res => ({ type: 'groupes', ...res }))
         );
     }
+    // Rencontres retiré pour alignement PROD
 
     const responses = await Promise.all(searchPromises);
     
@@ -223,6 +275,79 @@ const Rechercher = () => {
             allResults = [...allResults, ...response.data.map(item => ({ type: response.type, data: item }))]
         }
     });
+
+    // Marketplace aggregator (boutiques, produits publiés, avis)
+    if (filter === 'all' || filter === 'marketplace') {
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/market/partners`);
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && Array.isArray(data?.partners)) {
+          const term = searchTerm.trim().toLowerCase();
+          const partners = data.partners;
+          const partnerMatches = partners.filter((p) => {
+            const name = String(p?.display_name || '').toLowerCase();
+            const cat = String(p?.category || '').toLowerCase();
+            const desc = String(p?.description || '').toLowerCase();
+            return name.includes(term) || cat.includes(term) || desc.includes(term);
+          });
+          // Boutiques
+          allResults = [
+            ...allResults,
+            ...partnerMatches.slice(0, 10).map((p) => ({ type: 'market_boutiques', data: p }))
+          ];
+
+          // Produits publiés (recherche titre/description) – limiter à 8-10 partenaires
+          const productPartners = partnerMatches.slice(0, 8);
+          const productsArrays = await Promise.all(
+            productPartners.map(async (p) => {
+              try {
+                const r = await fetch(`${apiBaseUrl}/api/market/partners/${encodeURIComponent(p.id)}/items`);
+                const j = await r.json().catch(() => ({}));
+                if (!r.ok || !Array.isArray(j?.items)) return [];
+                const arr = j.items.filter((it) => it?.is_published === true);
+                return arr.filter((it) => {
+                  const t = String(it?.title || '').toLowerCase();
+                  const d = String(it?.description || '').toLowerCase();
+                  return t.includes(term) || d.includes(term);
+                }).map((it) => ({ ...it, partnerId: p.id }));
+              } catch { return []; }
+            })
+          );
+          const products = productsArrays.flat().slice(0, 12);
+          allResults = [
+            ...allResults,
+            ...products.map((it) => ({ type: 'market_produits', data: it }))
+          ];
+
+          // Avis (recherche texte commentaire) – limiter à 5 partenaires
+          const ratingPartners = partnerMatches.slice(0, 5);
+          const ratingsArrays = await Promise.all(
+            ratingPartners.map(async (p) => {
+              try {
+                const qs = new URLSearchParams({ limit: '20', offset: '0' });
+                const r = await fetch(`${apiBaseUrl}/api/market/public/partners/${encodeURIComponent(p.id)}/ratings?${qs.toString()}`);
+                const j = await r.json().catch(() => ({}));
+                if (!r.ok || !Array.isArray(j?.ratings)) return [];
+                return j.ratings.filter((rv) => String(rv?.comment || '').toLowerCase().includes(term)).map((rv) => ({
+                  ...rv,
+                  partnerId: p.id,
+                  partnerName: p.display_name,
+                  partnerLogo: p.logo_url,
+                }));
+              } catch { return []; }
+            })
+          );
+          const ratings = ratingsArrays.flat().slice(0, 12);
+          allResults = [
+            ...allResults,
+            ...ratings.map((rv) => ({ type: 'market_avis', data: rv }))
+          ];
+        }
+      } catch {}
+    }
+
+    // Exclure les posts dont l'auteur est supprimé
+    allResults = allResults.filter((r) => !(r.type === 'posts' && r.data?.profiles?.is_deleted === true));
 
     setResults(allResults);
     setLoading(false);
@@ -250,13 +375,8 @@ const Rechercher = () => {
         const push = (p, type) => promises.push(p.then(res => ({ type, res })).catch(() => ({ type, res: { data: [], error: null } })));
 
         const want = (t) => filter === 'all' || filter === t;
-
-        if (want('rencontres')) {
-          const qR1 = supabase.from('rencontres').select('id, user_id, name, image_url, photos, profiles(username, avatar_url)').ilike('name', like).limit(5);
-          const qR2 = supabase.from('rencontres').select('id, user_id, name, image_url, photos, profiles!inner(username, avatar_url)').ilike('profiles.username', like).limit(5);
-          push(qR1, 'rencontres');
-          push(qR2, 'rencontres');
-        }
+        if (want('groupes')) push(supabase.from('view_groupes_accessible').select('id, nom, image_url, description').ilike('nom', like).limit(5), 'groupes');
+        // Rencontres retiré pour alignement PROD
         if (want('annonces')) {
           const q = supabase.from('annonces').select('id, titre, description, media_url').ilike('titre', like).limit(5);
           push(q, 'annonces');
@@ -270,7 +390,7 @@ const Rechercher = () => {
           push(q, 'evenements');
         }
         if (want('posts')) {
-          const q = supabase.from('posts').select('id, content, profiles(username, avatar_url)').ilike('content', like).limit(5);
+          const q = supabase.from('posts').select('id, content, profiles(username, avatar_url, is_deleted)').ilike('content', like).limit(5);
           push(q, 'posts');
         }
         if (want('faits_divers')) {
@@ -284,13 +404,51 @@ const Rechercher = () => {
           const arr = Array.isArray(res?.data) ? res.data : [];
           arr.forEach((d) => list.push({ type, data: d }));
         });
+        // Suggestions Marketplace (boutiques + produits publiés)
+        if (want('marketplace')) {
+          try {
+            const res = await fetch(`${apiBaseUrl}/api/market/partners`);
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && Array.isArray(data?.partners)) {
+              const t = term.toLowerCase();
+              const partners = data.partners;
+              const partnerMatches = partners.filter((p) => {
+                const name = String(p?.display_name || '').toLowerCase();
+                const cat = String(p?.category || '').toLowerCase();
+                const desc = String(p?.description || '').toLowerCase();
+                return name.includes(t) || cat.includes(t) || desc.includes(t);
+              });
+              partnerMatches.slice(0, 5).forEach((p) => list.push({ type: 'market_boutiques', data: p }));
+              const productPartners = partnerMatches.slice(0, 3);
+              const productsArrays = await Promise.all(
+                productPartners.map(async (p) => {
+                  try {
+                    const r = await fetch(`${apiBaseUrl}/api/market/partners/${encodeURIComponent(p.id)}/items`);
+                    const j = await r.json().catch(() => ({}));
+                    if (!r.ok || !Array.isArray(j?.items)) return [];
+                    const arr = j.items.filter((it) => it?.is_published === true);
+                    return arr.filter((it) => {
+                      const tt = String(it?.title || '').toLowerCase();
+                      const d = String(it?.description || '').toLowerCase();
+                      return tt.includes(t) || d.includes(t);
+                    }).map((it) => ({ ...it, partnerId: p.id }));
+                  } catch { return []; }
+                })
+              );
+              productsArrays.flat().slice(0, 5).forEach((it) => list.push({ type: 'market_produits', data: it }));
+            }
+          } catch {}
+        }
 
-        // déduplique pour rencontres (doublons R1/R2)
+        // Post-process: dédupliquer rencontres (doublons R1/R2) et filtrer posts supprimés
         const seenRencontre = new Set();
         const merged = list.filter((item) => {
-          if (item.type !== 'rencontres') return true;
-          if (seenRencontre.has(item.data.id)) return false;
-          seenRencontre.add(item.data.id);
+          if (item.type === 'rencontres') {
+            if (seenRencontre.has(item.data.id)) return false;
+            seenRencontre.add(item.data.id);
+            return true;
+          }
+          if (item.type === 'posts' && item?.data?.profiles?.is_deleted === true) return false;
           return true;
         }).slice(0, 12);
 
@@ -349,22 +507,6 @@ const Rechercher = () => {
                   <div className="space-y-2">
                     {suggestions.map(({type, data}) => {
                       switch (type) {
-                        case 'rencontres': {
-                          const rencontrePhoto = getRencontrePhoto(data);
-                          const bucket = rencontrePhoto ? 'rencontres' : 'avatars';
-                          const path = rencontrePhoto || data.profiles?.avatar_url;
-                          return (
-                            <div key={`r-${data.id}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/rencontre?rid=${data.id}`)}>
-                              <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
-                                <MediaDisplay bucket={bucket} path={path} alt={data.profiles?.username || data.name} className="w-full h-full object-cover" />
-                              </div>
-                              <div className="min-w-0">
-                                <div className="text-sm font-semibold truncate">{data.profiles?.username || data.name}</div>
-                                <div className="text-xs text-gray-600 truncate">Profil Rencontre</div>
-                              </div>
-                            </div>
-                          );
-                        }
                         case 'annonces':
                           return (
                             <div key={`a-${data.id}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => navigate('/annonces')}>
@@ -421,7 +563,35 @@ const Rechercher = () => {
                               </div>
                               <div className="min-w-0">
                                 <div className="text-sm font-semibold truncate">{data.title}</div>
-                                <div className="text-xs text-gray-600 truncate">Fait Divers</div>
+                                <div className="text-xs text-gray-600 truncate">Actualité</div>
+                              </div>
+                            </div>
+                          );
+                        case 'market_boutiques':
+                          return (
+                            <div key={`mb-${data.id}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/marketplace/partner/${encodeURIComponent(data.id)}`)}>
+                              <div className="w-10 h-10 rounded overflow-hidden bg-gray-200 flex-shrink-0">
+                                {data.logo_url ? (
+                                  <img src={data.logo_url} alt={data.display_name} className="w-full h-full object-cover" />
+                                ) : null}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold truncate">{data.display_name || 'Boutique'}</div>
+                                <div className="text-xs text-gray-600 truncate">{data.category || 'Marketplace'}</div>
+                              </div>
+                            </div>
+                          );
+                        case 'market_produits':
+                          return (
+                            <div key={`mp-${data.id}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/marketplace/partner/${encodeURIComponent(data.partnerId)}`)}>
+                              <div className="w-10 h-10 rounded overflow-hidden bg-gray-200 flex-shrink-0">
+                                {data?.media?.image_url ? (
+                                  <img src={data.media.image_url} alt={data.title} className="w-full h-full object-cover" />
+                                ) : null}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold truncate">{data.title || 'Article'}</div>
+                                <div className="text-xs text-gray-600 truncate">Produit</div>
                               </div>
                             </div>
                           );
