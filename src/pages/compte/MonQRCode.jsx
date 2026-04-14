@@ -23,6 +23,8 @@ const MonQRCode = () => {
   const [suggestLoading, setSuggestLoading] = useState(false);
   const [myQrs, setMyQrs] = useState([]);
   const [paying, setPaying] = useState(false);
+  const [isFreeEvent, setIsFreeEvent] = useState(null); // null = inconnu, true/false connu
+  const [eventInfoLoading, setEventInfoLoading] = useState(false);
 
   const formatMoney = (amountMinor, currency) => {
     if (typeof amountMinor !== 'number') return null;
@@ -76,6 +78,30 @@ const MonQRCode = () => {
       setEventId(fromQuery);
     }
   }, [location.search]);
+
+  // Charger les infos de l'événement sélectionné pour déterminer s'il est gratuit
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const run = async () => {
+      if (!eventId) { setIsFreeEvent(null); return; }
+      setEventInfoLoading(true);
+      try {
+        const res = await fetch(`${API_PREFIX}/events/${encodeURIComponent(eventId)}`, { signal: ctrl.signal });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { setIsFreeEvent(null); return; }
+        const amount = typeof data?.price_amount === 'number' ? data.price_amount : null;
+        const currency = data?.currency ? String(data.currency).toLowerCase() : null;
+        const free = !amount || amount <= 0 || !currency;
+        setIsFreeEvent(free);
+      } catch {
+        setIsFreeEvent(null);
+      } finally {
+        setEventInfoLoading(false);
+      }
+    };
+    run();
+    return () => ctrl.abort();
+  }, [eventId]);
 
   useEffect(() => {
     if (!cacheKey) return;
@@ -256,27 +282,31 @@ const MonQRCode = () => {
               <Input value={eventId} onChange={(e) => setEventId(e.target.value)} placeholder="Ex: 0f8c...-uuid" />
             </div>
 
-            <Button disabled={submitting || !eventId} onClick={onGenerate} className="bg-[#2BA84A] text-white w-full">
-              {submitting ? 'Génération…' : '🎟 Obtenir mon QR Code'}
-            </Button>
+            {eventId && isFreeEvent === true && (
+              <Button disabled={submitting || eventInfoLoading} onClick={onGenerate} className="bg-[#2BA84A] text-white w-full">
+                {submitting ? 'Génération…' : '🎟 Obtenir mon QR Code'}
+              </Button>
+            )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <Button
-                disabled={paying || !eventId}
-                onClick={() => startCheckout('full')}
-                className="bg-[#2BA84A] text-white w-full"
-              >
-                {paying ? 'Redirection…' : 'Payer maintenant'}
-              </Button>
-              <Button
-                disabled={paying || !eventId}
-                onClick={() => startCheckout('deposit')}
-                variant="outline"
-                className="w-full"
-              >
-                {paying ? 'Redirection…' : 'Payer acompte'}
-              </Button>
-            </div>
+            {eventId && isFreeEvent === false && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Button
+                  disabled={paying || eventInfoLoading}
+                  onClick={() => startCheckout('full')}
+                  className="bg-[#2BA84A] text-white w-full"
+                >
+                  {paying ? 'Redirection…' : 'Payer maintenant'}
+                </Button>
+                <Button
+                  disabled={paying || eventInfoLoading}
+                  onClick={() => startCheckout('deposit')}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {paying ? 'Redirection…' : 'Payer acompte'}
+                </Button>
+              </div>
+            )}
 
             {error && <div className="text-sm text-red-600">{error}</div>}
           </CardContent>
