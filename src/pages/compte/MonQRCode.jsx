@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
+import { isEventFree } from '@/utils/isEventFree';
+import { loadStripe } from '@stripe/stripe-js';
+import { EmbeddedCheckout, EmbeddedCheckoutProvider } from '@stripe/react-stripe-js';
 
 const API_BASE_URL = (import.meta.env.VITE_SERVER_LAB_URL || 'https://onekamer-server-lab.onrender.com').replace(/\/$/, '');
 const API_PREFIX = `${API_BASE_URL}/api`;
@@ -25,6 +28,10 @@ const MonQRCode = () => {
   const [paying, setPaying] = useState(false);
   const [isFreeEvent, setIsFreeEvent] = useState(null); // null = inconnu, true/false connu
   const [eventInfoLoading, setEventInfoLoading] = useState(false);
+  const [pk, setPk] = useState(null);
+  const [embeddedSecret, setEmbeddedSecret] = useState(null);
+  const [showEmbedded, setShowEmbedded] = useState(false);
+  const stripePromise = useMemo(() => (pk ? loadStripe(pk) : null), [pk]);
 
   const formatMoney = (amountMinor, currency) => {
     if (typeof amountMinor !== 'number') return null;
@@ -86,12 +93,11 @@ const MonQRCode = () => {
       if (!eventId) { setIsFreeEvent(null); return; }
       setEventInfoLoading(true);
       try {
-        const res = await fetch(`${API_PREFIX}/events/${encodeURIComponent(eventId)}`, { signal: ctrl.signal });
+        const ts = Date.now();
+        const res = await fetch(`${API_PREFIX}/events/${encodeURIComponent(eventId)}?ts=${ts}`, { signal: ctrl.signal, cache: 'no-store' });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) { setIsFreeEvent(null); return; }
-        const amount = typeof data?.price_amount === 'number' ? data.price_amount : null;
-        const currency = data?.currency ? String(data.currency).toLowerCase() : null;
-        const free = !amount || amount <= 0 || !currency;
+        const free = isEventFree(data);
         setIsFreeEvent(free);
       } catch {
         setIsFreeEvent(null);
@@ -231,6 +237,45 @@ const MonQRCode = () => {
     }
   };
 
+  const ensureStripePk = async () => {
+    if (pk) return pk;
+    const res = await fetch(`${API_PREFIX}/stripe/config`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data?.publishableKey) throw new Error('Clé Stripe indisponible');
+    setPk(data.publishableKey);
+    return data.publishableKey;
+  };
+
+  const startEmbeddedCheckout = async (paymentMode) => {
+    if (!eventId) { setError("Veuillez sélectionner un événement"); return; }
+    if (!session?.access_token) { setError('Vous devez être connecté.'); return; }
+    setError(null);
+    setPaying(true);
+    try {
+      await ensureStripePk();
+      const res = await fetch(`${API_PREFIX}/events/${encodeURIComponent(eventId)}/embedded-checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ payment_mode: paymentMode }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.clientSecret) {
+        setEmbeddedSecret(data.clientSecret);
+        setShowEmbedded(true);
+        return;
+      }
+      // Fallback vers redirection Checkout si non disponible côté serveur LAB
+      await startCheckout(paymentMode);
+    } catch (e) {
+      setError(e?.message || 'Erreur interne');
+    } finally {
+      setPaying(false);
+    }
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-64">Chargement…</div>;
   }
@@ -292,14 +337,14 @@ const MonQRCode = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <Button
                   disabled={paying || eventInfoLoading}
-                  onClick={() => startCheckout('full')}
+                  onClick={() => startEmbeddedCheckout('full')}
                   className="bg-[#2BA84A] text-white w-full"
                 >
                   {paying ? 'Redirection…' : 'Payer maintenant'}
                 </Button>
                 <Button
                   disabled={paying || eventInfoLoading}
-                  onClick={() => startCheckout('deposit')}
+                  onClick={() => startEmbeddedCheckout('deposit')}
                   variant="outline"
                   className="w-full"
                 >
@@ -338,6 +383,24 @@ const MonQRCode = () => {
               )}
 
               {value && <div className="text-xs text-center text-gray-500 break-all">{value}</div>}
+            </CardContent>
+          </Card>
+        )}
+
+        {showEmbedded && embeddedSecret && stripePromise && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Paiement sécurisé</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div id="stripe-embedded-checkout" className="w-full">
+                <EmbeddedCheckoutProvider
+                  stripe={stripePromise}
+                  options={{ clientSecret: embeddedSecret }}
+                >
+                  <EmbeddedCheckout />
+                </EmbeddedCheckoutProvider>
+              </div>
             </CardContent>
           </Card>
         )}
